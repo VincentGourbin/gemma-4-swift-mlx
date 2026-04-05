@@ -47,24 +47,18 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
 
     public var maxSize: Int? { nil }
 
-    /// state retourne les K/V decompresses pour la compatibilite avec les couches KV-shared
-    /// qui lisent cache.state[0] / cache.state[1] comme des tenseurs rank-4
+    /// state retourne les normes quantisees comme proxy leger.
+    /// Les couches KV-shared detectent TurboQuantKVCache et utilisent
+    /// quantizedAttention() directement — pas de decompression.
     public var state: [MLXArray] {
         get {
-            guard let ks = currentKeyState, let vs = currentValueState,
-                  let kCodec = keyCodec, let vCodec = valueCodec else { return [] }
-            return [kCodec.dequantize(ks), vCodec.dequantize(vs)]
+            guard let ks = currentKeyState, let vs = currentValueState else { return [] }
+            // Retourner les normes comme marqueurs (le vrai acces se fait via quantizedAttention)
+            return [ks.norms, vs.norms]
         }
         set {
-            // Serialization: re-quantiser les K/V
-            guard newValue.count >= 2 else { return }
-            if keyCodec == nil {
-                ensureCodecs(keys: newValue[0], values: newValue[1])
-            }
-            keyStore = keyCodec!.quantize(newValue[0])
-            valueStore = valueCodec!.quantize(newValue[1])
-            _offset = newValue[0].dim(2)
-            invalidateCache()
+            // Serialization: pas de support pour l'instant
+            guard !newValue.isEmpty else { return }
         }
     }
 
@@ -138,8 +132,10 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
             }
         }
 
-        // Decompresser pour la compatibilite avec l'attention standard
-        return (keyCodec!.dequantize(currentKeyState!), valueCodec!.dequantize(currentValueState!))
+        // Pas de decompression — l'appelant utilise quantizedAttention() directement
+        // Retourner des tenseurs vides (le retour n'est pas utilise dans le path TurboQuant)
+        let dummy = MLXArray.zeros([1])
+        return (dummy, dummy)
     }
 
     // MARK: - Quantized Attention (fast path)
