@@ -407,25 +407,35 @@ struct ProfileSweep: AsyncParsableCommand {
 
     // Construit un prompt qui approche le nombre de tokens cible
     private func buildPrompt(targetTokens: Int, fillerText: String, container: ModelContainer) async -> String {
-        // Tokeniser le filler une fois pour connaitre sa taille
-        let fillerTokenCount = await container.perform { context in
-            context.tokenizer.encode(text: fillerText).count
-        }
-
-        guard fillerTokenCount > 0 else { return fillerText }
-
         let suffix = "\n\nBased on the above text, provide a comprehensive summary of the key themes and findings."
-        let suffixTokens = await container.perform { context in
+
+        // Tokeniser le filler et le suffix
+        let fillerTokens: [Int] = await container.perform { context in
+            context.tokenizer.encode(text: fillerText)
+        }
+        let suffixTokens: Int = await container.perform { context in
             context.tokenizer.encode(text: suffix).count
         }
 
-        let repeats = max(1, (targetTokens - suffixTokens) / fillerTokenCount)
-        var prompt = ""
-        for _ in 0 ..< repeats {
-            prompt += fillerText
+        guard !fillerTokens.isEmpty else { return fillerText + suffix }
+
+        let availableForFiller = max(1, targetTokens - suffixTokens)
+
+        if fillerTokens.count <= availableForFiller {
+            // Filler trop court : repliquer
+            let repeats = max(1, availableForFiller / fillerTokens.count)
+            var prompt = ""
+            for _ in 0 ..< repeats { prompt += fillerText }
+            prompt += suffix
+            return prompt
+        } else {
+            // Filler trop long : tronquer au nombre de tokens cible
+            let truncatedTokens = Array(fillerTokens.prefix(availableForFiller))
+            let truncatedText: String = await container.perform { context in
+                context.tokenizer.decode(tokenIds: truncatedTokens)
+            }
+            return truncatedText + suffix
         }
-        prompt += suffix
-        return prompt
     }
 }
 
