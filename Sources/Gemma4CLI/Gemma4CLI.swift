@@ -10,14 +10,99 @@ import MLXLLM
 import Tokenizers
 import HuggingFace
 
+// MARK: - Helpers
+
+/// Cree un HubClient configure pour utiliser le cache personnalise et le token HF
+func makeHubClient(token: String? = nil) -> HubClient {
+    let resolvedToken = token ?? ProcessInfo.processInfo.environment["HF_TOKEN"]
+    let cacheDir = Gemma4ModelCache.modelsDirectory
+    // Creer le repertoire cache si necessaire
+    try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
+    let cache = HubCache(cacheDirectory: cacheDir)
+    if let token = resolvedToken {
+        return HubClient(
+            host: HubClient.defaultHost,
+            bearerToken: token,
+            cache: cache
+        )
+    }
+    return HubClient(cache: cache)
+}
+
+/// Affiche un avertissement si le modele risque de depasser la RAM
+func warnIfLowRAM(modelId: String) {
+    guard let model = Gemma4Pipeline.Model(rawValue: modelId) else { return }
+    let ram = Gemma4ModelCache.systemRAMGB
+    if model.recommendedRAMGB > ram {
+        print("⚠ Attention: \(model.displayName) recommande \(model.recommendedRAMGB) Go de RAM (systeme: \(ram) Go)")
+        print("  Le chargement risque d'echouer ou d'etre tres lent.")
+    }
+}
+
 @main
 struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
-        abstract: "Test d'inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self],
+        abstract: "Inference Gemma 4 via MLX Swift",
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Profile.self],
         defaultSubcommand: Generate.self
     )
+}
+
+// MARK: - Models (liste et info)
+
+struct Models: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Liste les modeles Gemma 4 disponibles"
+    )
+
+    @Flag(name: .long, help: "Afficher uniquement les modeles recommandes pour cette machine")
+    var recommended: Bool = false
+
+    func run() {
+        let ram = Gemma4ModelCache.systemRAMGB
+        print("RAM systeme: \(ram) Go\n")
+
+        let models: [Gemma4Pipeline.Model]
+        if recommended {
+            models = Gemma4Pipeline.Model.recommended(forRAMGB: ram)
+            print("Modeles recommandes pour \(ram) Go de RAM:\n")
+        } else {
+            models = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+            print("Tous les modeles disponibles:\n")
+        }
+
+        if models.isEmpty {
+            print("  Aucun modele compatible avec \(ram) Go de RAM.")
+            return
+        }
+
+        for model in models {
+            let downloaded = Gemma4ModelCache.isDownloaded(model)
+            let status = downloaded ? " [telecharge]" : ""
+            let itBadge = model.isInstructionTuned ? "IT" : "base"
+            let moeBadge = model.isMoE ? " MoE" : ""
+            let format = model.isBF16 ? "BF16" : "4-bit"
+
+            var modalities: [String] = []
+            if model.supportsImage { modalities.append("image") }
+            if model.supportsAudio { modalities.append("audio") }
+            if model.supportsVideo { modalities.append("video") }
+            let modalitiesStr = modalities.joined(separator: "+")
+
+            print("  \(model.rawValue)\(status)")
+            print("    \(model.displayName) | \(model.parameterCount) params (\(model.effectiveParameters) effectifs) | ~\(Int(model.estimatedSizeGB)) Go | \(format) | \(itBadge)\(moeBadge) | \(modalitiesStr) | RAM min: \(model.recommendedRAMGB) Go")
+
+            if downloaded, let size = Gemma4ModelCache.diskSize(for: model) {
+                let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
+                print("    Taille sur disque: \(sizeGB) Go")
+            }
+            print()
+        }
+
+        print("Utilisation: gemma4-cli generate --model <ID> \"votre prompt\"")
+        print("Token HF: export HF_TOKEN=<votre_token> ou --hf-token <token>")
+    }
 }
 
 // MARK: - Generate (single prompt)
@@ -32,6 +117,9 @@ struct Generate: AsyncParsableCommand {
 
     @Option(name: .long, help: "Chemin local vers le modele (bypass download)")
     var modelPath: String?
+
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
 
     @Option(name: .long, help: "Prompt systeme")
     var system: String = "Tu es un assistant utile. Reponds de maniere concise."
@@ -50,7 +138,10 @@ struct Generate: AsyncParsableCommand {
         print("Enregistrement du type gemma4_text...")
         await Gemma4Registration.register()
 
-        // 2. Charger le modele
+        // 2. Warning RAM
+        warnIfLowRAM(modelId: model)
+
+        // 3. Charger le modele
         let modelSource = modelPath ?? model
         print("Chargement du modele: \(modelSource)")
         let startLoad = Date()
@@ -66,7 +157,7 @@ struct Generate: AsyncParsableCommand {
         } else {
             // Telechargement + chargement depuis HuggingFace
             container = try await loadModelContainer(
-                from: #hubDownloader(),
+                from: #hubDownloader(makeHubClient(token: hfToken)),
                 using: #huggingFaceTokenizerLoader(),
                 id: model
             ) { progress in
@@ -79,10 +170,10 @@ struct Generate: AsyncParsableCommand {
         let loadTime = Date().timeIntervalSince(startLoad)
         print("\nModele charge en \(String(format: "%.1f", loadTime))s")
 
-        // 3. Stats GPU
+        // 4. Stats GPU
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
 
-        // 4. Generer
+        // 5. Generer
         print("\n--- Generation ---")
         print("Systeme: \(system)")
         print("Prompt: \(prompt)")
@@ -132,6 +223,9 @@ struct Chat: AsyncParsableCommand {
     @Option(name: .long, help: "Chemin local vers le modele")
     var modelPath: String?
 
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
+
     @Option(name: .long, help: "Prompt systeme")
     var system: String = "Tu es un assistant utile. Reponds de maniere concise."
 
@@ -143,6 +237,7 @@ struct Chat: AsyncParsableCommand {
 
     func run() async throws {
         await Gemma4Registration.register()
+        warnIfLowRAM(modelId: model)
 
         print("Chargement de \(modelPath ?? model)...")
         let container: ModelContainer
@@ -154,7 +249,7 @@ struct Chat: AsyncParsableCommand {
             )
         } else {
             container = try await loadModelContainer(
-                from: #hubDownloader(),
+                from: #hubDownloader(makeHubClient(token: hfToken)),
                 using: #huggingFaceTokenizerLoader(),
                 id: model
             ) { progress in
@@ -202,6 +297,9 @@ struct Describe: AsyncParsableCommand {
     @Option(name: .long, help: "ID HuggingFace du modele")
     var model: String = "mlx-community/gemma-4-e2b-it-4bit"
 
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
+
     @Option(name: .long, help: "Chemin vers une image")
     var image: String?
 
@@ -229,11 +327,12 @@ struct Describe: AsyncParsableCommand {
         // 1. Enregistrer en mode multimodal
         print("Enregistrement Gemma 4 (multimodal)...")
         await Gemma4Registration.register(multimodal: true)
+        warnIfLowRAM(modelId: model)
 
         // 2. Charger le modele
         print("Chargement du modele: \(model)")
         let container = try await loadModelContainer(
-            from: #hubDownloader(),
+            from: #hubDownloader(makeHubClient(token: hfToken)),
             using: #huggingFaceTokenizerLoader(),
             id: model
         ) { progress in

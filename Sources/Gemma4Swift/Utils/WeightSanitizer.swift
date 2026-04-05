@@ -6,11 +6,17 @@ import MLX
 /// Sanitize les poids du modele pour correspondre a la structure Swift
 public enum WeightSanitizer {
 
+    /// Detecte si les poids viennent du format Google BF16 (vs MLX community pre-converti)
+    /// Les poids Google ont le prefixe "model." sur les cles
+    public static func isGoogleFormat(_ weights: [String: MLXArray]) -> Bool {
+        weights.keys.contains { $0.hasPrefix("model.") }
+    }
+
     /// Nettoie les poids charges depuis les safetensors
     /// - Supprime les prefixes "model."
     /// - Remappe "language_model.X" → "language_model.model.X"
     /// - Ignore les cles rotary_emb
-    /// - Transpose les poids Conv2d/Conv1d PyTorch → MLX
+    /// - Transpose les poids Conv2d/Conv1d PyTorch → MLX (format Google uniquement)
     /// - Split les poids MoE gate_up_proj
     public static func sanitize(
         weights: [String: MLXArray],
@@ -18,6 +24,7 @@ public enum WeightSanitizer {
         hasAudio: Bool = false,
         useClippedLinears: Bool = false
     ) -> [String: MLXArray] {
+        let isGoogle = isGoogleFormat(weights)
         var sanitized: [String: MLXArray] = [:]
 
         for (key, value) in weights {
@@ -54,8 +61,16 @@ public enum WeightSanitizer {
                 newKey = "language_model.model." + rest
             }
 
-            // Conv1d/Conv2d: les modeles MLX community ont deja les poids au bon format
-            // Pas de transposition necessaire
+            // Conv2d: transposer [out, in, H, W] → [out, H, W, in] pour les modeles Google BF16
+            // Les modeles MLX community ont deja les poids au bon format
+            if isGoogle && newKey.contains(".conv") && newKey.hasSuffix(".weight") && newValue.ndim == 4 {
+                newValue = newValue.transposed(0, 2, 3, 1)
+            }
+
+            // Conv1d: transposer [out, in, K] → [out, K, in] pour les modeles Google BF16
+            if isGoogle && newKey.contains(".conv") && newKey.hasSuffix(".weight") && newValue.ndim == 3 {
+                newValue = newValue.transposed(0, 2, 1)
+            }
 
             // MoE: experts.down_proj → experts.switch_glu.down_proj.weight
             if newKey.hasSuffix(".experts.down_proj") {
