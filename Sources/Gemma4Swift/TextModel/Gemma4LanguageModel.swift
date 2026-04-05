@@ -46,15 +46,21 @@ public class Gemma4LanguageModel: Module {
     }
 
     /// Cree les caches KV pour chaque couche concrete (non-partagee)
-    public func makeCache() -> [any KVCache] {
+    /// - Parameter kvBits: si specifie, utilise TurboQuant pour les couches full attention
+    public func makeCache(kvBits: Float? = nil) -> [any KVCache] {
         var caches: [any KVCache] = []
         let layerTypes = config.resolvedLayerTypes
         let concreteLayers = Array(layerTypes[..<config.firstKvSharedLayerIdx])
 
         for layerType in concreteLayers {
             if layerType == "full_attention" {
-                caches.append(KVCacheSimple())
+                if let bits = kvBits, bits > 0 {
+                    caches.append(TurboQuantKVCache(bits: bits))
+                } else {
+                    caches.append(KVCacheSimple())
+                }
             } else {
+                // Sliding window: toujours RotatingKVCache (taille fixe, pas besoin de compresser)
                 caches.append(MLXLMCommon.RotatingKVCache(maxSize: config.slidingWindow, keep: 0))
             }
         }

@@ -53,6 +53,9 @@ struct ProfileRun: AsyncParsableCommand {
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
+    @Option(name: .long, help: "Bits de quantisation KV cache TurboQuant (3, 4)")
+    var kvBits: Int?
+
     @Option(name: .long, help: "Repertoire de sortie pour les traces")
     var output: String?
 
@@ -71,7 +74,11 @@ struct ProfileRun: AsyncParsableCommand {
         session.maxTokens = maxTokens
 
         // 1. Chargement du modele
-        print("Profiling Gemma 4: \(modelId)")
+        if let kvBits = kvBits {
+            session.quantization = "TurboQuant \(kvBits)-bit KV"
+        }
+
+        print("Profiling Gemma 4: \(modelId)\(kvBits != nil ? " (TurboQuant \(kvBits!)-bit KV)" : "")")
         session.beginPhase("1. Model Loading", category: .modelLoad)
 
         await Gemma4Registration.register()
@@ -117,7 +124,10 @@ struct ProfileRun: AsyncParsableCommand {
 
             // 3. KV Cache allocation
             session.beginPhase("3. KV Cache Allocation", category: .kvCache)
-            let cache = context.model.newCache(parameters: nil)
+            let params = self.kvBits != nil
+                ? GenerateParameters(kvBits: self.kvBits)
+                : nil
+            let cache = context.model.newCache(parameters: params)
             session.endPhase("3. KV Cache Allocation", category: .kvCache)
 
             // 4. Prefill

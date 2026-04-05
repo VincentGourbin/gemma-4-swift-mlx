@@ -42,7 +42,8 @@ public class Gemma4LLMModel: Module, LLMModel {
     }
 
     public func newCache(parameters: GenerateParameters?) -> [any KVCache] {
-        languageModel.makeCache()
+        let kvBits: Float? = parameters?.kvBits != nil ? Float(parameters!.kvBits!) : nil
+        return languageModel.makeCache(kvBits: kvBits)
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
