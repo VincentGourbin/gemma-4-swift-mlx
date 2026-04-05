@@ -43,6 +43,7 @@ public struct Gemma4TextConfig: Codable {
     public let enableMoeBlock: Bool
     public let numExperts: Int?
     public let topKExperts: Int?
+    public let moeIntermediateSize: Int
     public let tieWordEmbeddings: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -72,6 +73,7 @@ public struct Gemma4TextConfig: Codable {
         case enableMoeBlock = "enable_moe_block"
         case numExperts = "num_experts"
         case topKExperts = "top_k_experts"
+        case moeIntermediateSize = "moe_intermediate_size"
         case tieWordEmbeddings = "tie_word_embeddings"
     }
 
@@ -103,6 +105,7 @@ public struct Gemma4TextConfig: Codable {
         enableMoeBlock = try c.decodeIfPresent(Bool.self, forKey: .enableMoeBlock) ?? false
         numExperts = try c.decodeIfPresent(Int.self, forKey: .numExperts)
         topKExperts = try c.decodeIfPresent(Int.self, forKey: .topKExperts)
+        moeIntermediateSize = try c.decodeIfPresent(Int.self, forKey: .moeIntermediateSize) ?? 0
         tieWordEmbeddings = try c.decodeIfPresent(Bool.self, forKey: .tieWordEmbeddings) ?? true
     }
 

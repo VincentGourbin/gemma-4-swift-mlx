@@ -6,7 +6,7 @@ import MLXNN
 import MLXLMCommon
 
 /// Couche decoder Gemma 4
-/// Combine: attention + MLP + per-layer input gating + layer_scalar
+/// Combine: attention + MLP (+ MoE parallele pour 26B-A4B) + per-layer input gating + layer_scalar
 public class Gemma4DecoderLayer: Module {
     let config: Gemma4TextConfig
     let layerIdx: Int
@@ -20,6 +20,13 @@ public class Gemma4DecoderLayer: Module {
     @ModuleInfo(key: "post_attention_layernorm") var postAttentionLayernorm: RMSNorm
     @ModuleInfo(key: "pre_feedforward_layernorm") var preFeedforwardLayernorm: RMSNorm
     @ModuleInfo(key: "post_feedforward_layernorm") var postFeedforwardLayernorm: RMSNorm
+
+    // MoE (26B-A4B) : MLP dense + experts en parallele
+    @ModuleInfo(key: "router") var router: Gemma4Router?
+    @ModuleInfo(key: "experts") var experts: Gemma4Experts?
+    @ModuleInfo(key: "post_feedforward_layernorm_1") var postFeedforwardLayernorm1: RMSNorm?
+    @ModuleInfo(key: "pre_feedforward_layernorm_2") var preFeedforwardLayernorm2: RMSNorm?
+    @ModuleInfo(key: "post_feedforward_layernorm_2") var postFeedforwardLayernorm2: RMSNorm?
 
     // Per-layer input gating (modeles 2B/4B)
     @ModuleInfo(key: "per_layer_input_gate") var perLayerInputGate: Linear?
@@ -43,6 +50,21 @@ public class Gemma4DecoderLayer: Module {
         self._postAttentionLayernorm.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
         self._preFeedforwardLayernorm.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
         self._postFeedforwardLayernorm.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
+
+        // MoE : router + experts + 3 layernorms supplementaires
+        if enableMoe {
+            self._router.wrappedValue = Gemma4Router(config)
+            self._experts.wrappedValue = Gemma4Experts(config)
+            self._postFeedforwardLayernorm1.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
+            self._preFeedforwardLayernorm2.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
+            self._postFeedforwardLayernorm2.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)
+        } else {
+            self._router.wrappedValue = nil
+            self._experts.wrappedValue = nil
+            self._postFeedforwardLayernorm1.wrappedValue = nil
+            self._preFeedforwardLayernorm2.wrappedValue = nil
+            self._postFeedforwardLayernorm2.wrappedValue = nil
+        }
 
         // Per-layer input gating (si le modele a des per-layer inputs)
         if hiddenSizePerLayerInput > 0 {
@@ -74,10 +96,34 @@ public class Gemma4DecoderLayer: Module {
         h = postAttentionLayernorm(h)
         h = residual + h
 
-        // MLP
+        // Feedforward : MLP dense (+ MoE experts en parallele si 26B-A4B)
         residual = h
-        h = preFeedforwardLayernorm(h)
-        h = mlp(h)
+
+        if enableMoe,
+           let router = router,
+           let experts = experts,
+           let norm1 = postFeedforwardLayernorm1,
+           let preNorm2 = preFeedforwardLayernorm2,
+           let postNorm2 = postFeedforwardLayernorm2 {
+            // Branche 1 : MLP dense
+            var h1 = preFeedforwardLayernorm(h)
+            h1 = mlp(h1)
+            h1 = norm1(h1)
+
+            // Branche 2 : MoE experts
+            let (topKIndices, topKWeights) = router(h)
+            var h2 = preNorm2(h)
+            h2 = experts(h2, topKIndices: topKIndices, topKWeights: topKWeights)
+            h2 = postNorm2(h2)
+
+            // Combiner les deux branches
+            h = h1 + h2
+        } else {
+            // MLP simple (E2B, E4B, 31B)
+            h = preFeedforwardLayernorm(h)
+            h = mlp(h)
+        }
+
         h = postFeedforwardLayernorm(h)
         h = residual + h
 
