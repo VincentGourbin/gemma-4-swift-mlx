@@ -44,7 +44,7 @@ struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
         abstract: "Inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self, Models.self],
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Profile.self],
         defaultSubcommand: Generate.self
     )
 }
