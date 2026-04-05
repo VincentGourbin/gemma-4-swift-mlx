@@ -2,6 +2,7 @@
 
 import Foundation
 import MLX
+import MLXFast
 import MLXNN
 import MLXLMCommon
 
@@ -84,7 +85,7 @@ public class Gemma4DecoderLayer: Module {
 
     public func callAsFunction(
         _ x: MLXArray,
-        mask: MLXArray? = nil,
+        mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
         cache: KVCache? = nil,
         perLayerInput: MLXArray? = nil
     ) -> MLXArray {

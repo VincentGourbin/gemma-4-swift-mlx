@@ -24,14 +24,12 @@ public class Gemma4LanguageModel: Module {
     public func callAsFunction(
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
-        mask: MLXArray? = nil,
         cache: [KVCache?]? = nil,
         perLayerInputs: MLXArray? = nil
     ) -> MLXArray {
         var out = model(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
-            mask: mask,
             cache: cache,
             perLayerInputs: perLayerInputs
         )
