@@ -1,0 +1,23 @@
+{
+  "name": "TurboQuant Context Sweep",
+  "description": "Benchmark TurboQuant vs Standard KV cache at increasing context lengths. Finds the crossover point where TurboQuant becomes advantageous in memory and/or throughput.",
+  "generated_tokens": 200,
+  "context_sizes": [500, 1000, 2000, 4000, 8000, 16000],
+  "kv_configs": [
+    {"name": "Standard", "kv_bits": 0},
+    {"name": "TQ 4-bit", "kv_bits": 4},
+    {"name": "TQ 3-bit", "kv_bits": 3}
+  ],
+  "models": [
+    {"name": "E2B BF16", "path": "~/Library/Caches/models/google/gemma-4-E2B-it"},
+    {"name": "26B-A4B BF16", "path": "~/Library/Caches/models/google/gemma-4-26B-A4B-it"}
+  ],
+  "base_prompt": "Based on the above document, provide a comprehensive summary of the key themes and findings.",
+  "filler_text_source": "docs/examples/turboquant_paper.txt",
+  "notes": [
+    "context_sizes are approximate target token counts (actual depends on tokenizer)",
+    "kv_bits=0 means standard KV cache (no TurboQuant)",
+    "filler_text_source is replicated to reach target context size",
+    "Run with: gemma4-cli profile sweep --scenarios docs/benchmarks/scenarios.json"
+  ]
+}

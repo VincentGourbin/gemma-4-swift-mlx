@@ -107,7 +107,9 @@ public struct ChromeTraceExporter {
                 "model": session.modelVariant,
                 "quantization": session.quantization,
                 "prompt_tokens": session.promptTokenCount,
+                "generated_tokens": session.generatedTokenCount,
                 "max_tokens": session.maxTokens,
+                "kv_bits": session.kvBits as Any,
                 "session_id": session.sessionId,
             ] as [String: Any],
         ])

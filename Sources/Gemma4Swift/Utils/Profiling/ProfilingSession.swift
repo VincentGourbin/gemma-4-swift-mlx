@@ -16,6 +16,8 @@ public final class ProfilingSession: @unchecked Sendable {
     public var quantization: String = ""
     public var promptTokenCount: Int = 0
     public var maxTokens: Int = 0
+    public var generatedTokenCount: Int = 0
+    public var kvBits: Float? = nil
 
     private var events: [ProfilingEvent] = []
     private var memoryTimeline: [MemoryTimelineEntry] = []
@@ -250,7 +252,9 @@ public final class ProfilingSession: @unchecked Sendable {
         """
 
         report += "  Model: \(modelVariant)  Quant: \(quantization)\n"
-        report += "  Prompt tokens: \(promptTokenCount)  Max tokens: \(maxTokens)\n"
+        let kvDesc = kvBits != nil ? "TurboQuant \(kvBits!)-bit" : "Standard"
+        report += "  KV Cache: \(kvDesc)  Context: \(promptTokenCount) tokens\n"
+        report += "  Generated: \(generatedTokenCount)/\(maxTokens) tokens\n"
         report += "  Device: \(deviceArchitecture)  RAM: \(systemRAMGB)GB\n\n"
 
         report += "  PHASE TIMINGS\n"
