@@ -145,6 +145,7 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
     // MARK: - Quantized Attention (fast path)
 
     /// Attention directe sur K/V quantises (sans decompression complete)
+    /// Utilise le kernel fusionne si possible (single-token decode, D multiple de 32)
     public func quantizedAttention(
         queries: MLXArray,
         scale: Float = 1.0,
@@ -163,6 +164,31 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         let nRepeats = nQHeads / nKVHeads
 
         let groupedQueries = (queries * scale).reshaped(B, nKVHeads, nRepeats, L, D)
+
+        // Fast path: fused Metal kernel pour single-token decode
+        if L == 1 && D >= 32 && D % 32 == 0 {
+            let qRot = kCodec.prepareQueries(groupedQueries)
+            // Flatten: [B, nKVHeads, nRepeats, 1, D] → [B*nQHeads, D]
+            let qFlat = qRot.reshaped(B * nQHeads, D)
+
+            if let fusedOut = fusedMSEDecode(
+                queries: qFlat,
+                keyState: ks,
+                valueState: vs,
+                keyBits: kCodec.bits,
+                valBits: vCodec.bits,
+                keyCodebook: kCodec.codebook,
+                valCodebook: vCodec.codebook,
+                nRepeats: nRepeats
+            ) {
+                // Output est en espace tourne — appliquer rotation inverse des values
+                let outRotated = fusedOut.reshaped(B, nKVHeads, nRepeats, D)
+                let output = vCodec.rotateInverse(outRotated)
+                return output.reshaped(B, nQHeads, L, D).asType(queries.dtype)
+            }
+        }
+
+        // Fallback: MLX pur (prefill ou dimensions non-alignees)
         let preparedQueries = kCodec.prepareQueries(groupedQueries)
         let scores = kCodec.scorePrepared(preparedQueries, state: ks)
         let output = vCodec.weightedSumFromScores(scores, state: vs)

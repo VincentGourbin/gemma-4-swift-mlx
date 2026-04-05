@@ -143,7 +143,23 @@ public class Gemma4Attention: Module {
         queries = rope(queries, offset: offset)
         keys = rope(keys, offset: offset)
 
-        // attentionWithCacheUpdate() gere l'update du cache + dispatch quantized/standard
+        // TurboQuant path: quantise les K/V puis attention directe sur les donnees quantisees
+        if let turboCache = cache as? TurboQuantKVCache {
+            // Stocker les K/V quantises (update le cache)
+            let _ = turboCache.update(keys: keys, values: values)
+
+            // Attention fusionnee directement sur les K/V compresses
+            let output = turboCache.quantizedAttention(
+                queries: queries,
+                scale: scale,
+                mask: mask
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            return oProj(output)
+        }
+
+        // Standard path: attentionWithCacheUpdate() gere l'update du cache
         let output = attentionWithCacheUpdate(
             queries: queries,
             keys: keys,
