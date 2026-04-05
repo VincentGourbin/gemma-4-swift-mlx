@@ -108,7 +108,9 @@ public class Gemma4Attention: Module {
 
         var keys: MLXArray
         var values: MLXArray
-        let offset: Int
+
+        // Lire l'offset AVANT que attentionWithCacheUpdate() l'incremente
+        let offset = cache?.offset ?? 0
 
         if isKvSharedLayer, let cache = cache {
             // Couche partagee: reutiliser le cache existant
@@ -116,7 +118,6 @@ public class Gemma4Attention: Module {
             if state.count >= 2 {
                 keys = state[0]
                 values = state[1]
-                offset = cache.offset
                 // Appliquer RoPE aux queries avec le bon offset
                 queries = rope(queries, offset: offset)
 
@@ -132,13 +133,15 @@ public class Gemma4Attention: Module {
                 .reshaped(B, L, -1)
                 return oProj(output)
             } else {
-                (keys, values, offset) = computeKV(x: x, B: B, L: L)
+                (keys, values) = computeKV(x: x, B: B, L: L)
             }
         } else {
-            (keys, values, offset) = computeKV(x: x, B: B, L: L)
+            (keys, values) = computeKV(x: x, B: B, L: L)
         }
 
+        // Appliquer RoPE aux queries ET aux keys avec le bon offset (position reelle dans la sequence)
         queries = rope(queries, offset: offset)
+        keys = rope(keys, offset: offset)
 
         // attentionWithCacheUpdate() gere l'update du cache + dispatch quantized/standard
         let output = attentionWithCacheUpdate(
@@ -157,7 +160,7 @@ public class Gemma4Attention: Module {
 
     private func computeKV(
         x: MLXArray, B: Int, L: Int
-    ) -> (keys: MLXArray, values: MLXArray, offset: Int) {
+    ) -> (keys: MLXArray, values: MLXArray) {
         var keys = kProj(x).reshaped(B, L, numKVHeads, headDim)
 
         // K=V: values sont le raw k_proj output (avant k_norm)
@@ -172,9 +175,9 @@ public class Gemma4Attention: Module {
         values = vNorm(values)
         values = values.transposed(0, 2, 1, 3)
 
+        // RoPE est applique par l'appelant avec l'offset correct du cache
         keys = keys.transposed(0, 2, 1, 3)
-        keys = rope(keys, offset: 0)
 
-        return (keys, values, 0)
+        return (keys, values)
     }
 }
