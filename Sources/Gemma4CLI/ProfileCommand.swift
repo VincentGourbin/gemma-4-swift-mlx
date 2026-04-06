@@ -9,6 +9,7 @@ import MLXLMCommon
 import MLXLLM
 import HuggingFace
 import Tokenizers
+import SQLite3
 
 struct Profile: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -224,7 +225,7 @@ struct ProfileSweep: AsyncParsableCommand {
     @Option(name: .long, help: "Fichier texte pour remplir le contexte")
     var fillerText: String?
 
-    @Option(name: .long, help: "Fichier CSV de sortie")
+    @Option(name: .long, help: "Fichier JSONL de sortie (append-safe, reprend ou il en etait)")
     var output: String?
 
     func run() async throws {
@@ -283,18 +284,12 @@ struct ProfileSweep: AsyncParsableCommand {
         print("  RAM systeme: \(systemRAMGB) Go (unified memory)")
         print()
 
-        // Resultats
-        struct SweepResult {
-            let contextTokens: Int
-            let kvBits: Int
-            let kvConfigName: String
-            let throughput: Double
-            let ttftMs: Double
-            let peakMLXMB: Double
-            let peakProcessMB: Double
-            let generatedTokens: Int
+        // Base SQLite pour les resultats (resume-safe, queryable)
+        let db = output != nil ? SweepDatabase(path: output!) : nil
+        let completedRuns = db?.loadCompletedRuns(model: modelName) ?? []
+        if !completedRuns.isEmpty {
+            print("  Reprise: \(completedRuns.count) runs deja effectues, skip")
         }
-        var results: [SweepResult] = []
 
         // Lire le max context et la memoire
         let maxCtx = await container.perform { context -> Int in
@@ -339,6 +334,16 @@ struct ProfileSweep: AsyncParsableCommand {
             }
 
             for kvBits in kvConfigs {
+                // Reprise : skip si deja fait (tolerance 10% sur la taille du contexte)
+                let alreadyDone = completedRuns.contains { r in
+                    r.kvBits == kvBits && abs(r.contextTokens - targetSize) < max(50, targetSize / 10)
+                }
+                if alreadyDone {
+                    let cfgLabel = kvBits > 0 ? "TQ \(kvBits)-bit" : "Standard"
+                    print("  \(String(format: "%7d", targetSize))    \(cfgLabel.padding(toLength: 12, withPad: " ", startingAt: 0))  [deja fait, skip]")
+                    continue
+                }
+
                 // Construire le prompt pour atteindre la taille cible
                 let prompt = await buildPrompt(
                     targetTokens: targetSize,
@@ -412,27 +417,31 @@ struct ProfileSweep: AsyncParsableCommand {
                 let peakMLX = timeline.map(\.mlxActiveMB).max() ?? 0
                 let peakProcess = timeline.map(\.processFootprintMB).max() ?? 0
 
-                let result = SweepResult(
+                // Inserer dans la base SQLite (transactionnel, resume-safe)
+                db?.insert(
+                    model: modelName,
                     contextTokens: tokenIds.count,
+                    generatedTokens: genTokens.count,
+                    totalTokens: tokenIds.count + genTokens.count,
                     kvBits: kvBits,
                     kvConfigName: configName,
                     throughput: throughput,
                     ttftMs: prefillMs,
                     peakMLXMB: peakMLX,
                     peakProcessMB: peakProcess,
-                    generatedTokens: genTokens.count
+                    deviceArchitecture: GPU.deviceInfo().architecture,
+                    systemRAMGB: Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
                 )
-                results.append(result)
 
                 // Afficher la ligne
-                let ctxStr = String(format: "%7d", result.contextTokens)
+                let ctxStr = String(format: "%7d", tokenIds.count)
                 let cfgStr = configName.padding(toLength: 12, withPad: " ", startingAt: 0)
-                let tpsStr = String(format: "%7.1f", result.throughput)
-                let ttftStr = formatSweepMs(result.ttftMs)
-                let mlxStr = String(format: "%8.1f Go", result.peakMLXMB / 1024)
-                let procStr = String(format: "%8.1f Go", result.peakProcessMB / 1024)
-                let genStr = String(format: "%4d", result.generatedTokens)
-                let totalStr = String(format: "%6d", result.contextTokens + result.generatedTokens)
+                let tpsStr = String(format: "%7.1f", throughput)
+                let ttftStr = formatSweepMs(prefillMs)
+                let mlxStr = String(format: "%8.1f Go", peakMLX / 1024)
+                let procStr = String(format: "%8.1f Go", peakProcess / 1024)
+                let genStr = String(format: "%4d", genTokens.count)
+                let totalStr = String(format: "%6d", tokenIds.count + genTokens.count)
                 print("  \(ctxStr)    \(cfgStr)  \(tpsStr)   \(ttftStr)  \(mlxStr)  \(procStr)  \(genStr)  \(totalStr)")
 
                 // Liberer le cache GPU entre les runs
@@ -443,17 +452,11 @@ struct ProfileSweep: AsyncParsableCommand {
         print("  \(separator)")
         print("\u{2570}\(separator)\u{256F}")
 
-        // Export CSV
-        if let csvPath = output {
-            var csv = "model,context_tokens,generated_tokens,total_tokens,kv_config,kv_bits,throughput_toks,ttft_ms,peak_mlx_mb,peak_process_mb\n"
-            for r in results {
-                let total = r.contextTokens + r.generatedTokens
-                csv += "\(modelName),\(r.contextTokens),\(r.generatedTokens),\(total),\(r.kvConfigName),\(r.kvBits),"
-                csv += "\(String(format: "%.1f", r.throughput)),\(String(format: "%.1f", r.ttftMs)),"
-                csv += "\(String(format: "%.1f", r.peakMLXMB)),\(String(format: "%.1f", r.peakProcessMB))\n"
-            }
-            try csv.write(toFile: csvPath, atomically: true, encoding: .utf8)
-            print("\nCSV: \(csvPath)")
+        // Résumé
+        if let outputPath = output {
+            let count = db?.totalCount() ?? 0
+            print("\nSQLite: \(outputPath) (\(count) runs total)")
+            print("Query: sqlite3 \(outputPath) \"SELECT * FROM sweep_results ORDER BY context_tokens, kv_bits\"")
         }
     }
 
@@ -496,5 +499,113 @@ private func formatSweepMs(_ ms: Double) -> String {
         return String(format: "%7.0fms", ms)
     } else {
         return String(format: "%6.1fs ", ms / 1000)
+    }
+}
+
+// MARK: - SQLite Storage for Sweep Results
+
+/// Base SQLite pour stocker les resultats de benchmark (resume-safe, queryable)
+final class SweepDatabase {
+    private var db: OpaquePointer?
+
+    struct CompletedRun {
+        let contextTokens: Int
+        let kvBits: Int
+    }
+
+    init(path: String) {
+        guard sqlite3_open(path, &db) == SQLITE_OK else {
+            print("  ⚠ SQLite: impossible d'ouvrir \(path)")
+            return
+        }
+        createTable()
+    }
+
+    deinit {
+        sqlite3_close(db)
+    }
+
+    private func createTable() {
+        let sql = """
+            CREATE TABLE IF NOT EXISTS sweep_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model TEXT NOT NULL,
+                context_tokens INTEGER NOT NULL,
+                generated_tokens INTEGER NOT NULL,
+                total_tokens INTEGER NOT NULL,
+                kv_bits INTEGER NOT NULL,
+                kv_config_name TEXT NOT NULL,
+                throughput_toks REAL NOT NULL,
+                ttft_ms REAL NOT NULL,
+                peak_mlx_mb REAL NOT NULL,
+                peak_process_mb REAL NOT NULL,
+                device_architecture TEXT NOT NULL,
+                system_ram_gb INTEGER NOT NULL,
+                timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """
+        exec(sql)
+    }
+
+    func insert(
+        model: String, contextTokens: Int, generatedTokens: Int, totalTokens: Int,
+        kvBits: Int, kvConfigName: String, throughput: Double, ttftMs: Double,
+        peakMLXMB: Double, peakProcessMB: Double, deviceArchitecture: String, systemRAMGB: Int
+    ) {
+        let sql = """
+            INSERT INTO sweep_results
+            (model, context_tokens, generated_tokens, total_tokens, kv_bits, kv_config_name,
+             throughput_toks, ttft_ms, peak_mlx_mb, peak_process_mb, device_architecture, system_ram_gb)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (model as NSString).utf8String, -1, nil)
+        sqlite3_bind_int(stmt, 2, Int32(contextTokens))
+        sqlite3_bind_int(stmt, 3, Int32(generatedTokens))
+        sqlite3_bind_int(stmt, 4, Int32(totalTokens))
+        sqlite3_bind_int(stmt, 5, Int32(kvBits))
+        sqlite3_bind_text(stmt, 6, (kvConfigName as NSString).utf8String, -1, nil)
+        sqlite3_bind_double(stmt, 7, throughput)
+        sqlite3_bind_double(stmt, 8, ttftMs)
+        sqlite3_bind_double(stmt, 9, peakMLXMB)
+        sqlite3_bind_double(stmt, 10, peakProcessMB)
+        sqlite3_bind_text(stmt, 11, (deviceArchitecture as NSString).utf8String, -1, nil)
+        sqlite3_bind_int(stmt, 12, Int32(systemRAMGB))
+
+        sqlite3_step(stmt)
+    }
+
+    /// Charge les runs deja effectues pour un modele (pour la reprise)
+    func loadCompletedRuns(model: String) -> [CompletedRun] {
+        let sql = "SELECT context_tokens, kv_bits FROM sweep_results WHERE model = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (model as NSString).utf8String, -1, nil)
+
+        var runs: [CompletedRun] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            runs.append(CompletedRun(
+                contextTokens: Int(sqlite3_column_int(stmt, 0)),
+                kvBits: Int(sqlite3_column_int(stmt, 1))
+            ))
+        }
+        return runs
+    }
+
+    func totalCount() -> Int {
+        let sql = "SELECT COUNT(*) FROM sweep_results"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int(stmt, 0)) : 0
+    }
+
+    private func exec(_ sql: String) {
+        sqlite3_exec(db, sql, nil, nil, nil)
     }
 }

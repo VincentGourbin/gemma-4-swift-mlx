@@ -10,7 +10,7 @@ import MLXLLM
 /// Modele Gemma 4 multimodal complet (texte + vision + audio)
 /// Conforme a LLMModel pour l'enregistrement dans mlx-swift-lm.
 public class Gemma4MultimodalLLMModel: Module, LLMModel {
-    let config: Gemma4Config
+    public let config: Gemma4Config
 
     @ModuleInfo(key: "language_model") var languageModel: Gemma4LanguageModel
     @ModuleInfo(key: "vision_tower") var visionTower: VisionModel

@@ -113,7 +113,7 @@ for entry in "${MODELS[@]}"; do
         --kv-bits-list "$KV_BITS" \
         --generated-tokens "$GEN_TOKENS" \
         $FILLER_ARG \
-        --output "$RESULTS_DIR/${shortcut}_sweep_${TIMESTAMP}.csv" \
+        --output "$RESULTS_DIR/sweep_${TIMESTAMP}.sqlite" \
     || echo "  ⚠ Sweep interrompu (probablement OOM sur grands contextes)"
 
     echo ""
@@ -135,5 +135,7 @@ echo "  Benchmark termine!"
 echo "  Modeles testes: $((CURRENT - SKIPPED))/$TOTAL_MODELS (${SKIPPED} skip RAM)"
 echo "  Resultats dans: $RESULTS_DIR/"
 echo ""
-ls -lh "$RESULTS_DIR"/*_${TIMESTAMP}.csv 2>/dev/null || echo "  (aucun CSV)"
+ls -lh "$RESULTS_DIR"/sweep_${TIMESTAMP}.sqlite 2>/dev/null || echo "  (aucune base)"
+echo ""
+echo "  Query: sqlite3 $RESULTS_DIR/sweep_${TIMESTAMP}.sqlite \"SELECT model, context_tokens, kv_config_name, throughput_toks, peak_mlx_mb FROM sweep_results ORDER BY model, context_tokens, kv_bits\""
 echo "============================================================"

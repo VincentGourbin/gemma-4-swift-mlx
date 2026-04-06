@@ -44,7 +44,7 @@ struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
         abstract: "Inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Profile.self],
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self],
         defaultSubcommand: Generate.self
     )
 }
@@ -102,6 +102,152 @@ struct Models: ParsableCommand {
 
         print("Utilisation: gemma4-cli generate --model <ID> \"votre prompt\"")
         print("Token HF: export HF_TOKEN=<votre_token> ou --hf-token <token>")
+    }
+}
+
+// MARK: - Download
+
+struct Download: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Telecharge un ou plusieurs modeles Gemma 4"
+    )
+
+    @Argument(help: "IDs des modeles a telecharger (ex: e2b-4bit e4b-8bit 31b-4bit), ou 'all' pour tout telecharger")
+    var modelIds: [String] = []
+
+    @Flag(name: .long, help: "Telecharger tous les modeles disponibles")
+    var all: Bool = false
+
+    @Flag(name: .long, help: "Telecharger uniquement les modeles recommandes pour cette machine")
+    var recommended: Bool = false
+
+    @Option(name: .long, help: "Token HuggingFace (pour modeles prives)")
+    var hfToken: String?
+
+    @Flag(name: .long, help: "Forcer le re-telechargement meme si deja present")
+    var force: Bool = false
+
+    /// Mappe les raccourcis vers les IDs complets
+    static let shortcuts: [String: String] = [
+        // E2B
+        "e2b-4bit": "mlx-community/gemma-4-e2b-it-4bit",
+        "e2b-6bit": "mlx-community/gemma-4-e2b-it-6bit",
+        "e2b-8bit": "mlx-community/gemma-4-e2b-it-8bit",
+        "e2b-bf16": "mlx-community/gemma-4-e2b-it-bf16",
+        // E4B
+        "e4b-4bit": "mlx-community/gemma-4-e4b-it-4bit",
+        "e4b-6bit": "mlx-community/gemma-4-e4b-it-6bit",
+        "e4b-8bit": "mlx-community/gemma-4-e4b-it-8bit",
+        "e4b-bf16": "mlx-community/gemma-4-e4b-it-bf16",
+        // 31B
+        "31b-4bit": "mlx-community/gemma-4-31b-it-4bit",
+        "31b-6bit": "mlx-community/gemma-4-31b-it-6bit",
+        "31b-8bit": "mlx-community/gemma-4-31b-it-8bit",
+        "31b-bf16": "mlx-community/gemma-4-31b-it-bf16",
+        // 26B-A4B
+        "a4b-4bit": "mlx-community/gemma-4-26b-a4b-it-4bit",
+        "a4b-6bit": "mlx-community/gemma-4-26b-a4b-it-6bit",
+        "a4b-8bit": "mlx-community/gemma-4-26b-a4b-it-8bit",
+        "a4b-bf16": "mlx-community/gemma-4-26b-a4b-it-bf16",
+    ]
+
+    func run() async throws {
+        let modelsToDownload: [Gemma4Pipeline.Model]
+
+        if all {
+            modelsToDownload = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+        } else if recommended {
+            let ram = Gemma4ModelCache.systemRAMGB
+            modelsToDownload = Gemma4Pipeline.Model.recommended(forRAMGB: ram)
+            print("Modeles recommandes pour \(ram) Go de RAM:")
+        } else if !modelIds.isEmpty {
+            var resolved: [Gemma4Pipeline.Model] = []
+            for id in modelIds {
+                let fullId = Self.shortcuts[id.lowercased()] ?? id
+                if let model = Gemma4Pipeline.Model(rawValue: fullId) {
+                    resolved.append(model)
+                } else {
+                    print("Modele inconnu: \(id)")
+                    print("  Raccourcis: \(Self.shortcuts.keys.sorted().joined(separator: ", "))")
+                    throw ExitCode.failure
+                }
+            }
+            modelsToDownload = resolved
+        } else {
+            print("Specifiez des modeles, --all, ou --recommended")
+            print("Raccourcis: \(Self.shortcuts.keys.sorted().joined(separator: ", "))")
+            print("Exemple: gemma4-cli download e2b-4bit e4b-4bit")
+            throw ExitCode.failure
+        }
+
+        // Estimation taille totale
+        let totalGB = modelsToDownload.reduce(Float(0)) { $0 + $1.estimatedSizeGB }
+        let alreadyDownloaded = modelsToDownload.filter { Gemma4ModelCache.isDownloaded($0) }
+        let toDownload = force ? modelsToDownload : modelsToDownload.filter { !Gemma4ModelCache.isDownloaded($0) }
+
+        print("\n\(modelsToDownload.count) modeles selectionnes (~\(Int(totalGB)) Go total)")
+        if !alreadyDownloaded.isEmpty && !force {
+            print("\(alreadyDownloaded.count) deja telecharges (utiliser --force pour re-telecharger)")
+        }
+        print("\(toDownload.count) a telecharger\n")
+
+        if toDownload.isEmpty {
+            print("Rien a telecharger.")
+            return
+        }
+
+        // Enregistrer les types pour le chargement
+        await Gemma4Registration.register(multimodal: true)
+
+        // Telecharger sequentiellement
+        for (i, model) in toDownload.enumerated() {
+            print("[\(i + 1)/\(toDownload.count)] \(model.displayName) (~\(Int(model.estimatedSizeGB)) Go)")
+            print("  ID: \(model.rawValue)")
+
+            let startTime = Date()
+            var lastPct = -1
+
+            do {
+                let hub = makeHubClient(token: hfToken)
+                // Decomposer l'ID en namespace/name
+                let parts = model.rawValue.split(separator: "/")
+                let repoId = Repo.ID(namespace: String(parts[0]), name: String(parts[1]))
+                let destDir = Gemma4ModelCache.modelsDirectory
+                    .appendingPathComponent(String(parts[0]))
+                    .appendingPathComponent(String(parts[1]))
+                try? FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
+
+                let _ = try await hub.downloadSnapshot(
+                    of: repoId,
+                    to: destDir,
+                    matching: ["*.safetensors", "*.json", "*.jinja", "*.txt"]
+                ) { progress in
+                    let pct = Int(progress.fractionCompleted * 100)
+                    if pct != lastPct {
+                        lastPct = pct
+                        print("\r  Progression: \(pct)%", terminator: "")
+                        fflush(stdout)
+                    }
+                }
+
+                let elapsed = Date().timeIntervalSince(startTime)
+                print("\r  Termine en \(String(format: "%.0f", elapsed))s")
+
+                // Verifier
+                if Gemma4ModelCache.isDownloaded(model) {
+                    if let size = Gemma4ModelCache.diskSize(for: model) {
+                        let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
+                        print("  Taille: \(sizeGB) Go")
+                    }
+                }
+            } catch {
+                print("\r  ERREUR: \(error.localizedDescription)")
+                print("  Verifiez votre token HF: export HF_TOKEN=<token> ou --hf-token <token>")
+            }
+            print()
+        }
+
+        print("Telechargement termine.")
     }
 }
 
