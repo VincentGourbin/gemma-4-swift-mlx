@@ -26,8 +26,10 @@ public final class TurboQuantMSECodec: @unchecked Sendable {
     public init(dim: Int, bits: Int, seed: UInt64) {
         self.dim = dim
         self.bits = bits
-        // RHT pour les dimensions power-of-2 (plus rapide)
-        self.useRHT = dim > 0 && isPowerOfTwo(dim)
+        // RHT desactive — le butterfly Swift ne produit pas les bons resultats.
+        // La rotation dense est mathematiquement correcte pour toutes les dimensions.
+        // TODO: reimplementer le WHT via Metal kernel pour O(D log D)
+        self.useRHT = false
 
         if useRHT {
             self.signs = turboQuantRHTSignVector(dim: dim, seed: seed)
@@ -75,6 +77,7 @@ public final class TurboQuantMSECodec: @unchecked Sendable {
         for m in 0 ..< midpoints.shape[0] {
             indices = indices + (rotated .> midpoints[m]).asType(.uint32)
         }
+        eval(indices)
         return turboQuantPackLowbit(indices, bits: bits)
     }
 
@@ -91,6 +94,7 @@ public final class TurboQuantMSECodec: @unchecked Sendable {
         for m in 0 ..< midpoints.shape[0] {
             indices = indices + (rotated .> midpoints[m]).asType(.uint32)
         }
+        eval(indices)
         let packed = turboQuantPackLowbit(indices, bits: bits)
         let estimatedRotated = codebook[indices.asType(.int32)]
         return (packed, rotateInverse(estimatedRotated))
