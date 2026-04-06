@@ -14,23 +14,24 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Configs
 CONTEXT_SIZES="500,8000,16000,32000,64000,96000"
-KV_BITS="0,4,3"
 GEN_TOKENS=200
 
-# Modeles a benchmarker (shortcut|display_name|estimated_gb)
+# Modeles a benchmarker (shortcut|display_name|estimated_gb|kv_bits)
+# kv_bits: TurboQuant ne vaut le coup que sur 26B-A4B et 31B (assez de couches full attention)
+# E2B/E4B: standard uniquement (overhead TQ > gain compression)
 MODELS=(
-    "e2b-4bit|E2B 4-bit|3.6"
-    "e2b-8bit|E2B 8-bit|5.2"
-    "e2b-bf16|E2B BF16|10.0"
-    "e4b-4bit|E4B 4-bit|5.0"
-    "e4b-8bit|E4B 8-bit|8.0"
-    "e4b-bf16|E4B BF16|19.0"
-    "a4b-4bit|26B-A4B 4-bit|14.0"
-    "a4b-8bit|26B-A4B 8-bit|27.0"
-    "a4b-bf16|26B-A4B BF16|52.0"
-    "31b-4bit|31B 4-bit|17.0"
-    "31b-8bit|31B 8-bit|33.0"
-    "31b-bf16|31B BF16|63.0"
+    "e2b-4bit|E2B 4-bit|3.6|0"
+    "e2b-8bit|E2B 8-bit|5.2|0"
+    "e2b-bf16|E2B BF16|10.0|0"
+    "e4b-4bit|E4B 4-bit|5.0|0"
+    "e4b-8bit|E4B 8-bit|8.0|0"
+    "e4b-bf16|E4B BF16|19.0|0"
+    "a4b-4bit|26B-A4B 4-bit|14.0|0,4,3"
+    "a4b-8bit|26B-A4B 8-bit|27.0|0,4,3"
+    "a4b-bf16|26B-A4B BF16|52.0|0,4,3"
+    "31b-4bit|31B 4-bit|17.0|0,4,3"
+    "31b-8bit|31B 8-bit|33.0|0,4,3"
+    "31b-bf16|31B BF16|63.0|0,4,3"
 )
 
 mkdir -p "$RESULTS_DIR"
@@ -52,7 +53,7 @@ echo "============================================================"
 echo "  TurboQuant Context Sweep — $(date)"
 echo "  RAM: ${RAM_GB} Go"
 echo "  Context sizes: $CONTEXT_SIZES"
-echo "  KV configs: $KV_BITS (0=Standard)"
+echo "  KV configs: Standard only for E2B/E4B, Standard+TQ4+TQ3 for 26B/31B"
 echo "  Tokens a generer: $GEN_TOKENS"
 echo "  Mode: download → benchmark → delete"
 echo "============================================================"
@@ -69,7 +70,7 @@ CURRENT=0
 SKIPPED=0
 
 for entry in "${MODELS[@]}"; do
-    IFS='|' read -r shortcut display_name size_gb <<< "$entry"
+    IFS='|' read -r shortcut display_name size_gb kv_bits <<< "$entry"
     CURRENT=$((CURRENT + 1))
 
     # Verifier si le modele tient en RAM (avec marge 30%)
@@ -126,7 +127,7 @@ for entry in "${MODELS[@]}"; do
     "$CLI" profile sweep \
         --model-path "$MODEL_PATH" \
         --context-sizes "$CONTEXT_SIZES" \
-        --kv-bits-list "$KV_BITS" \
+        --kv-bits-list "$kv_bits" \
         --generated-tokens "$GEN_TOKENS" \
         $FILLER_ARG \
         --output "$RESULTS_DIR/sweep_${TIMESTAMP}.sqlite" \
