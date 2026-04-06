@@ -82,7 +82,7 @@ struct Models: ParsableCommand {
             let status = downloaded ? " [telecharge]" : ""
             let itBadge = model.isInstructionTuned ? "IT" : "base"
             let moeBadge = model.isMoE ? " MoE" : ""
-            let format = model.isBF16 ? "BF16" : "4-bit"
+            let format = model.quantization
 
             var modalities: [String] = []
             if model.supportsImage { modalities.append("image") }

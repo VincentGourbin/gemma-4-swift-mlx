@@ -106,10 +106,25 @@ for try await token in stream {
 
 ## Supported Models
 
-| Model | Size | Parameters | HuggingFace ID |
-|-------|------|-----------|----------------|
-| Gemma 4 E2B (4-bit) | ~3.6 GB | 2.3B effective | `mlx-community/gemma-4-e2b-it-4bit` |
-| Gemma 4 E4B (4-bit) | ~5 GB | 4B effective | `mlx-community/gemma-4-e4b-it-4bit` |
+### Model Families
+
+| Family | Total Params | Active Params | MoE | Audio | Key Features |
+|--------|:---:|:---:|:---:|:---:|---|
+| **E2B** | 5.1B | 2.3B | No | Yes | Fastest. Text + Vision + Audio + Video |
+| **E4B** | 9.6B | 4.5B | No | Yes | Best quality/size ratio. Full multimodal |
+| **31B** | 31.3B | 31.3B | No | No | Highest quality. Text + Vision. K=V attention |
+| **26B-A4B** | 25.8B | 3.8B | Yes (128 experts, top-8) | No | MoE efficiency. Text + Vision. K=V attention |
+
+### Available Quantizations
+
+| Model | 4-bit | 6-bit | 8-bit | BF16 | HuggingFace ID pattern |
+|-------|:---:|:---:|:---:|:---:|---|
+| **E2B** | ~3.6 GB | ~4.2 GB | ~5.2 GB | ~10 GB | `mlx-community/gemma-4-e2b-it-{quant}` |
+| **E4B** | ~5 GB | ~6.5 GB | ~8 GB | ~19 GB | `mlx-community/gemma-4-e4b-it-{quant}` |
+| **31B** | ~17 GB | ~25 GB | ~33 GB | ~63 GB | `mlx-community/gemma-4-31b-it-{quant}` |
+| **26B-A4B** | ~14 GB | ~21 GB | ~27 GB | ~52 GB | `mlx-community/gemma-4-26b-a4b-it-{quant}` |
+
+> Additional formats available: `mxfp4`, `mxfp8`, `nvfp4`, `5-bit`. See [mlx-community on HuggingFace](https://huggingface.co/mlx-community?search=gemma-4).
 
 ## Architecture
 
