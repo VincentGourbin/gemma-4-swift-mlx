@@ -13,7 +13,7 @@ FILLER="$SCRIPT_DIR/../examples/turboquant_paper.txt"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Configs
-CONTEXT_SIZES="500,1000,2000,4000,8000,16000,32000,64000,96000"
+CONTEXT_SIZES="500,8000,16000,32000,64000,96000"
 KV_BITS="0,4,3"
 GEN_TOKENS=200
 
@@ -88,18 +88,34 @@ for entry in "${MODELS[@]}"; do
     echo "  Telechargement..."
     "$CLI" download "$shortcut" 2>&1 | grep -E "(Telechargement|telecharge|Erreur|Go)" || true
 
-    # 2. Trouver le path local
+    # 2. Trouver le path local (format propre: mlx-community/name/)
     MODEL_PATH=""
     CACHE_DIR="$HOME/Library/Caches/models"
-    for d in "$CACHE_DIR"/models--mlx-community--*/snapshots/*/; do
-        if [ -f "${d}config.json" ] && echo "$d" | grep -qi "$(echo $shortcut | sed 's/-/.*/')"; then
-            MODEL_PATH="${d%/}"
-            break
-        fi
-    done
+    # Mapping shortcut → HF ID
+    HF_ID=$("$CLI" download --help 2>/dev/null | grep -q "" && echo "")  # fallback
+    case "$shortcut" in
+        e2b-4bit) HF_NAME="mlx-community/gemma-4-e2b-it-4bit" ;;
+        e2b-6bit) HF_NAME="mlx-community/gemma-4-e2b-it-6bit" ;;
+        e2b-8bit) HF_NAME="mlx-community/gemma-4-e2b-it-8bit" ;;
+        e2b-bf16) HF_NAME="mlx-community/gemma-4-e2b-it-bf16" ;;
+        e4b-4bit) HF_NAME="mlx-community/gemma-4-e4b-it-4bit" ;;
+        e4b-6bit) HF_NAME="mlx-community/gemma-4-e4b-it-6bit" ;;
+        e4b-8bit) HF_NAME="mlx-community/gemma-4-e4b-it-8bit" ;;
+        e4b-bf16) HF_NAME="mlx-community/gemma-4-e4b-it-bf16" ;;
+        a4b-4bit) HF_NAME="mlx-community/gemma-4-26b-a4b-it-4bit" ;;
+        a4b-6bit) HF_NAME="mlx-community/gemma-4-26b-a4b-it-6bit" ;;
+        a4b-8bit) HF_NAME="mlx-community/gemma-4-26b-a4b-it-8bit" ;;
+        a4b-bf16) HF_NAME="mlx-community/gemma-4-26b-a4b-it-bf16" ;;
+        31b-4bit) HF_NAME="mlx-community/gemma-4-31b-it-4bit" ;;
+        31b-6bit) HF_NAME="mlx-community/gemma-4-31b-it-6bit" ;;
+        31b-8bit) HF_NAME="mlx-community/gemma-4-31b-it-8bit" ;;
+        31b-bf16) HF_NAME="mlx-community/gemma-4-31b-it-bf16" ;;
+        *) HF_NAME="" ;;
+    esac
 
-    if [ -z "$MODEL_PATH" ]; then
-        echo "  ⚠ Modele non trouve apres download, skip"
+    MODEL_PATH="$CACHE_DIR/$HF_NAME"
+    if [ ! -f "$MODEL_PATH/config.json" ]; then
+        echo "  ⚠ Modele non trouve a $MODEL_PATH, skip"
         continue
     fi
 
@@ -120,11 +136,9 @@ for entry in "${MODELS[@]}"; do
 
     # 4. Supprimer le modele pour liberer le disque
     echo "  Nettoyage du modele..."
-    # Trouver et supprimer le dossier models--mlx-community--XXX complet
-    REPO_DIR=$(echo "$MODEL_PATH" | grep -o '.*/models--[^/]*')
-    if [ -n "$REPO_DIR" ] && [ -d "$REPO_DIR" ]; then
-        du -sh "$REPO_DIR" | awk '{print "  Suppression: " $2 " (" $1 ")"}'
-        rm -rf "$REPO_DIR"
+    if [ -d "$MODEL_PATH" ]; then
+        du -sh "$MODEL_PATH" | awk '{print "  Suppression: " $2 " (" $1 ")"}'
+        rm -rf "$MODEL_PATH"
     fi
     echo "  OK"
     echo ""

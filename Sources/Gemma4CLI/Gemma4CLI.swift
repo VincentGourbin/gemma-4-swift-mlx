@@ -233,6 +233,13 @@ struct Download: AsyncParsableCommand {
                 let elapsed = Date().timeIntervalSince(startTime)
                 print("\r  Termine en \(String(format: "%.0f", elapsed))s")
 
+                // Nettoyer le cache HF interne (models--org--name/) pour ne garder que le format propre
+                let hfCacheDir = Gemma4ModelCache.modelsDirectory
+                    .appendingPathComponent("models--\(model.rawValue.replacingOccurrences(of: "/", with: "--"))")
+                if FileManager.default.fileExists(atPath: hfCacheDir.path) {
+                    try? FileManager.default.removeItem(at: hfCacheDir)
+                }
+
                 // Verifier
                 if Gemma4ModelCache.isDownloaded(model) {
                     if let size = Gemma4ModelCache.diskSize(for: model) {
