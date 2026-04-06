@@ -297,9 +297,6 @@ struct ProfileSweep: AsyncParsableCommand {
             if let m = context.model as? Gemma4MultimodalLLMModel { return m.config.textConfig.maxPositionEmbeddings }
             return 131072
         }
-        // Sur Apple Silicon, la memoire unifiee est partagee CPU/GPU
-        // On prend 75% de la RAM totale comme limite safe pour Metal
-        let metalMaxGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824 * 0.75
         let modelBaseMemMB = Double(MLX.GPU.activeMemory) / (1024 * 1024)
 
         // Header
@@ -311,6 +308,13 @@ struct ProfileSweep: AsyncParsableCommand {
         print("  Context    Config          tok/s     TTFT      MLX Peak    Process Peak  Gen   Total")
         print("  \(separator)")
 
+        // Metal buffer max = RAM totale (Apple Silicon unified memory)
+        let metalMaxBytes = ProcessInfo.processInfo.physicalMemory
+        let metalMaxGB = Double(metalMaxBytes) / 1_073_741_824
+        // Garder 20% de marge pour l'OS et les process overheads
+        let safeMaxGB = metalMaxGB * 0.80
+        var lastPeakProcessMB: Double = 0
+
         var skipRemaining = false
         for targetSize in sizes {
             if skipRemaining { break }
@@ -321,16 +325,15 @@ struct ProfileSweep: AsyncParsableCommand {
                 continue
             }
 
-            // Estimation memoire grossiere: base + ~2 bytes par token par layer pour le KV cache
-            // Pour E2B: 35 layers, head_dim 256/512, num_kv_heads 1 → ~0.5 KB/token
-            // Pour 31B: 60 layers, head_dim 512, num_kv_heads 16 → ~30 KB/token
-            let estimatedKVperTokenKB: Double = modelBaseMemMB > 20_000 ? 30.0 : (modelBaseMemMB > 5_000 ? 8.0 : 0.5)
-            let estimatedTotalGB = (modelBaseMemMB + Double(targetSize) * estimatedKVperTokenKB) / 1024
-            let safetyMargin = 0.9 // garder 10% de marge
-            if estimatedTotalGB > metalMaxGB * safetyMargin {
-                print("  \(String(format: "%7d", targetSize))    SKIP (estime ~\(String(format: "%.0f", estimatedTotalGB)) Go > Metal max \(String(format: "%.0f", metalMaxGB * safetyMargin)) Go)")
-                skipRemaining = true
-                continue
+            // Protection memoire basee sur le pic reel du run precedent
+            // Si le dernier run a utilise >70% de la RAM, on ne tente pas un contexte plus grand
+            if lastPeakProcessMB > 0 {
+                let lastPeakGB = lastPeakProcessMB / 1024
+                if lastPeakGB > safeMaxGB {
+                    print("  \(String(format: "%7d", targetSize))    SKIP (pic precedent \(String(format: "%.1f", lastPeakGB)) Go > safe max \(String(format: "%.1f", safeMaxGB)) Go)")
+                    skipRemaining = true
+                    continue
+                }
             }
 
             for kvBits in kvConfigs {
@@ -432,6 +435,9 @@ struct ProfileSweep: AsyncParsableCommand {
                     deviceArchitecture: GPU.deviceInfo().architecture,
                     systemRAMGB: Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
                 )
+
+                // Mettre a jour le pic memoire reel pour la protection du prochain run
+                lastPeakProcessMB = max(lastPeakProcessMB, peakProcess)
 
                 // Afficher la ligne
                 let ctxStr = String(format: "%7d", tokenIds.count)

@@ -20,6 +20,11 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
     private var _offset: Int = 0
     private var _cachedSliced: (TurboQuantMSEState, TurboQuantMSEState)?
     private var _cachedSlicedOffset: Int = -1
+    /// Pendant le prefill, on garde les K/V bruts pour l'attention standard (pas de decompression)
+    /// Apres le prefill (premier token decode), on compresse tout en batch
+    private var prefillKeys: MLXArray?
+    private var prefillValues: MLXArray?
+    public private(set) var prefillDone: Bool = false
 
     public init(bits: Float = 4.0, seed: UInt64 = 0, cacheStep: Int = 256) {
         self.bits = bits
@@ -47,17 +52,19 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
 
     public var maxSize: Int? { nil }
 
-    /// state retourne les normes quantisees comme proxy leger.
-    /// Les couches KV-shared detectent TurboQuantKVCache et utilisent
-    /// quantizedAttention() directement — pas de decompression.
+    /// Pendant le prefill: retourne les K/V BF16 bruts pour l'attention standard.
+    /// Apres le prefill: retourne les normes quantisees (les couches shared utilisent quantizedAttention).
     public var state: [MLXArray] {
         get {
+            // Prefill: retourner les K/V bruts
+            if let pk = prefillKeys, let pv = prefillValues {
+                return [pk, pv]
+            }
+            // Decode: retourner les normes comme proxy
             guard let ks = currentKeyState, let vs = currentValueState else { return [] }
-            // Retourner les normes comme marqueurs (le vrai acces se fait via quantizedAttention)
             return [ks.norms, vs.norms]
         }
         set {
-            // Serialization: pas de support pour l'instant
             guard !newValue.isEmpty else { return }
         }
     }
@@ -107,10 +114,45 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
     @discardableResult
     public func update(keys: MLXArray, values: MLXArray) -> (MLXArray, MLXArray) {
         ensureCodecs(keys: keys, values: values)
+        let nNew = keys.dim(2)
 
+        // Phase 1: Prefill (multi-token) — garder en BF16, pas de quantisation
+        // La quantisation pendant le prefill cree des intermediaires enormes (unpack + einsum)
+        if nNew > 1 && !prefillDone {
+            if let pk = prefillKeys {
+                prefillKeys = concatenated([pk, keys], axis: 2)
+                prefillValues = concatenated([prefillValues!, values], axis: 2)
+            } else {
+                prefillKeys = keys
+                prefillValues = values
+            }
+            _offset += nNew
+            return (prefillKeys!, prefillValues!)
+        }
+
+        // Phase 2: Premier token decode — compresser le prefill en batch puis continuer
+        if !prefillDone {
+            prefillDone = true
+            if let pk = prefillKeys, let pv = prefillValues {
+                // Compresser tout le prefill en une passe
+                let prefillKeyState = keyCodec!.quantize(pk)
+                let prefillValueState = valueCodec!.quantize(pv)
+                let prefillLen = pk.dim(2)
+                keyStore = allocate(like: prefillKeyState, length: max(prefillLen + cacheStep, cacheStep))
+                valueStore = allocate(like: prefillValueState, length: max(prefillLen + cacheStep, cacheStep))
+                write(dst: &keyStore!, src: prefillKeyState, start: 0)
+                write(dst: &valueStore!, src: prefillValueState, start: 0)
+                eval(keyStore!.norms, keyStore!.indices, valueStore!.norms, valueStore!.indices)
+                // Liberer les buffers prefill
+                prefillKeys = nil
+                prefillValues = nil
+            }
+        }
+
+        // Phase 3: Decode (single-token) — quantiser incrementalement
         let newKeyState = keyCodec!.quantize(keys)
         let newValueState = valueCodec!.quantize(values)
-        let newEnd = _offset + keys.dim(2)
+        let newEnd = _offset + nNew
 
         if keyStore == nil {
             keyStore = allocate(like: newKeyState, length: max(newEnd, cacheStep))
@@ -126,14 +168,10 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         _offset = newEnd
         invalidateCache()
 
-        if keys.dim(2) > 1 || (_offset % 50 == 0) {
-            if let ks = keyStore, let vs = valueStore {
-                eval(ks.norms, ks.indices, vs.norms, vs.indices)
-            }
+        if _offset % 50 == 0 {
+            eval(keyStore!.norms, keyStore!.indices, valueStore!.norms, valueStore!.indices)
         }
 
-        // Pas de decompression — l'appelant utilise quantizedAttention() directement
-        // Retourner des tenseurs vides (le retour n'est pas utilise dans le path TurboQuant)
         let dummy = MLXArray.zeros([1])
         return (dummy, dummy)
     }
