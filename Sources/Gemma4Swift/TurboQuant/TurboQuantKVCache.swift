@@ -1,5 +1,7 @@
-// TurboQuant KV Cache — Cache compresse conforme au protocol KVCache de MLXLMCommon
+// TurboQuant KV Cache — Cache compresse avec quantisation immediate et attention chunked
 // Port de turboquant.py : TurboQuantKVCache(_BaseCache)
+// Quantise les K/V IMMEDIATEMENT dans update() (pas de buffer BF16)
+// Attention chunked avec online softmax pendant le prefill
 
 import Foundation
 import MLX
@@ -7,7 +9,9 @@ import MLXFast
 import MLXLMCommon
 
 /// KV Cache compresse via TurboQuant MSE Codec.
-/// Drop-in replacement pour KVCacheSimple avec compression 3-7x du KV cache.
+/// Quantise immediatement chaque K/V dans update().
+/// Attention chunked (query blocks × key chunks) avec online softmax pour le prefill.
+/// Fused Metal kernel pour le decode single-token.
 public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
     public let bits: Float
     public let seed: UInt64
@@ -20,11 +24,10 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
     private var _offset: Int = 0
     private var _cachedSliced: (TurboQuantMSEState, TurboQuantMSEState)?
     private var _cachedSlicedOffset: Int = -1
-    /// Pendant le prefill, on garde les K/V bruts pour l'attention standard (pas de decompression)
-    /// Apres le prefill (premier token decode), on compresse tout en batch
-    private var prefillKeys: MLXArray?
-    private var prefillValues: MLXArray?
-    public private(set) var prefillDone: Bool = false
+
+    /// Tailles de chunk pour l'attention quantisee pendant le prefill
+    let queryBlockSize: Int = 16
+    let keyChunkSize: Int = 2048
 
     public init(bits: Float = 4.0, seed: UInt64 = 0, cacheStep: Int = 256) {
         self.bits = bits
@@ -52,21 +55,14 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
 
     public var maxSize: Int? { nil }
 
-    /// Pendant le prefill: retourne les K/V BF16 bruts pour l'attention standard.
-    /// Apres le prefill: retourne les normes quantisees (les couches shared utilisent quantizedAttention).
+    /// Retourne les normes quantisees comme proxy.
+    /// Les couches KV-shared utilisent quantizedAttention() directement.
     public var state: [MLXArray] {
         get {
-            // Prefill: retourner les K/V bruts
-            if let pk = prefillKeys, let pv = prefillValues {
-                return [pk, pv]
-            }
-            // Decode: retourner les normes comme proxy
             guard let ks = currentKeyState, let vs = currentValueState else { return [] }
             return [ks.norms, vs.norms]
         }
-        set {
-            guard !newValue.isEmpty else { return }
-        }
+        set { /* serialization: pas de support */ }
     }
 
     public var metaState: [String] {
@@ -107,49 +103,16 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         return .causal
     }
 
-    public func innerState() -> [MLXArray] {
-        state
-    }
+    public func innerState() -> [MLXArray] { state }
+
+    // MARK: - Update (quantisation immediate)
 
     @discardableResult
     public func update(keys: MLXArray, values: MLXArray) -> (MLXArray, MLXArray) {
         ensureCodecs(keys: keys, values: values)
         let nNew = keys.dim(2)
 
-        // Phase 1: Prefill (multi-token) — garder en BF16, pas de quantisation
-        // La quantisation pendant le prefill cree des intermediaires enormes (unpack + einsum)
-        if nNew > 1 && !prefillDone {
-            if let pk = prefillKeys {
-                prefillKeys = concatenated([pk, keys], axis: 2)
-                prefillValues = concatenated([prefillValues!, values], axis: 2)
-            } else {
-                prefillKeys = keys
-                prefillValues = values
-            }
-            _offset += nNew
-            return (prefillKeys!, prefillValues!)
-        }
-
-        // Phase 2: Premier token decode — compresser le prefill en batch puis continuer
-        if !prefillDone {
-            prefillDone = true
-            if let pk = prefillKeys, let pv = prefillValues {
-                // Compresser tout le prefill en une passe
-                let prefillKeyState = keyCodec!.quantize(pk)
-                let prefillValueState = valueCodec!.quantize(pv)
-                let prefillLen = pk.dim(2)
-                keyStore = allocate(like: prefillKeyState, length: max(prefillLen + cacheStep, cacheStep))
-                valueStore = allocate(like: prefillValueState, length: max(prefillLen + cacheStep, cacheStep))
-                write(dst: &keyStore!, src: prefillKeyState, start: 0)
-                write(dst: &valueStore!, src: prefillValueState, start: 0)
-                eval(keyStore!.norms, keyStore!.indices, valueStore!.norms, valueStore!.indices)
-                // Liberer les buffers prefill
-                prefillKeys = nil
-                prefillValues = nil
-            }
-        }
-
-        // Phase 3: Decode (single-token) — quantiser incrementalement
+        // Quantiser immediatement — pas de buffer BF16
         let newKeyState = keyCodec!.quantize(keys)
         let newValueState = valueCodec!.quantize(values)
         let newEnd = _offset + nNew
@@ -168,7 +131,8 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         _offset = newEnd
         invalidateCache()
 
-        if _offset % 50 == 0 {
+        // Eval periodique pour eviter l'explosion du graph
+        if nNew > 1 || (_offset % 50 == 0) {
             eval(keyStore!.norms, keyStore!.indices, valueStore!.norms, valueStore!.indices)
         }
 
@@ -176,10 +140,9 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         return (dummy, dummy)
     }
 
-    // MARK: - Quantized Attention (fast path)
+    // MARK: - Quantized Attention
 
-    /// Attention directe sur K/V quantises (sans decompression complete)
-    /// Utilise le kernel fusionne si possible (single-token decode, D multiple de 32)
+    /// Attention quantisee — route vers fused kernel (L=1) ou chunked (L>1)
     public func quantizedAttention(
         queries: MLXArray,
         scale: Float = 1.0,
@@ -202,45 +165,149 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         // Fast path: fused Metal kernel pour single-token decode
         if L == 1 && D >= 32 && D % 32 == 0 {
             let qRot = kCodec.prepareQueries(groupedQueries)
-            // Flatten: [B, nKVHeads, nRepeats, 1, D] → [B*nQHeads, D]
             let qFlat = qRot.reshaped(B * nQHeads, D)
 
             if let fusedOut = fusedMSEDecode(
-                queries: qFlat,
-                keyState: ks,
-                valueState: vs,
-                keyBits: kCodec.bits,
-                valBits: vCodec.bits,
-                keyCodebook: kCodec.codebook,
-                valCodebook: vCodec.codebook,
+                queries: qFlat, keyState: ks, valueState: vs,
+                keyBits: kCodec.bits, valBits: vCodec.bits,
+                keyCodebook: kCodec.codebook, valCodebook: vCodec.codebook,
                 nRepeats: nRepeats
             ) {
-                // Output est en espace tourne — appliquer rotation inverse des values
                 let outRotated = fusedOut.reshaped(B, nKVHeads, nRepeats, D)
                 let output = vCodec.rotateInverse(outRotated)
                 return output.reshaped(B, nQHeads, L, D).asType(queries.dtype)
             }
         }
 
-        // Fallback: MLX pur (prefill ou dimensions non-alignees)
-        let preparedQueries = kCodec.prepareQueries(groupedQueries)
-        let scores = kCodec.scorePrepared(preparedQueries, state: ks)
-        let output = vCodec.weightedSumFromScores(scores, state: vs)
+        // Chunked path pour prefill (L > 1) et fallback decode
+        return chunkedQuantizedAttention(
+            groupedQueries: groupedQueries,
+            keyState: ks, valueState: vs,
+            kCodec: kCodec, vCodec: vCodec,
+            B: B, nKVHeads: nKVHeads, nRepeats: nRepeats, L: L, D: D
+        ).asType(queries.dtype)
+    }
 
-        return output.reshaped(B, nQHeads, L, D).asType(queries.dtype)
+    // MARK: - Chunked Quantized Attention (online softmax)
+
+    /// Attention chunked : score par blocs de queries × chunks de keys
+    /// Online softmax pour la stabilite numerique sans materialiser [L, T] complet
+    private func chunkedQuantizedAttention(
+        groupedQueries: MLXArray,
+        keyState: TurboQuantMSEState,
+        valueState: TurboQuantMSEState,
+        kCodec: TurboQuantMSECodec,
+        vCodec: TurboQuantMSECodec,
+        B: Int, nKVHeads: Int, nRepeats: Int, L: Int, D: Int
+    ) -> MLXArray {
+        let T = keyState.length
+        let nQHeads = nKVHeads * nRepeats
+
+        // Tourner toutes les queries d'un coup (une matmul)
+        let preparedQueries = kCodec.prepareQueries(groupedQueries)
+
+        // Offset des queries dans la sequence (pour le masque causal)
+        // Les queries couvrent les positions [offset - L, offset), les keys [0, T)
+        let queryOffset = _offset - L
+
+        var outputBlocks: [MLXArray] = []
+
+        for qStart in stride(from: 0, to: L, by: queryBlockSize) {
+            let qEnd = min(qStart + queryBlockSize, L)
+
+            // Slice du bloc de queries : [B, nKVHeads, nRepeats, QB, D]
+            let qBlock = preparedQueries[0..., 0..., 0..., qStart ..< qEnd, 0...]
+
+            // Accumulateurs online softmax (float32)
+            var maxScore = MLXArray.full([B, nKVHeads, nRepeats, qEnd - qStart], values: MLXArray(Float(-1e30)))
+            var sumExp = MLXArray.zeros([B, nKVHeads, nRepeats, qEnd - qStart])
+            var outputAccum = MLXArray.zeros([B, nKVHeads, nRepeats, qEnd - qStart, D])
+
+            for kStart in stride(from: 0, to: T, by: keyChunkSize) {
+                let kEnd = min(kStart + keyChunkSize, T)
+
+                // Slice des states pour ce chunk
+                let keyChunk = sliceStateRange(keyState, start: kStart, end: kEnd)
+                let valChunk = sliceStateRange(valueState, start: kStart, end: kEnd)
+
+                // Score : [B, H, R, QB, KC]
+                var scores = kCodec.scorePreparedChunk(qBlock, state: keyChunk)
+
+                // Masque causal : query a position absolue (queryOffset + qStart + qi)
+                // peut voir les keys a position <= sa position
+                scores = applyCausalMask(
+                    scores: scores,
+                    qAbsStart: queryOffset + qStart,
+                    kAbsStart: kStart,
+                    QB: qEnd - qStart,
+                    KC: kEnd - kStart
+                )
+
+                // Online softmax update
+                let chunkMax = scores.max(axis: -1)
+                let newMax = maximum(maxScore, chunkMax)
+                let correction = MLX.exp(maxScore - newMax)
+                let expScores = MLX.exp(scores - expandedDimensions(newMax, axis: -1))
+                let chunkSum = expScores.sum(axis: -1)
+
+                // Rescale et accumule
+                outputAccum = outputAccum * expandedDimensions(correction, axis: -1)
+                    + vCodec.weightedSumRotatedChunk(expScores, state: valChunk)
+                sumExp = sumExp * correction + chunkSum
+                maxScore = newMax
+            }
+
+            // Normaliser et rotation inverse
+            let normalized = outputAccum / maximum(expandedDimensions(sumExp, axis: -1), MLXArray(1e-10))
+            let blockFinal = vCodec.rotateInverse(normalized)
+            outputBlocks.append(blockFinal)
+
+            // Eval pour eviter l'explosion du graph
+            eval(outputBlocks.last!)
+        }
+
+        // Concatener tous les blocs : [B, nKVHeads, nRepeats, L, D]
+        let fullOutput: MLXArray
+        if outputBlocks.count == 1 {
+            fullOutput = outputBlocks[0]
+        } else {
+            fullOutput = concatenated(outputBlocks, axis: 3)
+        }
+        return fullOutput.reshaped(B, nQHeads, L, D)
+    }
+
+    /// Applique le masque causal pour un chunk query×key
+    private func applyCausalMask(
+        scores: MLXArray, qAbsStart: Int, kAbsStart: Int, QB: Int, KC: Int
+    ) -> MLXArray {
+        // Optimisation : si tout le chunk de keys est avant le debut des queries, pas de masque
+        if kAbsStart + KC <= qAbsStart { return scores }
+
+        // Construire un petit masque [QB, KC]
+        let qPositions = MLXArray(Int32(qAbsStart) ..< Int32(qAbsStart + QB))[0..., .newAxis]
+        let kPositions = MLXArray(Int32(kAbsStart) ..< Int32(kAbsStart + KC))[.newAxis, 0...]
+        let mask = qPositions .>= kPositions // [QB, KC] bool
+
+        return MLX.where(mask, scores, MLXArray(Float(-1e30)))
+    }
+
+    /// Slice un state sur la dimension T (axe 2)
+    private func sliceStateRange(_ state: TurboQuantMSEState, start: Int, end: Int) -> TurboQuantMSEState {
+        TurboQuantMSEState(
+            norms: state.norms[0..., 0..., start ..< end],
+            indices: state.indices[0..., 0..., start ..< end, 0...]
+        )
     }
 
     // MARK: - Compression Stats
 
-    /// Taille memoire compressée en octets
     public var compressedNbytes: Int {
         (currentKeyState?.nbytes ?? 0) + (currentValueState?.nbytes ?? 0)
     }
 
-    /// Ratio de compression effectif
     public var effectiveCompressionRatio: Float {
         guard _offset > 0, let kCodec = keyCodec else { return 1.0 }
-        let bfSize = _offset * kCodec.dim * 2 * 2 // T * D * 2 (K+V) * 2 bytes (float16)
+        let bfSize = _offset * kCodec.dim * 2 * 2
         let compSize = compressedNbytes
         return compSize > 0 ? Float(bfSize) / Float(compSize) : 1.0
     }
@@ -280,7 +347,7 @@ public final class TurboQuantKVCache: @unchecked Sendable, KVCache {
         let capacity = state.norms.dim(2)
         guard needed > capacity else { return state }
         let newCap = max(needed, capacity + cacheStep)
-        var newState = allocate(like: state, length: newCap)
+        let newState = allocate(like: state, length: newCap)
         if used > 0 {
             newState.norms[0..., 0..., 0 ..< used] = state.norms[0..., 0..., 0 ..< used]
             newState.indices[0..., 0..., 0 ..< used, 0...] = state.indices[0..., 0..., 0 ..< used, 0...]

@@ -167,6 +167,30 @@ public final class TurboQuantMSECodec: @unchecked Sendable {
     public func weightedSumFromScores(_ scores: MLXArray, state: TurboQuantMSEState) -> MLXArray {
         weightedSum(softmax(scores, axis: -1), state: state)
     }
+
+    // MARK: - Chunked Scoring (pour l'attention chunked pendant le prefill)
+
+    /// Score un bloc de queries contre un chunk de keys quantises.
+    /// Identique a scorePrepared mais n'unpack que le chunk (KC tokens, pas tout T).
+    public func scorePreparedChunk(_ preparedQueries: MLXArray, state: TurboQuantMSEState) -> MLXArray {
+        let indices = turboQuantUnpackLowbit(state.indices, bits: bits, length: dim).asType(.int32)
+        let rotated = codebook[indices]
+        let dots = MLX.einsum("bhmld,bhtd->bhmlt", preparedQueries, rotated)
+        return dots * state.norms.asType(.float32)[0..., 0..., .newAxis, .newAxis, 0...]
+    }
+
+    /// Somme ponderee en espace TOURNE (pas d'inverse rotation).
+    /// L'appelant accumule en espace tourne puis applique rotateInverse a la fin.
+    public func weightedSumRotatedChunk(_ weights: MLXArray, state: TurboQuantMSEState) -> MLXArray {
+        let indices = turboQuantUnpackLowbit(state.indices, bits: bits, length: dim).asType(.int32)
+        let rotated = codebook[indices]
+        return MLX.einsum(
+            "bhmlt,bht,bhtd->bhmld",
+            weights,
+            state.norms.asType(.float32),
+            rotated
+        )
+    }
 }
 
 // MARK: - Metal Score Kernel

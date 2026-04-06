@@ -116,19 +116,14 @@ public class Gemma4Attention: Module {
             // Couche partagee: reutiliser le cache existant (pas d'update)
             queries = rope(queries, offset: offset)
 
-            // TurboQuant shared
+            // TurboQuant shared: toujours attention quantisee (prefill chunked ou decode fused)
             if let turboCache = cache as? TurboQuantKVCache {
-                if turboCache.prefillDone {
-                    // Decode: attention quantisee directe (zero decompression)
-                    let output = turboCache.quantizedAttention(
-                        queries: queries, scale: scale, mask: mask
-                    )
-                    .transposed(0, 2, 1, 3)
-                    .reshaped(B, L, -1)
-                    return oProj(output)
-                }
-                // Prefill: les K/V sont en BF16, lire via state (retourne les prefill buffers)
-                // → tombe dans le path standard ci-dessous
+                let output = turboCache.quantizedAttention(
+                    queries: queries, scale: scale, mask: mask
+                )
+                .transposed(0, 2, 1, 3)
+                .reshaped(B, L, -1)
+                return oProj(output)
             }
 
             // Standard shared: lire les K/V decompresses du cache
@@ -154,29 +149,11 @@ public class Gemma4Attention: Module {
         queries = rope(queries, offset: offset)
         keys = rope(keys, offset: offset)
 
-        // TurboQuant path
+        // TurboQuant path: quantise immediatement puis attention quantisee (chunked ou fused)
         if let turboCache = cache as? TurboQuantKVCache {
-            let (cachedKeys, cachedValues) = turboCache.update(keys: keys, values: values)
-
-            if !turboCache.prefillDone {
-                // Prefill: K/V encore en BF16 — attention standard (pas de decompression)
-                let output = MLXFast.scaledDotProductAttention(
-                    queries: queries,
-                    keys: cachedKeys,
-                    values: cachedValues,
-                    scale: scale,
-                    mask: mask
-                )
-                .transposed(0, 2, 1, 3)
-                .reshaped(B, L, -1)
-                return oProj(output)
-            }
-
-            // Decode: attention fusionnee sur K/V compresses
+            turboCache.update(keys: keys, values: values)
             let output = turboCache.quantizedAttention(
-                queries: queries,
-                scale: scale,
-                mask: mask
+                queries: queries, scale: scale, mask: mask
             )
             .transposed(0, 2, 1, 3)
             .reshaped(B, L, -1)
