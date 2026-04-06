@@ -263,7 +263,25 @@ struct ProfileSweep: AsyncParsableCommand {
             print()
         }
 
-        print("Modele charge.\n")
+        // Lire le max_position_embeddings depuis la config du modele
+        let maxContextSize = await container.perform { context -> Int in
+            if let gemmaModel = context.model as? Gemma4LLMModel {
+                return gemmaModel.config.maxPositionEmbeddings
+            }
+            if let multimodalModel = context.model as? Gemma4MultimodalLLMModel {
+                return multimodalModel.config.textConfig.maxPositionEmbeddings
+            }
+            return 131072 // fallback
+        }
+
+        // Memoire systeme totale (unified memory = GPU memory sur Apple Silicon)
+        let systemRAMBytes = ProcessInfo.processInfo.physicalMemory
+        let systemRAMGB = String(format: "%.0f", Double(systemRAMBytes) / 1_073_741_824)
+
+        print("Modele charge.")
+        print("  Contexte max: \(maxContextSize) tokens")
+        print("  RAM systeme: \(systemRAMGB) Go (unified memory)")
+        print()
 
         // Resultats
         struct SweepResult {
@@ -278,15 +296,48 @@ struct ProfileSweep: AsyncParsableCommand {
         }
         var results: [SweepResult] = []
 
+        // Lire le max context et la memoire
+        let maxCtx = await container.perform { context -> Int in
+            if let m = context.model as? Gemma4LLMModel { return m.config.maxPositionEmbeddings }
+            if let m = context.model as? Gemma4MultimodalLLMModel { return m.config.textConfig.maxPositionEmbeddings }
+            return 131072
+        }
+        // Sur Apple Silicon, la memoire unifiee est partagee CPU/GPU
+        // On prend 75% de la RAM totale comme limite safe pour Metal
+        let metalMaxGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824 * 0.75
+        let modelBaseMemMB = Double(MLX.GPU.activeMemory) / (1024 * 1024)
+
         // Header
         let separator = String(repeating: "\u{2500}", count: 82)
         print("\u{256D}\(separator)\u{256E}")
-        print("\u{2502}  TURBOQUANT CONTEXT SWEEP \u{2014} \(modelName)".padding(toLength: 83, withPad: " ", startingAt: 0) + "\u{2502}")
+        let headerLine = "\u{2502}  TURBOQUANT CONTEXT SWEEP \u{2014} \(modelName) (max ctx: \(maxCtx))"
+        print(headerLine.padding(toLength: 83, withPad: " ", startingAt: 0) + "\u{2502}")
         print("\u{251C}\(separator)\u{2524}")
-        print("  Context    Config          tok/s     TTFT      MLX Peak    Process Peak  Tokens")
+        print("  Context    Config          tok/s     TTFT      MLX Peak    Process Peak  Gen   Total")
         print("  \(separator)")
 
+        var skipRemaining = false
         for targetSize in sizes {
+            if skipRemaining { break }
+
+            // Protection: verifier que le contexte ne depasse pas le max du modele
+            if targetSize > maxCtx {
+                print("  \(String(format: "%7d", targetSize))    SKIP (depasse max_position_embeddings = \(maxCtx))")
+                continue
+            }
+
+            // Estimation memoire grossiere: base + ~2 bytes par token par layer pour le KV cache
+            // Pour E2B: 35 layers, head_dim 256/512, num_kv_heads 1 → ~0.5 KB/token
+            // Pour 31B: 60 layers, head_dim 512, num_kv_heads 16 → ~30 KB/token
+            let estimatedKVperTokenKB: Double = modelBaseMemMB > 20_000 ? 30.0 : (modelBaseMemMB > 5_000 ? 8.0 : 0.5)
+            let estimatedTotalGB = (modelBaseMemMB + Double(targetSize) * estimatedKVperTokenKB) / 1024
+            let safetyMargin = 0.9 // garder 10% de marge
+            if estimatedTotalGB > metalMaxGB * safetyMargin {
+                print("  \(String(format: "%7d", targetSize))    SKIP (estime ~\(String(format: "%.0f", estimatedTotalGB)) Go > Metal max \(String(format: "%.0f", metalMaxGB * safetyMargin)) Go)")
+                skipRemaining = true
+                continue
+            }
+
             for kvBits in kvConfigs {
                 // Construire le prompt pour atteindre la taille cible
                 let prompt = await buildPrompt(
@@ -380,8 +431,9 @@ struct ProfileSweep: AsyncParsableCommand {
                 let ttftStr = formatSweepMs(result.ttftMs)
                 let mlxStr = String(format: "%8.1f Go", result.peakMLXMB / 1024)
                 let procStr = String(format: "%8.1f Go", result.peakProcessMB / 1024)
-                let tokStr = String(format: "%5d", result.generatedTokens)
-                print("  \(ctxStr)    \(cfgStr)  \(tpsStr)   \(ttftStr)  \(mlxStr)  \(procStr)  \(tokStr)")
+                let genStr = String(format: "%4d", result.generatedTokens)
+                let totalStr = String(format: "%6d", result.contextTokens + result.generatedTokens)
+                print("  \(ctxStr)    \(cfgStr)  \(tpsStr)   \(ttftStr)  \(mlxStr)  \(procStr)  \(genStr)  \(totalStr)")
 
                 // Liberer le cache GPU entre les runs
                 MLX.GPU.clearCache()
@@ -393,12 +445,12 @@ struct ProfileSweep: AsyncParsableCommand {
 
         // Export CSV
         if let csvPath = output {
-            var csv = "model,context_tokens,kv_config,kv_bits,throughput_toks,ttft_ms,peak_mlx_mb,peak_process_mb,generated_tokens\n"
+            var csv = "model,context_tokens,generated_tokens,total_tokens,kv_config,kv_bits,throughput_toks,ttft_ms,peak_mlx_mb,peak_process_mb\n"
             for r in results {
-                csv += "\(modelName),\(r.contextTokens),\(r.kvConfigName),\(r.kvBits),"
+                let total = r.contextTokens + r.generatedTokens
+                csv += "\(modelName),\(r.contextTokens),\(r.generatedTokens),\(total),\(r.kvConfigName),\(r.kvBits),"
                 csv += "\(String(format: "%.1f", r.throughput)),\(String(format: "%.1f", r.ttftMs)),"
-                csv += "\(String(format: "%.1f", r.peakMLXMB)),\(String(format: "%.1f", r.peakProcessMB)),"
-                csv += "\(r.generatedTokens)\n"
+                csv += "\(String(format: "%.1f", r.peakMLXMB)),\(String(format: "%.1f", r.peakProcessMB))\n"
             }
             try csv.write(toFile: csvPath, atomically: true, encoding: .utf8)
             print("\nCSV: \(csvPath)")
