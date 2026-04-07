@@ -1,0 +1,55 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-4bit
+Modele charge.
+Traitement de l'image: UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 1 image(s), batch: [1, 3, 624, 1008]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [7830, 1816, 236761, 54234, 506, 11273, 532, 3739, 5708, 236761, 106, 107, 105, 4368, 107]
+  audio_token(258881): 0, boa(256000): 0, eoa(258883): 0
+  Tokens image dans le prompt: 280
+  Total input tokens: 316
+
+--- Generation multimodale ---
+  Mode: vision
+  Prompt: Describe this user interface screenshot in detail. Read all visible text including French text. Describe the layout and application purpose.
+---
+This is a screenshot of a user interface, likely from a software application, given its structured layout and menu options. The interface appears to be a workspace for a creative or development process, possibly related to 3D or visual asset creation, given the mention of "Forge."
+
+Here is a detailed description:
+
+**Overall Layout:**
+The interface has a dark or muted background, with a main central area dedicated to the workspace and a vertical sidebar on the left for navigation.
+
+**Left Sidebar (Navigation Panel):**
+The left sidebar is a vertical menu structure, organized with icons and text labels. It seems to be the primary navigation for different modules or features. Visible items include:
+
+*   **Création** (Creation)
+    *   **Forge ton idée** (Forge your idea) - This item is currently selected or highlighted.
+    *   **Génération d'image** (Image generation)
+    *   **Générer une vidéo** (Generate a video)
+    *   **Fils d'attente** (Queue/Waiting line) with a badge indicating a count (the number **1**).
+*   **Outils** (Tools)
+    *   **Supprimer l'arrière...** (Delete the background...)
+    *   **Upscale**
+    *   **Créer un LoRA** (Create a LoRA)
+*   **Bibliothèque** (Library)
+    *   **Bibliothèque** (Library)
+*   **Adaptateurs LoRA** (LoRA Adapters)
+*   **Réglages** (Settings)
+    *   **Modèles** (Models)
+    *   **Préférences** (Preferences)
+    *   **Cache** (Cache)
+*   **Aide** (Help)
+    *   **Documentation**
+
+**Central Workspace:**
+The main area of the screen is where the active feature is displayed.
+
+*   **Top Section:** There is a header area with a title, "**Forge ton idée**" (Forge your idea), and a button labeled "**Auto-sauvé**" (Auto-saved).
+*   **Middle Section (Workflow/Preview):** Below the header, there is a section showing a workflow or preview. It displays a small visual element, which looks like a connection or flow:
+    *   An icon representing a process (perhaps a lightbulb
+
+--- Stats ---
+Tokens: 500, Temps: 6.48s, Vitesse: 77.2 t/s
+GPU pic: 4460 Mo

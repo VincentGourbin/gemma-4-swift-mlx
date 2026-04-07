@@ -1,0 +1,55 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 1 image(s), batch: [1, 3, 624, 1008]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [506, 11273, 532, 3739, 5708, 236761, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  audio_token(258881): 0, boa(256000): 0, eoa(258883): 0
+  Tokens image dans le prompt: 280
+  Total input tokens: 320
+
+--- Generation multimodale ---
+  Mode: vision
+  Prompt: Describe this user interface screenshot in detail. Read all visible text including French text. Describe the layout and application purpose.
+---
+This is a high-resolution screenshot of a dark-themed desktop application user interface, likely a creative software tool for AI-driven media generation. The interface is primarily in French.
+
+### **Layout and Structure**
+The interface is divided into three main sections:
+1.  **Left Sidebar (Navigation):** A dark vertical panel containing the main menu categories and navigation links.
+2.  **Main Workspace (Center/Right):** A large dark blue area where the primary interaction and visual output occur.
+3.  **Top Header:** A thin bar containing the application name and some status icons.
+
+---
+
+### **Detailed Content and Text**
+
+#### **1. Left Sidebar**
+The sidebar is organized into several sections:
+
+*   **Top Section (Unlabeled):**
+    *   **Forge ton idée** (Forge your idea): This is the active/selected menu item, highlighted with a blue vertical bar and a light blue background. It features a lightbulb icon.
+*   **Création (Creation):**
+    *   **Génération d'image** (Image generation): Icon of a landscape/picture.
+    *   **Générer une vidéo** (Generate a video): Icon of a video camera.
+    *   **File d'attente** (Queue): Icon of a list, with a blue notification badge showing the number "**1**".
+*   **Outils (Tools):**
+    *   **Supprimer l'arrière-...** (Remove background...): Icon of people.
+    *   **Upscale**: Icon of an upward arrow.
+    *   **Créer un LoRA** (Create a LoRA): Icon of a magic wand.
+*   **Bibliothèque (Library):**
+    *   **Bibliothèque** (Library): Icon of a book/library.
+    *   **Adaptateurs LoRA** (LoRA Adapters): Icon of a chip/circuit.
+*   **Réglages (Settings):**
+    *   **Modèles** (Models): Icon of a grid/layers.
+    *   **Préférences** (Preferences): Icon of horizontal lines/settings.
+    *   **Cache**: Icon of a hard drive/storage.
+*   **Aide (Help):**
+    *   **Documentation**: Icon of a question mark in a circle.
+    *   
+
+--- Stats ---
+Tokens: 500, Temps: 20.21s, Vitesse: 24.7 t/s
+GPU pic: 16311 Mo

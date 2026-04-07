@@ -1,0 +1,27 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-4bit
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+Traitement de l'image: UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 2 image(s), batch: [2, 3, 624, 1008]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [528, 3364, 236761, 2199, 9578, 236888, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  audio_token(258881): 0, boa(256000): 0, eoa(258883): 0
+  Tokens image dans le prompt: 560
+  Total input tokens: 594
+
+--- Generation multimodale ---
+  Mode: vision
+  Prompt: Find 3 things these two images have in common. Be creative!
+---
+Finding commonalities between a red vintage car and a software interface requires some creative thinking! Here are three things they have in common:
+
+1.  **The Concept of "Forge":** The software is explicitly named "Flux**Forge** Studio," and the red car is a Citroën 2CV, a vehicle famously "forged" from a philosophy of simplicity and ruggedness to serve as a "umbrella on four wheels" for the French countryside. Both represent the result of a specific design "forge" or creative process.
+2.  **A "Studio" Aesthetic:** The car is positioned against a lush, green natural backdrop, acting as a subject for a professional-looking outdoor photoshoot (a natural studio). Meanwhile, the second image is literally a digital "Studio" interface where visual content is created.
+3.  **A State of "Processing":** The car is a classic, meaning it is in a state of preservation and ongoing maintenance (processing the passage of time). The software interface is currently "Processing" an animation, as indicated by the "Animation en cours..." (Animation in progress) text and the loading percentage.<turn|>
+
+--- Stats ---
+Tokens: 233, Temps: 34.63s, Vitesse: 6.7 t/s
+GPU pic: 20344 Mo
