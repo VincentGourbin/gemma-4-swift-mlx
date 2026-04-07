@@ -29,14 +29,14 @@ public class ConformerBlock: Module {
         super.init()
     }
 
-    public func callAsFunction(_ x: MLXArray, mask: MLXArray, causalValidMask: MLXArray) -> MLXArray {
+    public func callAsFunction(_ x: MLXArray, mask: MLXArray, causalValidMask: MLXArray, positionEmbeddings: MLXArray) -> MLXArray {
         var h = feedForward1(x)
 
         // Attention avec pre/post norm et residual
         let residual = h
         h = clip(h, min: MLXArray(-gradientClipping), max: MLXArray(gradientClipping))
         h = normPreAttn(h)
-        h = selfAttn(h, mask: mask, causalValidMask: causalValidMask)
+        h = selfAttn(h, mask: mask, causalValidMask: causalValidMask, positionEmbeddings: positionEmbeddings)
         h = clip(h, min: MLXArray(-gradientClipping), max: MLXArray(gradientClipping))
         h = residual + normPostAttn(h)
 

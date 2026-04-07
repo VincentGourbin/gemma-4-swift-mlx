@@ -547,8 +547,11 @@ struct Describe: AsyncParsableCommand {
         // 6. Expanser les tokens: remplacer chaque token special par N copies
         let imageTokenId = Int(Gemma4Processor.imageTokenId)
         let videoTokenId = Int(Gemma4Processor.videoTokenId)
+        let audioTokenId = Int(Gemma4Processor.audioTokenId)
         let boiTokenId = Int(Gemma4Processor.boiTokenId)
         let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+        let boaTokenId = Int(Gemma4Processor.boaTokenId)
+        let eoaTokenId = Int(Gemma4Processor.eoaTokenId)
         var expandedTokenIds: [Int] = []
         for tid in tokenIds {
             if tid == imageTokenId {
@@ -565,6 +568,13 @@ struct Describe: AsyncParsableCommand {
                     expandedTokenIds.append(videoTokenId)
                 }
                 expandedTokenIds.append(eoiTokenId)
+            } else if tid == audioTokenId {
+                // Audio: boa + audio_token * N + eoa
+                expandedTokenIds.append(boaTokenId)
+                for _ in 0 ..< numAudioTokens {
+                    expandedTokenIds.append(audioTokenId)
+                }
+                expandedTokenIds.append(eoaTokenId)
             } else {
                 expandedTokenIds.append(tid)
             }
