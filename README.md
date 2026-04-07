@@ -180,7 +180,12 @@ import Gemma4Swift
 let pipeline = Gemma4Pipeline()
 try await pipeline.load(.e2b4bit)
 
-// Or from a custom path
+// Or download + load in one call (no MLXLMCommon import needed)
+try await pipeline.load(.e2b4bit, downloadIfNeeded: true) { progress in
+    print("Downloading: \(Int(progress.fraction * 100))% — \(progress.currentFile)")
+}
+
+// Or from a custom local path
 try await pipeline.load(from: URL(fileURLWithPath: "/path/to/model"))
 
 // Chat

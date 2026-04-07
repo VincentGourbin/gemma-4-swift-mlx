@@ -206,13 +206,27 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
     // MARK: - Chargement
 
-    /// Charge un modele Gemma 4 depuis le cache local.
+    /// Charge un modele Gemma 4, avec telechargement optionnel.
     /// Gere automatiquement l'enregistrement du type de modele et le chargement du tokenizer.
     /// - Parameters:
     ///   - model: le modele a charger (enum Model)
     ///   - multimodal: si true, charge le modele multimodal complet (vision+audio+video). Defaut: true.
-    /// - Throws: Gemma4PipelineError.modelNotDownloaded si le modele n'est pas telecharge localement
-    public func load(_ model: Model, multimodal: Bool = true) async throws {
+    ///   - downloadIfNeeded: si true, telecharge le modele s'il n'est pas en cache. Defaut: false.
+    ///   - hfToken: token HuggingFace optionnel (pour modeles prives)
+    ///   - progress: callback de progression du telechargement
+    /// - Throws: Gemma4PipelineError.modelNotDownloaded si le modele n'est pas telecharge et downloadIfNeeded est false
+    public func load(
+        _ model: Model,
+        multimodal: Bool = true,
+        downloadIfNeeded: Bool = false,
+        hfToken: String? = nil,
+        progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
+    ) async throws {
+        // Telecharger si necessaire
+        if downloadIfNeeded && !Gemma4ModelCache.isDownloaded(model) {
+            let _ = try await Gemma4ModelDownloader.download(model, token: hfToken, progress: progress)
+        }
+
         guard let localPath = Gemma4ModelCache.localPath(for: model) else {
             throw Gemma4PipelineError.modelNotDownloaded(model.rawValue)
         }
