@@ -61,11 +61,34 @@ public class VisionAttention: Module {
         k = k.transposed(0, 2, 1, 3)
         v = v.transposed(0, 2, 1, 3)
 
-        let output = MLXFast.scaledDotProductAttention(
-            queries: q, keys: k, values: v,
+        // Pad head_dim a une taille supportee par le fused SDPA (64, 80, 128)
+        // pour eviter les NaN sur les lignes all-masked (tokens padding)
+        // head_dim=72 (26B/31B) doit etre padde a 80
+        let needsPad = headDim != 64 && headDim != 80 && headDim != 128 && headDim != 256
+        var qPad = q, kPad = k, vPad = v
+        let targetDim: Int
+        if needsPad {
+            targetDim = headDim <= 64 ? 64 : headDim <= 80 ? 80 : headDim <= 128 ? 128 : 256
+            let padSize = targetDim - headDim
+            let padShape = [q.dim(0), q.dim(1), q.dim(2), padSize]
+            let zeros = MLXArray.zeros(padShape, dtype: q.dtype)
+            qPad = concatenated([q, zeros], axis: -1)
+            kPad = concatenated([k, zeros], axis: -1)
+            vPad = concatenated([v, zeros], axis: -1)
+        } else {
+            targetDim = headDim
+        }
+
+        var output = MLXFast.scaledDotProductAttention(
+            queries: qPad, keys: kPad, values: vPad,
             scale: 1.0,
             mask: mask.map { .array($0) } ?? .none
         )
+
+        // Unpad si on a padde
+        if needsPad {
+            output = output[.ellipsis, 0 ..< headDim]
+        }
 
         // [B, H, L, D] → [B, L, H*D]
         let result = output.transposed(0, 2, 1, 3).reshaped(B, L, -1)

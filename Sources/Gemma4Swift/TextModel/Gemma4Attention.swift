@@ -11,6 +11,7 @@ import MLXLMCommon
 /// - K=V optionnel (values = raw k_proj avant k_norm)
 /// - KV sharing pour les couches tardives
 /// - RoPE par type d'attention (standard ou proportional)
+/// - Utilise attentionWithCacheUpdate() pour le support quantized KV cache
 public class Gemma4Attention: Module {
     let config: Gemma4TextConfig
     let layerIdx: Int
@@ -96,50 +97,77 @@ public class Gemma4Attention: Module {
 
     public func callAsFunction(
         _ x: MLXArray,
-        mask: MLXArray? = nil,
+        mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
         cache: KVCache? = nil
     ) -> MLXArray {
         let (B, L, _) = (x.dim(0), x.dim(1), x.dim(2))
 
         var queries = qProj(x).reshaped(B, L, numHeads, headDim)
         queries = qNorm(queries)
+        queries = queries.transposed(0, 2, 1, 3)
 
-        var offset = 0
         var keys: MLXArray
         var values: MLXArray
 
+        // Lire l'offset AVANT que attentionWithCacheUpdate() l'incremente
+        let offset = cache?.offset ?? 0
+
         if isKvSharedLayer, let cache = cache {
-            // Couche partagee: reutiliser le cache existant
+            // Couche partagee: reutiliser le cache existant (pas d'update)
+            queries = rope(queries, offset: offset)
+
+            // TurboQuant shared: toujours attention quantisee (prefill chunked ou decode fused)
+            if let turboCache = cache as? TurboQuantKVCache {
+                let output = turboCache.quantizedAttention(
+                    queries: queries, scale: scale, mask: mask
+                )
+                .transposed(0, 2, 1, 3)
+                .reshaped(B, L, -1)
+                return oProj(output)
+            }
+
+            // Standard shared: lire les K/V decompresses du cache
             let state = cache.state
             if state.count >= 2 {
-                keys = state[0]
-                values = state[1]
-                offset = cache.offset
-            } else {
-                (keys, values, offset) = computeKV(x: x, B: B, L: L, cache: cache)
+                let output = MLXFast.scaledDotProductAttention(
+                    queries: queries,
+                    keys: state[0],
+                    values: state[1],
+                    scale: scale,
+                    mask: mask
+                )
+                .transposed(0, 2, 1, 3)
+                .reshaped(B, L, -1)
+                return oProj(output)
             }
+            (keys, values) = computeKV(x: x, B: B, L: L)
         } else {
-            (keys, values, offset) = computeKV(x: x, B: B, L: L, cache: cache)
+            (keys, values) = computeKV(x: x, B: B, L: L)
         }
 
-        queries = queries.transposed(0, 2, 1, 3)
+        // Appliquer RoPE aux queries ET aux keys avec le bon offset (position reelle dans la sequence)
         queries = rope(queries, offset: offset)
+        keys = rope(keys, offset: offset)
 
-        // Ajuster le masque si necessaire
-        var adjustedMask = mask
-        if let mask = mask {
-            let keysSeqLen = keys.shape[keys.ndim - 2]
-            if mask.shape.last! != keysSeqLen {
-                adjustedMask = mask[.ellipsis, (mask.shape.last! - keysSeqLen)...]
-            }
+        // TurboQuant path: quantise immediatement puis attention quantisee (chunked ou fused)
+        if let turboCache = cache as? TurboQuantKVCache {
+            turboCache.update(keys: keys, values: values)
+            let output = turboCache.quantizedAttention(
+                queries: queries, scale: scale, mask: mask
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            return oProj(output)
         }
 
-        let output = MLXFast.scaledDotProductAttention(
+        // Standard path: attentionWithCacheUpdate() gere l'update du cache
+        let output = attentionWithCacheUpdate(
             queries: queries,
             keys: keys,
             values: values,
+            cache: cache,
             scale: scale,
-            mask: adjustedMask.map { .array($0) } ?? .none
+            mask: mask
         )
         .transposed(0, 2, 1, 3)
         .reshaped(B, L, -1)
@@ -148,10 +176,8 @@ public class Gemma4Attention: Module {
     }
 
     private func computeKV(
-        x: MLXArray, B: Int, L: Int, cache: KVCache?
-    ) -> (keys: MLXArray, values: MLXArray, offset: Int) {
-        let offset = cache?.offset ?? 0
-
+        x: MLXArray, B: Int, L: Int
+    ) -> (keys: MLXArray, values: MLXArray) {
         var keys = kProj(x).reshaped(B, L, numKVHeads, headDim)
 
         // K=V: values sont le raw k_proj output (avant k_norm)
@@ -166,13 +192,9 @@ public class Gemma4Attention: Module {
         values = vNorm(values)
         values = values.transposed(0, 2, 1, 3)
 
+        // RoPE est applique par l'appelant avec l'offset correct du cache
         keys = keys.transposed(0, 2, 1, 3)
-        keys = rope(keys, offset: offset)
 
-        if let cache = cache {
-            (keys, values) = cache.update(keys: keys, values: values)
-        }
-
-        return (keys, values, offset)
+        return (keys, values)
     }
 }

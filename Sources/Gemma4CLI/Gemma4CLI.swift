@@ -4,20 +4,237 @@ import ArgumentParser
 import Foundation
 import Gemma4Swift
 import MLX
-import MLXHuggingFace
 import MLXLMCommon
 import MLXLLM
 import Tokenizers
-import HuggingFace
+
+// MARK: - Helpers
+
+/// Resout le token HuggingFace depuis l'option CLI ou l'environnement
+func resolveHFToken(_ token: String?) -> String? {
+    token ?? ProcessInfo.processInfo.environment["HF_TOKEN"]
+}
+
+/// Charge un modele depuis un chemin local
+func loadLocalModel(path: String) async throws -> ModelContainer {
+    let url = URL(fileURLWithPath: path)
+    await Gemma4Registration.register()
+    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+}
+
+/// Charge un modele multimodal depuis un chemin local
+func loadLocalMultimodalModel(path: String) async throws -> ModelContainer {
+    let url = URL(fileURLWithPath: path)
+    await Gemma4Registration.register(multimodal: true)
+    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+}
+
+/// Affiche un avertissement si le modele risque de depasser la RAM
+func warnIfLowRAM(modelId: String) {
+    guard let model = Gemma4Pipeline.Model(rawValue: modelId) else { return }
+    let ram = Gemma4ModelCache.systemRAMGB
+    if model.recommendedRAMGB > ram {
+        print("⚠ Attention: \(model.displayName) recommande \(model.recommendedRAMGB) Go de RAM (systeme: \(ram) Go)")
+        print("  Le chargement risque d'echouer ou d'etre tres lent.")
+    }
+}
 
 @main
 struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
-        abstract: "Test d'inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self],
+        abstract: "Inference Gemma 4 via MLX Swift",
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self],
         defaultSubcommand: Generate.self
     )
+}
+
+// MARK: - Models (liste et info)
+
+struct Models: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Liste les modeles Gemma 4 disponibles"
+    )
+
+    @Flag(name: .long, help: "Afficher uniquement les modeles recommandes pour cette machine")
+    var recommended: Bool = false
+
+    func run() {
+        let ram = Gemma4ModelCache.systemRAMGB
+        print("RAM systeme: \(ram) Go\n")
+
+        let models: [Gemma4Pipeline.Model]
+        if recommended {
+            models = Gemma4Pipeline.Model.recommended(forRAMGB: ram)
+            print("Modeles recommandes pour \(ram) Go de RAM:\n")
+        } else {
+            models = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+            print("Tous les modeles disponibles:\n")
+        }
+
+        if models.isEmpty {
+            print("  Aucun modele compatible avec \(ram) Go de RAM.")
+            return
+        }
+
+        for model in models {
+            let downloaded = Gemma4ModelCache.isDownloaded(model)
+            let status = downloaded ? " [telecharge]" : ""
+            let itBadge = model.isInstructionTuned ? "IT" : "base"
+            let moeBadge = model.isMoE ? " MoE" : ""
+            let format = model.quantization
+
+            var modalities: [String] = []
+            if model.supportsImage { modalities.append("image") }
+            if model.supportsAudio { modalities.append("audio") }
+            if model.supportsVideo { modalities.append("video") }
+            let modalitiesStr = modalities.joined(separator: "+")
+
+            print("  \(model.rawValue)\(status)")
+            print("    \(model.displayName) | \(model.parameterCount) params (\(model.effectiveParameters) effectifs) | ~\(Int(model.estimatedSizeGB)) Go | \(format) | \(itBadge)\(moeBadge) | \(modalitiesStr) | RAM min: \(model.recommendedRAMGB) Go")
+
+            if downloaded, let size = Gemma4ModelCache.diskSize(for: model) {
+                let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
+                print("    Taille sur disque: \(sizeGB) Go")
+            }
+            print()
+        }
+
+        print("Utilisation: gemma4-cli generate --model <ID> \"votre prompt\"")
+        print("Token HF: export HF_TOKEN=<votre_token> ou --hf-token <token>")
+    }
+}
+
+// MARK: - Download
+
+struct Download: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Telecharge un ou plusieurs modeles Gemma 4"
+    )
+
+    @Argument(help: "IDs des modeles a telecharger (ex: e2b-4bit e4b-8bit 31b-4bit), ou 'all' pour tout telecharger")
+    var modelIds: [String] = []
+
+    @Flag(name: .long, help: "Telecharger tous les modeles disponibles")
+    var all: Bool = false
+
+    @Flag(name: .long, help: "Telecharger uniquement les modeles recommandes pour cette machine")
+    var recommended: Bool = false
+
+    @Option(name: .long, help: "Token HuggingFace (pour modeles prives)")
+    var hfToken: String?
+
+    @Flag(name: .long, help: "Forcer le re-telechargement meme si deja present")
+    var force: Bool = false
+
+    /// Mappe les raccourcis vers les IDs complets
+    static let shortcuts: [String: String] = [
+        // E2B
+        "e2b-4bit": "mlx-community/gemma-4-e2b-it-4bit",
+        "e2b-6bit": "mlx-community/gemma-4-e2b-it-6bit",
+        "e2b-8bit": "mlx-community/gemma-4-e2b-it-8bit",
+        "e2b-bf16": "mlx-community/gemma-4-e2b-it-bf16",
+        // E4B
+        "e4b-4bit": "mlx-community/gemma-4-e4b-it-4bit",
+        "e4b-6bit": "mlx-community/gemma-4-e4b-it-6bit",
+        "e4b-8bit": "mlx-community/gemma-4-e4b-it-8bit",
+        "e4b-bf16": "mlx-community/gemma-4-e4b-it-bf16",
+        // 31B
+        "31b-4bit": "mlx-community/gemma-4-31b-it-4bit",
+        "31b-6bit": "mlx-community/gemma-4-31b-it-6bit",
+        "31b-8bit": "mlx-community/gemma-4-31b-it-8bit",
+        "31b-bf16": "mlx-community/gemma-4-31b-it-bf16",
+        // 26B-A4B
+        "a4b-4bit": "mlx-community/gemma-4-26b-a4b-it-4bit",
+        "a4b-6bit": "mlx-community/gemma-4-26b-a4b-it-6bit",
+        "a4b-8bit": "mlx-community/gemma-4-26b-a4b-it-8bit",
+        "a4b-bf16": "mlx-community/gemma-4-26b-a4b-it-bf16",
+    ]
+
+    func run() async throws {
+        let modelsToDownload: [Gemma4Pipeline.Model]
+
+        if all {
+            modelsToDownload = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+        } else if recommended {
+            let ram = Gemma4ModelCache.systemRAMGB
+            modelsToDownload = Gemma4Pipeline.Model.recommended(forRAMGB: ram)
+            print("Modeles recommandes pour \(ram) Go de RAM:")
+        } else if !modelIds.isEmpty {
+            var resolved: [Gemma4Pipeline.Model] = []
+            for id in modelIds {
+                let fullId = Self.shortcuts[id.lowercased()] ?? id
+                if let model = Gemma4Pipeline.Model(rawValue: fullId) {
+                    resolved.append(model)
+                } else {
+                    print("Modele inconnu: \(id)")
+                    print("  Raccourcis: \(Self.shortcuts.keys.sorted().joined(separator: ", "))")
+                    throw ExitCode.failure
+                }
+            }
+            modelsToDownload = resolved
+        } else {
+            print("Specifiez des modeles, --all, ou --recommended")
+            print("Raccourcis: \(Self.shortcuts.keys.sorted().joined(separator: ", "))")
+            print("Exemple: gemma4-cli download e2b-4bit e4b-4bit")
+            throw ExitCode.failure
+        }
+
+        // Estimation taille totale
+        let totalGB = modelsToDownload.reduce(Float(0)) { $0 + $1.estimatedSizeGB }
+        let alreadyDownloaded = modelsToDownload.filter { Gemma4ModelCache.isDownloaded($0) }
+        let toDownload = force ? modelsToDownload : modelsToDownload.filter { !Gemma4ModelCache.isDownloaded($0) }
+
+        print("\n\(modelsToDownload.count) modeles selectionnes (~\(Int(totalGB)) Go total)")
+        if !alreadyDownloaded.isEmpty && !force {
+            print("\(alreadyDownloaded.count) deja telecharges (utiliser --force pour re-telecharger)")
+        }
+        print("\(toDownload.count) a telecharger\n")
+
+        if toDownload.isEmpty {
+            print("Rien a telecharger.")
+            return
+        }
+
+        let token = resolveHFToken(hfToken)
+
+        // Telecharger sequentiellement
+        for (i, model) in toDownload.enumerated() {
+            print("[\(i + 1)/\(toDownload.count)] \(model.displayName) (~\(Int(model.estimatedSizeGB)) Go)")
+            print("  ID: \(model.rawValue)")
+
+            let startTime = Date()
+            let parts = model.rawValue.split(separator: "/")
+            let destDir = Gemma4ModelCache.modelsDirectory
+                .appendingPathComponent(String(parts[0]))
+                .appendingPathComponent(String(parts[1]))
+
+            do {
+                try await LocalModelDownloader.download(
+                    modelId: model.rawValue,
+                    to: destDir,
+                    token: token
+                ) { pct in
+                    print("\r  Progression: \(Int(pct * 100))%", terminator: "")
+                    fflush(stdout)
+                }
+
+                let elapsed = Date().timeIntervalSince(startTime)
+                print("\r  Termine en \(String(format: "%.0f", elapsed))s")
+
+                if let size = Gemma4ModelCache.diskSize(for: model) {
+                    let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
+                    print("  Taille: \(sizeGB) Go")
+                }
+            } catch {
+                print("\r  ERREUR: \(error.localizedDescription)")
+                print("  Verifiez votre token HF: export HF_TOKEN=<token> ou --hf-token <token>")
+            }
+            print()
+        }
+
+        print("Telechargement termine.")
+    }
 }
 
 // MARK: - Generate (single prompt)
@@ -32,6 +249,9 @@ struct Generate: AsyncParsableCommand {
 
     @Option(name: .long, help: "Chemin local vers le modele (bypass download)")
     var modelPath: String?
+
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
 
     @Option(name: .long, help: "Prompt systeme")
     var system: String = "Tu es un assistant utile. Reponds de maniere concise."
@@ -50,39 +270,27 @@ struct Generate: AsyncParsableCommand {
         print("Enregistrement du type gemma4_text...")
         await Gemma4Registration.register()
 
-        // 2. Charger le modele
+        // 2. Warning RAM
+        warnIfLowRAM(modelId: model)
+
+        // 3. Charger le modele
         let modelSource = modelPath ?? model
         print("Chargement du modele: \(modelSource)")
         let startLoad = Date()
 
-        let container: ModelContainer
-        if let path = modelPath {
-            // Chargement depuis un repertoire local
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(
-                from: url,
-                using: #huggingFaceTokenizerLoader()
-            )
-        } else {
-            // Telechargement + chargement depuis HuggingFace
-            container = try await loadModelContainer(
-                from: #hubDownloader(),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                let pct = Int(progress.fractionCompleted * 100)
-                print("\rTelechargement/chargement... \(pct)%", terminator: "")
-                fflush(stdout)
-            }
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
+        let container = try await loadLocalModel(path: path)
 
         let loadTime = Date().timeIntervalSince(startLoad)
-        print("\nModele charge en \(String(format: "%.1f", loadTime))s")
+        print("Modele charge en \(String(format: "%.1f", loadTime))s")
 
-        // 3. Stats GPU
+        // 4. Stats GPU
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
 
-        // 4. Generer
+        // 5. Generer
         print("\n--- Generation ---")
         print("Systeme: \(system)")
         print("Prompt: \(prompt)")
@@ -132,6 +340,9 @@ struct Chat: AsyncParsableCommand {
     @Option(name: .long, help: "Chemin local vers le modele")
     var modelPath: String?
 
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
+
     @Option(name: .long, help: "Prompt systeme")
     var system: String = "Tu es un assistant utile. Reponds de maniere concise."
 
@@ -143,26 +354,15 @@ struct Chat: AsyncParsableCommand {
 
     func run() async throws {
         await Gemma4Registration.register()
+        warnIfLowRAM(modelId: model)
 
-        print("Chargement de \(modelPath ?? model)...")
-        let container: ModelContainer
-        if let path = modelPath {
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(
-                from: url,
-                using: #huggingFaceTokenizerLoader()
-            )
-        } else {
-            container = try await loadModelContainer(
-                from: #hubDownloader(),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                print("\rTelechargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-                fflush(stdout)
-            }
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
-        print("\nModele pret. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+        print("Chargement de \(path)...")
+        let container = try await loadLocalModel(path: path)
+        print("Modele pret.")
 
         let params = GenerateParameters(
             maxTokens: maxTokens,
@@ -202,8 +402,14 @@ struct Describe: AsyncParsableCommand {
     @Option(name: .long, help: "ID HuggingFace du modele")
     var model: String = "mlx-community/gemma-4-e2b-it-4bit"
 
-    @Option(name: .long, help: "Chemin vers une image")
-    var image: String?
+    @Option(name: .long, help: "Chemin local vers le modele (bypass download)")
+    var modelPath: String?
+
+    @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
+    var hfToken: String?
+
+    @Option(name: .long, help: "Chemin vers une ou plusieurs images (repetable)")
+    var image: [String] = []
 
     @Option(name: .long, help: "Chemin vers un fichier audio")
     var audio: String?
@@ -221,7 +427,7 @@ struct Describe: AsyncParsableCommand {
     var temperature: Float = 0.3
 
     func run() async throws {
-        guard image != nil || audio != nil || video != nil else {
+        guard !image.isEmpty || audio != nil || video != nil else {
             print("Erreur: specifiez --image, --audio ou --video")
             throw ExitCode.failure
         }
@@ -229,35 +435,60 @@ struct Describe: AsyncParsableCommand {
         // 1. Enregistrer en mode multimodal
         print("Enregistrement Gemma 4 (multimodal)...")
         await Gemma4Registration.register(multimodal: true)
+        warnIfLowRAM(modelId: model)
 
         // 2. Charger le modele
-        print("Chargement du modele: \(model)")
-        let container = try await loadModelContainer(
-            from: #hubDownloader(),
-            using: #huggingFaceTokenizerLoader(),
-            id: model
-        ) { progress in
-            print("\rChargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-            fflush(stdout)
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
-        print("\nModele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+        print("Chargement du modele: \(path)")
+        let container = try await loadLocalMultimodalModel(path: path)
+        print("Modele charge.")
 
         // 3. Preparer les inputs multimodaux
+        let numImages = image.count
         var hasImage = false
         var hasAudio = false
-        var numImageTokens = 280
+        let numImageTokens = 280
         var numAudioTokens = 0
         var numVideoFrames = 0
         var pixelValues: MLXArray?
         var audioFeatures: Gemma4AudioProcessor.AudioFeatures?
 
-        // Image
-        if let imagePath = image {
-            print("Traitement de l'image: \(imagePath)")
-            let imageURL = URL(fileURLWithPath: imagePath)
-            pixelValues = try Gemma4ImageProcessor.processImage(url: imageURL)
+        // Images (une ou plusieurs)
+        var allPixelValues: [MLXArray] = []
+        if !image.isEmpty {
+            for imagePath in image {
+                print("Traitement de l'image: \(imagePath)")
+                let imageURL = URL(fileURLWithPath: imagePath)
+                let pixels = try Gemma4ImageProcessor.processImage(url: imageURL)
+                print("  Image preprocessee: \(pixels.shape)")
+                allPixelValues.append(pixels)
+            }
+
+            if allPixelValues.count == 1 {
+                pixelValues = allPixelValues[0]
+            } else {
+                // Multi-image: padder a la meme taille pour pouvoir batacher
+                let maxH = allPixelValues.map { $0.dim(2) }.max()!
+                let maxW = allPixelValues.map { $0.dim(3) }.max()!
+                var padded: [MLXArray] = []
+                for pv in allPixelValues {
+                    let h = pv.dim(2), w = pv.dim(3)
+                    if h == maxH && w == maxW {
+                        padded.append(pv)
+                    } else {
+                        // Padder avec des zeros (noir) a droite/en bas
+                        let result = MLXArray.zeros([1, 3, maxH, maxW], dtype: pv.dtype)
+                        result[0..., 0..., 0 ..< h, 0 ..< w] = pv
+                        padded.append(result)
+                    }
+                }
+                pixelValues = concatenated(padded, axis: 0)
+            }
             hasImage = true
-            print("  Image preprocessee: \(pixelValues!.shape)")
+            print("  Total: \(numImages) image(s), batch: \(pixelValues!.shape)")
         }
 
         // Audio
@@ -281,19 +512,50 @@ struct Describe: AsyncParsableCommand {
             print("  Video preprocessee: \(frames.frameCount) frames")
         }
 
-        // 4. Construire le prompt avec les vrais tokens multimodaux
-        let multimodalPrompt = Gemma4Processor.buildMultimodalPrompt(
-            userPrompt: prompt,
-            hasImage: hasImage && video == nil,
-            numImageTokens: numImageTokens,
-            hasAudio: hasAudio,
-            numAudioTokens: numAudioTokens,
-            hasVideo: video != nil,
-            numVideoFrames: numVideoFrames
-        )
+        // 4. Construire le contenu multimodal avec les placeholders
+        var contentParts: [String] = []
+        if hasImage && video == nil {
+            // Un <|image|> par image
+            for _ in 0 ..< numImages {
+                contentParts.append("<|image|>")
+            }
+        }
+        if video != nil {
+            for _ in 0 ..< numVideoFrames {
+                contentParts.append("<|image|>")
+            }
+        }
+        if hasAudio && numAudioTokens > 0 {
+            contentParts.append("<|audio|>")
+        }
+        contentParts.append(prompt)
+        let content = contentParts.joined(separator: "\n")
 
-        // 5. Tokeniser avec le vrai tokenizer (qui connait les tokens speciaux)
-        let tokenIds = await container.encode(multimodalPrompt)
+        // 5. Tokeniser via applyChatTemplate (gère les tokens spéciaux correctement)
+        let messages: [[String: String]] = [["role": "user", "content": content]]
+        var tokenIds: [Int] = try await container.perform { context in
+            try context.tokenizer.applyChatTemplate(messages: messages)
+        }
+
+        // 6. Expanser les tokens image : remplacer chaque image_token par numImageTokens copies
+        // Le tokenizer produit un seul token 258880 par <|image|>, on le remplace par 280
+        let imageTokenId = Int(Gemma4Processor.imageTokenId)
+        let boiTokenId = Int(Gemma4Processor.boiTokenId)
+        let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+        var expandedTokenIds: [Int] = []
+        for tid in tokenIds {
+            if tid == imageTokenId {
+                // Remplacer le single image token par: boi + image_token * N + eoi
+                expandedTokenIds.append(boiTokenId)
+                for _ in 0 ..< numImageTokens {
+                    expandedTokenIds.append(imageTokenId)
+                }
+                expandedTokenIds.append(eoiTokenId)
+            } else {
+                expandedTokenIds.append(tid)
+            }
+        }
+        tokenIds = expandedTokenIds
         let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
         // Debug: premiers et derniers tokens
@@ -367,7 +629,8 @@ struct Describe: AsyncParsableCommand {
                 print(text, terminator: "")
                 fflush(stdout)
 
-                // Verifier EOS
+                // EOS tokens officiels Gemma 4 (generation_config.json)
+                // 1 = <eos>, 106 = <start_of_turn>, 50 = (token de fin)
                 if nextToken == 1 || nextToken == 106 || nextToken == 50 { break }
 
                 // Generer le token suivant

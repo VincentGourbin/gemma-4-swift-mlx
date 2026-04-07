@@ -1,0 +1,59 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 1 image(s), batch: [1, 3, 624, 1008]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [7830, 1816, 236761, 54234, 506, 11273, 532, 3739, 5708, 236761, 106, 107, 105, 4368, 107]
+  audio_token(258881): 0, boa(256000): 0, eoa(258883): 0
+  Tokens image dans le prompt: 280
+  Total input tokens: 316
+
+--- Generation multimodale ---
+  Mode: vision
+  Prompt: Describe this user interface screenshot in detail. Read all visible text including French text. Describe the layout and application purpose.
+---
+This is a screenshot of a software application, likely an AI image generation tool, given the terminology and the visual elements. The interface is primarily in French.
+
+**Overall Layout:**
+The screen is divided into several vertical sections: a navigation sidebar on the left, a main workspace area in the center, and potentially a larger viewing/output area to the right (though the main focus is on the central panel).
+
+**Left Sidebar (Navigation):**
+This sidebar contains the main sections of the application:
+
+*   **Top Section (Project/Main Menu):**
+    *   A section labeled "Création" (Creation).
+    *   Underneath, there are options:
+        *   **"Forge ton idée"** (Forge your idea) - This appears to be the currently selected section.
+        *   "Génération d'image" (Image Generation).
+        *   "Générer une vidéo" (Generate a video).
+        *   "File d'attente" (Waiting line) with a notification badge showing "1".
+    *   **"Outils"** (Tools) section follows.
+    *   Under "Outils," there are options like:
+        *   "Supprimer l'arrière..." (Remove the background...).
+        *   "Upscale".
+        *   "Créer un LoRA".
+    *   **"Bibliothèque"** (Library) section:
+        *   "Bibliothèque" (Library).
+        *   "Adaptateurs LoRA".
+    *   **"Réglages"** (Settings) section:
+        *   "Modèles" (Models).
+        *   "Préférences" (Preferences).
+        *   "Cache".
+    *   **"Aide"** (Help) section:
+        *   "Documentation".
+        *   "Site web & Support".
+
+**Central Workspace (Main Focus):**
+This is where the current activity is taking place.
+
+*   **Top Bar/Title:** The main title is **"Forge ton idée"** (Forge your idea).
+*   **Activity Controls:** Below the title, there are two buttons:
+    *   "Nouvelle idée" (New idea).
+    *   A green button labeled **"Auto-sauve"** (Auto-save), which is currently selected.
+
+
+--- Stats ---
+Tokens: 500, Temps: 10.84s, Vitesse: 46.1 t/s
+GPU pic: 6044 Mo

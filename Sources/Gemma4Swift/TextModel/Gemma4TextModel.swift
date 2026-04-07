@@ -120,7 +120,7 @@ public class Gemma4TextModel: Module {
             fatalError("embed_tokens_per_layer non disponible")
         }
         var result = embed(inputIds)
-        result = result * MLXArray(embedTokensPerLayerScale, dtype: .float32)
+        result = result * MLXArray(embedTokensPerLayerScale, dtype: result.dtype)
         let shape = inputIds.shape + [config.numHiddenLayers, hiddenSizePerLayerInput]
         return result.reshaped(shape)
     }
@@ -146,7 +146,6 @@ public class Gemma4TextModel: Module {
     public func callAsFunction(
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
-        mask: MLXArray? = nil,
         cache: [KVCache?]? = nil,
         perLayerInputs: MLXArray? = nil
     ) -> MLXArray {
@@ -155,7 +154,7 @@ public class Gemma4TextModel: Module {
             h = inputsEmbeds
         } else if let inputs = inputs {
             h = embedTokens(inputs)
-            h = h * MLXArray(embedScale, dtype: .float32)
+            h = h * MLXArray(embedScale, dtype: h.dtype)
         } else {
             fatalError("inputs ou inputsEmbeds requis")
         }
@@ -175,14 +174,18 @@ public class Gemma4TextModel: Module {
         // Caches
         let cacheArray = cache ?? Array(repeating: nil as KVCache?, count: firstKvSharedLayerIdx)
 
-        // Masques d'attention
-        var globalMask: MLXArray? = nil
-        var slidingWindowMask: MLXArray? = nil
-
-        if mask == nil {
-            globalMask = createAttentionMask(h: h, cache: firstFullCacheIdx < cacheArray.count ? cacheArray[firstFullCacheIdx] : nil)
-            slidingWindowMask = createAttentionMask(h: h, cache: firstSlidingCacheIdx < cacheArray.count ? cacheArray[firstSlidingCacheIdx] : nil, windowSize: windowSize)
-        }
+        // Masques d'attention — utilise createAttentionMask() de MLXLMCommon
+        // Pour les single tokens (T=1) : retourne .none (pas de masque materialise)
+        // Pour les multi-tokens (prefill) : retourne .causal ou .array selon le cas
+        let globalMask = MLXLMCommon.createAttentionMask(
+            h: h,
+            cache: firstFullCacheIdx < cacheArray.count ? cacheArray[firstFullCacheIdx] : nil
+        )
+        let slidingWindowMask = MLXLMCommon.createAttentionMask(
+            h: h,
+            cache: firstSlidingCacheIdx < cacheArray.count ? cacheArray[firstSlidingCacheIdx] : nil,
+            windowSize: windowSize
+        )
 
         // Forward a travers les layers
         let layerTypes = config.resolvedLayerTypes
@@ -191,14 +194,7 @@ public class Gemma4TextModel: Module {
             let c = cacheIdx < cacheArray.count ? cacheArray[cacheIdx] : nil
             let isGlobal = layerTypes[i] == "full_attention"
 
-            let localMask: MLXArray?
-            if let mask = mask {
-                localMask = mask
-            } else if isGlobal {
-                localMask = globalMask
-            } else {
-                localMask = slidingWindowMask
-            }
+            let localMask = isGlobal ? globalMask : slidingWindowMask
 
             let perLayerInput: MLXArray?
             if let fpli = finalPerLayerInputs {
@@ -211,50 +207,5 @@ public class Gemma4TextModel: Module {
         }
 
         return norm(h)
-    }
-
-    // MARK: - Masque d'attention
-
-    private func createAttentionMask(h: MLXArray, cache: KVCache?, windowSize: Int? = nil) -> MLXArray? {
-        let T = h.dim(1)
-        let offset = cache?.offset ?? 0
-        let totalLen = T + offset
-
-        if T == 1 {
-            if let ws = windowSize {
-                let start = max(0, totalLen - ws)
-                let length = totalLen - start
-                return MLXArray.zeros([1, 1, 1, length])
-            }
-            return nil
-        }
-
-        // Masque causal
-        var mask = MLXArray.full([T, totalLen], values: MLXArray(Float.leastNormalMagnitude))
-        for i in 0 ..< T {
-            // Remplir avec 0 pour les positions valides (causales)
-            let validEnd = i + offset + 1
-            let validStart: Int
-            if let ws = windowSize {
-                validStart = max(0, validEnd - ws)
-            } else {
-                validStart = 0
-            }
-            if validStart < validEnd && validEnd <= totalLen {
-                // On ne peut pas faire d'assignation par slice facilement en MLX,
-                // donc on construit le masque avec tril/triu
-            }
-        }
-
-        // Methode plus simple: utiliser MLX.tril pour le masque causal
-        let causalMask = MLX.tril(MLXArray.ones([T, totalLen]), k: offset)
-        mask = MLX.where(causalMask .> 0, MLXArray(Float(0.0)), MLXArray(Float.leastNormalMagnitude))
-
-        if let ws = windowSize {
-            let windowMask = MLX.tril(MLXArray.ones([T, totalLen]), k: offset - ws)
-            mask = MLX.where(windowMask .> 0, MLXArray(Float.leastNormalMagnitude), mask)
-        }
-
-        return mask.reshaped(1, 1, T, totalLen)
     }
 }
