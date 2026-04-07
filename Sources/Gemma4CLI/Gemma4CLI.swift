@@ -408,8 +408,8 @@ struct Describe: AsyncParsableCommand {
     @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
     var hfToken: String?
 
-    @Option(name: .long, help: "Chemin vers une image")
-    var image: String?
+    @Option(name: .long, help: "Chemin vers une ou plusieurs images (repetable)")
+    var image: [String] = []
 
     @Option(name: .long, help: "Chemin vers un fichier audio")
     var audio: String?
@@ -427,7 +427,7 @@ struct Describe: AsyncParsableCommand {
     var temperature: Float = 0.3
 
     func run() async throws {
-        guard image != nil || audio != nil || video != nil else {
+        guard !image.isEmpty || audio != nil || video != nil else {
             print("Erreur: specifiez --image, --audio ou --video")
             throw ExitCode.failure
         }
@@ -447,21 +447,48 @@ struct Describe: AsyncParsableCommand {
         print("Modele charge.")
 
         // 3. Preparer les inputs multimodaux
+        let numImages = image.count
         var hasImage = false
         var hasAudio = false
-        var numImageTokens = 280
+        let numImageTokens = 280
         var numAudioTokens = 0
         var numVideoFrames = 0
         var pixelValues: MLXArray?
         var audioFeatures: Gemma4AudioProcessor.AudioFeatures?
 
-        // Image
-        if let imagePath = image {
-            print("Traitement de l'image: \(imagePath)")
-            let imageURL = URL(fileURLWithPath: imagePath)
-            pixelValues = try Gemma4ImageProcessor.processImage(url: imageURL)
+        // Images (une ou plusieurs)
+        var allPixelValues: [MLXArray] = []
+        if !image.isEmpty {
+            for imagePath in image {
+                print("Traitement de l'image: \(imagePath)")
+                let imageURL = URL(fileURLWithPath: imagePath)
+                let pixels = try Gemma4ImageProcessor.processImage(url: imageURL)
+                print("  Image preprocessee: \(pixels.shape)")
+                allPixelValues.append(pixels)
+            }
+
+            if allPixelValues.count == 1 {
+                pixelValues = allPixelValues[0]
+            } else {
+                // Multi-image: padder a la meme taille pour pouvoir batacher
+                let maxH = allPixelValues.map { $0.dim(2) }.max()!
+                let maxW = allPixelValues.map { $0.dim(3) }.max()!
+                var padded: [MLXArray] = []
+                for pv in allPixelValues {
+                    let h = pv.dim(2), w = pv.dim(3)
+                    if h == maxH && w == maxW {
+                        padded.append(pv)
+                    } else {
+                        // Padder avec des zeros (noir) a droite/en bas
+                        let result = MLXArray.zeros([1, 3, maxH, maxW], dtype: pv.dtype)
+                        result[0..., 0..., 0 ..< h, 0 ..< w] = pv
+                        padded.append(result)
+                    }
+                }
+                pixelValues = concatenated(padded, axis: 0)
+            }
             hasImage = true
-            print("  Image preprocessee: \(pixelValues!.shape)")
+            print("  Total: \(numImages) image(s), batch: \(pixelValues!.shape)")
         }
 
         // Audio
@@ -488,8 +515,10 @@ struct Describe: AsyncParsableCommand {
         // 4. Construire le contenu multimodal avec les placeholders
         var contentParts: [String] = []
         if hasImage && video == nil {
-            // Un seul <|image|> — le chat template et le tokenizer le gèrent
-            contentParts.append("<|image|>")
+            // Un <|image|> par image
+            for _ in 0 ..< numImages {
+                contentParts.append("<|image|>")
+            }
         }
         if video != nil {
             for _ in 0 ..< numVideoFrames {
