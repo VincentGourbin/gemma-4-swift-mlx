@@ -4,10 +4,8 @@ import ArgumentParser
 import Foundation
 import Gemma4Swift
 import MLX
-import MLXHuggingFace
 import MLXLMCommon
 import MLXLLM
-import HuggingFace
 import Tokenizers
 import SQLite3
 
@@ -83,23 +81,11 @@ struct ProfileRun: AsyncParsableCommand {
         print("Profiling Gemma 4: \(modelId)\(kvBits != nil ? " (TurboQuant \(kvBits!)-bit KV)" : "")")
         session.beginPhase("1. Model Loading", category: .modelLoad)
 
-        await Gemma4Registration.register()
-
-        let container: ModelContainer
-        if let path = modelPath {
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(from: url, using: #huggingFaceTokenizerLoader())
-        } else {
-            container = try await loadModelContainer(
-                from: #hubDownloader(makeHubClient(token: hfToken)),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                print("\rChargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-                fflush(stdout)
-            }
-            print()
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis.")
+            throw ExitCode.failure
         }
+        let container = try await loadLocalModel(path: path)
 
         session.endPhase("1. Model Loading", category: .modelLoad)
 
@@ -249,20 +235,12 @@ struct ProfileSweep: AsyncParsableCommand {
         let modelId = modelPath ?? model
         let modelName = modelId.split(separator: "/").last.map(String.init) ?? modelId
 
-        print("Enregistrement Gemma 4...")
-        await Gemma4Registration.register()
-
-        print("Chargement du modele: \(modelId)")
-        let container: ModelContainer
-        if let path = modelPath {
-            container = try await loadModelContainer(from: URL(fileURLWithPath: path), using: #huggingFaceTokenizerLoader())
-        } else {
-            container = try await loadModelContainer(
-                from: #hubDownloader(makeHubClient(token: hfToken)),
-                using: #huggingFaceTokenizerLoader(), id: model
-            ) { p in print("\rChargement... \(Int(p.fractionCompleted * 100))%", terminator: ""); fflush(stdout) }
-            print()
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis.")
+            throw ExitCode.failure
         }
+        print("Chargement du modele: \(path)")
+        let container = try await loadLocalModel(path: path)
 
         // Lire le max_position_embeddings depuis la config du modele
         let maxContextSize = await container.perform { context -> Int in
