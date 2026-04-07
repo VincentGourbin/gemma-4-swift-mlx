@@ -36,7 +36,8 @@ public struct Gemma4Processor {
     ///   - numAudioTokens: nombre de tokens audio
     ///   - hasVideo: si true, insere un placeholder video
     ///   - numVideoFrames: nombre de frames video
-    ///   - softTokensPerFrame: tokens par frame video (280)
+    ///   - softTokensPerFrame: tokens par frame video (70 par defaut, ref Python)
+    ///   - videoTimestamps: timestamps en secondes pour chaque frame video
     /// - Returns: le prompt avec les tokens expandes, pret pour la tokenisation
     public static func buildMultimodalPrompt(
         userPrompt: String,
@@ -47,7 +48,8 @@ public struct Gemma4Processor {
         numAudioTokens: Int = 0,
         hasVideo: Bool = false,
         numVideoFrames: Int = 0,
-        softTokensPerFrame: Int = 280
+        softTokensPerFrame: Int = 70,
+        videoTimestamps: [Double]? = nil
     ) -> String {
         var parts: [String] = []
 
@@ -57,11 +59,11 @@ public struct Gemma4Processor {
             parts.append(imageExpanded)
         }
 
-        // Video: meme pattern que image mais avec video_token (ou image_token pour chaque frame)
+        // Video: timestamp MM:SS + boi + video_token * N + eoi (ref Python)
         if hasVideo && numVideoFrames > 0 {
-            // Chaque frame est traitee comme une image
-            for _ in 0 ..< numVideoFrames {
-                let frameExpanded = boiToken + String(repeating: imageToken, count: softTokensPerFrame) + eoiToken
+            for i in 0 ..< numVideoFrames {
+                let ts = videoTimestamps.map { Gemma4VideoProcessor.formatTimestamp($0[i]) } ?? "00:00"
+                let frameExpanded = ts + "\n" + boiToken + String(repeating: videoToken, count: softTokensPerFrame) + eoiToken
                 parts.append(frameExpanded)
             }
         }

@@ -1,0 +1,16 @@
+Model: mlx-community/gemma-4-31b-it-4bit
+Video: step_3797B1A8.mp4 (1024x1024, HEVC, 24fps, ~10s)
+Frames: 9 @ ~1fps, 70 tokens/frame, 630 video tokens total
+Input tokens: 738
+
+--- Output ---
+
+This is a short, 9-second animated logo sequence for "The FluxForge Studio."
+
+*   **00:00 - 00:01:** The video begins with a clean, white background featuring the logo "FluxForge Studio" in a modern, sans-serif font. The "x" in "Flux" is highlighted in a gold/tan color, while the rest of the text is dark grey.
+*   **00:01 - 00:04:** The words "The" appear above the main logo. Simultaneously, various black abstract shapes, geometric lines, and fragmented typographic elements begin to float and drift across the screen, creating a sense of depth and motion around the central logo.
+*   **00:04 - 00:07:** The floating black elements increase in number and density, swirling around the logo. The camera appears to be slowly zooming in or shifting perspective, making the elements move more dynamically.
+*   **00:07 - 00:09:** The animation reaches a climax as the black geometric shapes converge and multiply rapidly, filling the screen. They form a complex, architectural-like grid or "forge" structure that frames the logo before the video ends.
+
+--- Stats ---
+Tokens: 263 (natural stop), Time: 45.24s, Speed: 5.8 t/s, GPU peak: 20787 MB

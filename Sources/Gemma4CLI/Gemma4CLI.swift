@@ -450,10 +450,14 @@ struct Describe: AsyncParsableCommand {
         let numImages = image.count
         var hasImage = false
         var hasAudio = false
+        var hasVideo = false
         let numImageTokens = 280
         var numAudioTokens = 0
         var numVideoFrames = 0
+        var videoSoftTokensPerFrame = Gemma4VideoProcessor.defaultSoftTokensPerFrame
+        var videoTimestamps: [Double] = []
         var pixelValues: MLXArray?
+        var videoFrameValues: MLXArray?
         var audioFeatures: Gemma4AudioProcessor.AudioFeatures?
 
         // Images (une ou plusieurs)
@@ -479,7 +483,6 @@ struct Describe: AsyncParsableCommand {
                     if h == maxH && w == maxW {
                         padded.append(pv)
                     } else {
-                        // Padder avec des zeros (noir) a droite/en bas
                         let result = MLXArray.zeros([1, 3, maxH, maxW], dtype: pv.dtype)
                         result[0..., 0..., 0 ..< h, 0 ..< w] = pv
                         padded.append(result)
@@ -501,28 +504,32 @@ struct Describe: AsyncParsableCommand {
             print("  Audio preprocesse: duree \(String(format: "%.1f", audioFeatures!.durationSeconds))s, \(numAudioTokens) tokens")
         }
 
-        // Video
+        // Video (pipeline aligné sur la référence Python)
         if let videoPath = video {
             print("Traitement de la video: \(videoPath)")
             let videoURL = URL(fileURLWithPath: videoPath)
-            let frames = try await Gemma4VideoProcessor.processVideo(url: videoURL, maxFrames: 8)
-            pixelValues = frames.pixelValues
+            let frames = try await Gemma4VideoProcessor.processVideo(url: videoURL)
+            videoFrameValues = frames.pixelValues
             numVideoFrames = frames.frameCount
-            hasImage = true // video utilise le vision encoder
-            print("  Video preprocessee: \(frames.frameCount) frames")
+            videoSoftTokensPerFrame = frames.softTokensPerFrame
+            videoTimestamps = frames.timestamps
+            hasVideo = true
+            print("  Video preprocessee: \(frames.frameCount) frames, \(frames.softTokensPerFrame) tokens/frame, \(String(format: "%.1f", frames.sourceFPS)) fps source")
+            print("  Timestamps: \(frames.timestamps.map { Gemma4VideoProcessor.formatTimestamp($0) }.joined(separator: " "))")
         }
 
         // 4. Construire le contenu multimodal avec les placeholders
         var contentParts: [String] = []
-        if hasImage && video == nil {
-            // Un <|image|> par image
+        if hasImage {
             for _ in 0 ..< numImages {
                 contentParts.append("<|image|>")
             }
         }
-        if video != nil {
-            for _ in 0 ..< numVideoFrames {
-                contentParts.append("<|image|>")
+        if hasVideo {
+            // Video: timestamp + <|video|> par frame (ref Python)
+            for i in 0 ..< numVideoFrames {
+                let ts = Gemma4VideoProcessor.formatTimestamp(videoTimestamps[i])
+                contentParts.append("\(ts)\n<|video|>")
             }
         }
         if hasAudio && numAudioTokens > 0 {
@@ -531,24 +538,31 @@ struct Describe: AsyncParsableCommand {
         contentParts.append(prompt)
         let content = contentParts.joined(separator: "\n")
 
-        // 5. Tokeniser via applyChatTemplate (gère les tokens spéciaux correctement)
+        // 5. Tokeniser via applyChatTemplate
         let messages: [[String: String]] = [["role": "user", "content": content]]
         var tokenIds: [Int] = try await container.perform { context in
             try context.tokenizer.applyChatTemplate(messages: messages)
         }
 
-        // 6. Expanser les tokens image : remplacer chaque image_token par numImageTokens copies
-        // Le tokenizer produit un seul token 258880 par <|image|>, on le remplace par 280
+        // 6. Expanser les tokens: remplacer chaque token special par N copies
         let imageTokenId = Int(Gemma4Processor.imageTokenId)
+        let videoTokenId = Int(Gemma4Processor.videoTokenId)
         let boiTokenId = Int(Gemma4Processor.boiTokenId)
         let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
         var expandedTokenIds: [Int] = []
         for tid in tokenIds {
             if tid == imageTokenId {
-                // Remplacer le single image token par: boi + image_token * N + eoi
+                // Image: boi + image_token * 280 + eoi
                 expandedTokenIds.append(boiTokenId)
                 for _ in 0 ..< numImageTokens {
                     expandedTokenIds.append(imageTokenId)
+                }
+                expandedTokenIds.append(eoiTokenId)
+            } else if tid == videoTokenId {
+                // Video: boi + video_token * 70 + eoi
+                expandedTokenIds.append(boiTokenId)
+                for _ in 0 ..< videoSoftTokensPerFrame {
+                    expandedTokenIds.append(videoTokenId)
                 }
                 expandedTokenIds.append(eoiTokenId)
             } else {
@@ -558,33 +572,29 @@ struct Describe: AsyncParsableCommand {
         tokenIds = expandedTokenIds
         let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
-        // Debug: premiers et derniers tokens
-        let first10 = Array(tokenIds.prefix(15))
-        let last10 = Array(tokenIds.suffix(15))
-        print("  Premiers tokens: \(first10)")
-        print("  Derniers tokens: \(last10)")
-        // Compter les tokens speciaux
-        let audioCount = tokenIds.filter { $0 == 258881 }.count
-        let boaCount = tokenIds.filter { $0 == 256000 }.count
-        let eoaCount = tokenIds.filter { $0 == 258883 }.count
-        print("  audio_token(\(258881)): \(audioCount), boa(\(256000)): \(boaCount), eoa(\(258883)): \(eoaCount)")
-
-        // Verifier les token counts
-        let counts = Gemma4Processor.validateTokenCounts(
-            inputIds: inputIds,
-            expectedImageTokens: hasImage ? numImageTokens : 0,
-            expectedAudioTokens: numAudioTokens
-        )
-        print("  Tokens image dans le prompt: \(counts.imageCount)")
-        if hasAudio { print("  Tokens audio dans le prompt: \(counts.audioCount)") }
+        // Debug tokens
+        let first15 = Array(tokenIds.prefix(15))
+        let last15 = Array(tokenIds.suffix(15))
+        print("  Premiers tokens: \(first15)")
+        print("  Derniers tokens: \(last15)")
+        let imgCount = tokenIds.filter { $0 == imageTokenId }.count
+        let vidCount = tokenIds.filter { $0 == videoTokenId }.count
+        let audCount = tokenIds.filter { $0 == 258881 }.count
+        print("  image_token: \(imgCount), video_token: \(vidCount), audio_token: \(audCount)")
         print("  Total input tokens: \(inputIds.shape[0])")
 
-        // 6. Injecter les donnees multimodales dans le modele
+        // 7. Injecter les donnees multimodales dans le modele
         nonisolated(unsafe) let finalPixelValues = pixelValues
+        nonisolated(unsafe) let finalVideoFrames = videoFrameValues
+        nonisolated(unsafe) let finalVideoSoftTokens = videoSoftTokensPerFrame
         nonisolated(unsafe) let finalAudioFeatures = audioFeatures
         await container.perform { context in
             if let model = context.model as? Gemma4MultimodalLLMModel {
                 model.pendingPixelValues = finalPixelValues
+                if finalVideoFrames != nil {
+                    model.pendingVideoFrames = finalVideoFrames
+                    model.pendingVideoSoftTokensPerFrame = finalVideoSoftTokens
+                }
                 if let af = finalAudioFeatures {
                     model.pendingAudioFeatures = af.features
                     model.pendingAudioMask = af.mask
@@ -593,7 +603,8 @@ struct Describe: AsyncParsableCommand {
         }
 
         print("\n--- Generation multimodale ---")
-        if hasImage { print("  Mode: vision") }
+        if hasImage { print("  Mode: vision (\(numImages) image(s), \(numImageTokens) tokens/image)") }
+        if hasVideo { print("  Mode: video (\(numVideoFrames) frames, \(videoSoftTokensPerFrame) tokens/frame)") }
         if hasAudio { print("  Mode: audio") }
         print("  Prompt: \(prompt)")
         print("---")
