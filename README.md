@@ -175,27 +175,28 @@ gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemm
 
 ```swift
 import Gemma4Swift
-import MLXLMCommon
 
-// Register Gemma 4 model type
-await Gemma4Registration.register()
+// Load a model (handles registration + tokenizer automatically)
+let pipeline = Gemma4Pipeline()
+try await pipeline.load(.e2b4bit)
 
-// Load model from local path
-let container = try await loadModelContainer(
-    from: URL(fileURLWithPath: modelPath),
-    using: LocalTokenizerLoader()
-)
+// Or from a custom path
+try await pipeline.load(from: URL(fileURLWithPath: "/path/to/model"))
 
 // Chat
-let session = ChatSession(container, instructions: "You are helpful.")
-let response = try await session.respond(to: "Hello!")
+let response = try await pipeline.chat(prompt: "Hello!")
 
 // Streaming
-let stream = session.streamResponse(to: "Write a poem")
+let stream = try pipeline.chatStream(prompt: "Write a poem")
 for try await token in stream {
     print(token, terminator: "")
 }
+
+// Multi-turn
+let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
+
+> No need to import `MLXLMCommon` — `Gemma4Pipeline.load()` handles registration, tokenizer loading, and model container setup internally.
 
 ### Thinking Mode Filter
 

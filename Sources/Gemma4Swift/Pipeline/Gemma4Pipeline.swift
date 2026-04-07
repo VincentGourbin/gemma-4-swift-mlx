@@ -206,6 +206,30 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
     // MARK: - Chargement
 
+    /// Charge un modele Gemma 4 depuis le cache local.
+    /// Gere automatiquement l'enregistrement du type de modele et le chargement du tokenizer.
+    /// - Parameters:
+    ///   - model: le modele a charger (enum Model)
+    ///   - multimodal: si true, charge le modele multimodal complet (vision+audio+video). Defaut: true.
+    /// - Throws: Gemma4PipelineError.modelNotDownloaded si le modele n'est pas telecharge localement
+    public func load(_ model: Model, multimodal: Bool = true) async throws {
+        guard let localPath = Gemma4ModelCache.localPath(for: model) else {
+            throw Gemma4PipelineError.modelNotDownloaded(model.rawValue)
+        }
+        try await load(from: localPath, multimodal: multimodal)
+    }
+
+    /// Charge un modele Gemma 4 depuis un chemin local arbitraire.
+    /// - Parameters:
+    ///   - path: URL du repertoire contenant config.json + safetensors + tokenizer.json
+    ///   - multimodal: si true, charge le modele multimodal complet. Defaut: true.
+    public func load(from path: URL, multimodal: Bool = true) async throws {
+        state = .unloaded
+        await Gemma4Registration.register(multimodal: multimodal)
+        let loaded = try await loadModelContainer(from: path, using: Gemma4TokenizerLoader())
+        setContainer(loaded)
+    }
+
     /// Initialise le pipeline avec un ModelContainer deja charge
     public func setContainer(_ container: ModelContainer) {
         self.container = container
@@ -356,11 +380,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
 public enum Gemma4PipelineError: LocalizedError {
     case modelNotLoaded
+    case modelNotDownloaded(String)
     case invalidInput(String)
 
     public var errorDescription: String? {
         switch self {
-        case .modelNotLoaded: return "Modele non charge"
+        case .modelNotLoaded: return "Modele non charge. Appelez load() d'abord."
+        case .modelNotDownloaded(let id): return "Modele '\(id)' non telecharge. Utilisez gemma4-cli download."
         case .invalidInput(let msg): return "Entree invalide: \(msg)"
         }
     }
