@@ -38,6 +38,13 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
-        .testTarget(name: "Gemma4SwiftTests", dependencies: ["Gemma4Swift"]),
+        .testTarget(
+            name: "Gemma4SwiftTests",
+            dependencies: [
+                "Gemma4Swift",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
+            ]
+        ),
     ]
 )
