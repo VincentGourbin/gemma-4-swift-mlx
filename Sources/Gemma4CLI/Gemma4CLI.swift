@@ -4,29 +4,29 @@ import ArgumentParser
 import Foundation
 import Gemma4Swift
 import MLX
-import MLXHuggingFace
 import MLXLMCommon
 import MLXLLM
 import Tokenizers
-import HuggingFace
 
 // MARK: - Helpers
 
-/// Cree un HubClient configure pour utiliser le cache personnalise et le token HF
-func makeHubClient(token: String? = nil) -> HubClient {
-    let resolvedToken = token ?? ProcessInfo.processInfo.environment["HF_TOKEN"]
-    let cacheDir = Gemma4ModelCache.modelsDirectory
-    // Creer le repertoire cache si necessaire
-    try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
-    let cache = HubCache(cacheDirectory: cacheDir)
-    if let token = resolvedToken {
-        return HubClient(
-            host: HubClient.defaultHost,
-            bearerToken: token,
-            cache: cache
-        )
-    }
-    return HubClient(cache: cache)
+/// Resout le token HuggingFace depuis l'option CLI ou l'environnement
+func resolveHFToken(_ token: String?) -> String? {
+    token ?? ProcessInfo.processInfo.environment["HF_TOKEN"]
+}
+
+/// Charge un modele depuis un chemin local
+func loadLocalModel(path: String) async throws -> ModelContainer {
+    let url = URL(fileURLWithPath: path)
+    await Gemma4Registration.register()
+    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+}
+
+/// Charge un modele multimodal depuis un chemin local
+func loadLocalMultimodalModel(path: String) async throws -> ModelContainer {
+    let url = URL(fileURLWithPath: path)
+    await Gemma4Registration.register(multimodal: true)
+    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
 }
 
 /// Affiche un avertissement si le modele risque de depasser la RAM
@@ -196,8 +196,7 @@ struct Download: AsyncParsableCommand {
             return
         }
 
-        // Enregistrer les types pour le chargement
-        await Gemma4Registration.register(multimodal: true)
+        let token = resolveHFToken(hfToken)
 
         // Telecharger sequentiellement
         for (i, model) in toDownload.enumerated() {
@@ -205,47 +204,27 @@ struct Download: AsyncParsableCommand {
             print("  ID: \(model.rawValue)")
 
             let startTime = Date()
-            var lastPct = -1
+            let parts = model.rawValue.split(separator: "/")
+            let destDir = Gemma4ModelCache.modelsDirectory
+                .appendingPathComponent(String(parts[0]))
+                .appendingPathComponent(String(parts[1]))
 
             do {
-                let hub = makeHubClient(token: hfToken)
-                // Decomposer l'ID en namespace/name
-                let parts = model.rawValue.split(separator: "/")
-                let repoId = Repo.ID(namespace: String(parts[0]), name: String(parts[1]))
-                let destDir = Gemma4ModelCache.modelsDirectory
-                    .appendingPathComponent(String(parts[0]))
-                    .appendingPathComponent(String(parts[1]))
-                try? FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
-
-                let _ = try await hub.downloadSnapshot(
-                    of: repoId,
+                try await LocalModelDownloader.download(
+                    modelId: model.rawValue,
                     to: destDir,
-                    matching: ["*.safetensors", "*.json", "*.jinja", "*.txt"]
-                ) { progress in
-                    let pct = Int(progress.fractionCompleted * 100)
-                    if pct != lastPct {
-                        lastPct = pct
-                        print("\r  Progression: \(pct)%", terminator: "")
-                        fflush(stdout)
-                    }
+                    token: token
+                ) { pct in
+                    print("\r  Progression: \(Int(pct * 100))%", terminator: "")
+                    fflush(stdout)
                 }
 
                 let elapsed = Date().timeIntervalSince(startTime)
                 print("\r  Termine en \(String(format: "%.0f", elapsed))s")
 
-                // Nettoyer le cache HF interne (models--org--name/) pour ne garder que le format propre
-                let hfCacheDir = Gemma4ModelCache.modelsDirectory
-                    .appendingPathComponent("models--\(model.rawValue.replacingOccurrences(of: "/", with: "--"))")
-                if FileManager.default.fileExists(atPath: hfCacheDir.path) {
-                    try? FileManager.default.removeItem(at: hfCacheDir)
-                }
-
-                // Verifier
-                if Gemma4ModelCache.isDownloaded(model) {
-                    if let size = Gemma4ModelCache.diskSize(for: model) {
-                        let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
-                        print("  Taille: \(sizeGB) Go")
-                    }
+                if let size = Gemma4ModelCache.diskSize(for: model) {
+                    let sizeGB = String(format: "%.1f", Double(size) / 1_073_741_824)
+                    print("  Taille: \(sizeGB) Go")
                 }
             } catch {
                 print("\r  ERREUR: \(error.localizedDescription)")
@@ -299,29 +278,14 @@ struct Generate: AsyncParsableCommand {
         print("Chargement du modele: \(modelSource)")
         let startLoad = Date()
 
-        let container: ModelContainer
-        if let path = modelPath {
-            // Chargement depuis un repertoire local
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(
-                from: url,
-                using: #huggingFaceTokenizerLoader()
-            )
-        } else {
-            // Telechargement + chargement depuis HuggingFace
-            container = try await loadModelContainer(
-                from: #hubDownloader(makeHubClient(token: hfToken)),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                let pct = Int(progress.fractionCompleted * 100)
-                print("\rTelechargement/chargement... \(pct)%", terminator: "")
-                fflush(stdout)
-            }
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
+        let container = try await loadLocalModel(path: path)
 
         let loadTime = Date().timeIntervalSince(startLoad)
-        print("\nModele charge en \(String(format: "%.1f", loadTime))s")
+        print("Modele charge en \(String(format: "%.1f", loadTime))s")
 
         // 4. Stats GPU
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
@@ -392,25 +356,13 @@ struct Chat: AsyncParsableCommand {
         await Gemma4Registration.register()
         warnIfLowRAM(modelId: model)
 
-        print("Chargement de \(modelPath ?? model)...")
-        let container: ModelContainer
-        if let path = modelPath {
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(
-                from: url,
-                using: #huggingFaceTokenizerLoader()
-            )
-        } else {
-            container = try await loadModelContainer(
-                from: #hubDownloader(makeHubClient(token: hfToken)),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                print("\rTelechargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-                fflush(stdout)
-            }
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
-        print("\nModele pret. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+        print("Chargement de \(path)...")
+        let container = try await loadLocalModel(path: path)
+        print("Modele pret.")
 
         let params = GenerateParameters(
             maxTokens: maxTokens,
@@ -486,23 +438,13 @@ struct Describe: AsyncParsableCommand {
         warnIfLowRAM(modelId: model)
 
         // 2. Charger le modele
-        let modelSource = modelPath ?? model
-        print("Chargement du modele: \(modelSource)")
-        let container: ModelContainer
-        if let path = modelPath {
-            let url = URL(fileURLWithPath: path)
-            container = try await loadModelContainer(from: url, using: #huggingFaceTokenizerLoader())
-        } else {
-            container = try await loadModelContainer(
-                from: #hubDownloader(makeHubClient(token: hfToken)),
-                using: #huggingFaceTokenizerLoader(),
-                id: model
-            ) { progress in
-                print("\rChargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-                fflush(stdout)
-            }
+        guard let path = modelPath else {
+            print("Erreur: --model-path requis. Utilisez 'gemma4-cli download' pour telecharger un modele.")
+            throw ExitCode.failure
         }
-        print("Modele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+        print("Chargement du modele: \(path)")
+        let container = try await loadLocalMultimodalModel(path: path)
+        print("Modele charge.")
 
         // 3. Preparer les inputs multimodaux
         var hasImage = false
