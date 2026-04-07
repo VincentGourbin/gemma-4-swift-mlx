@@ -450,6 +450,9 @@ struct Describe: AsyncParsableCommand {
     @Option(name: .long, help: "ID HuggingFace du modele")
     var model: String = "mlx-community/gemma-4-e2b-it-4bit"
 
+    @Option(name: .long, help: "Chemin local vers le modele (bypass download)")
+    var modelPath: String?
+
     @Option(name: .long, help: "Token HuggingFace (pour modeles Google)")
     var hfToken: String?
 
@@ -483,16 +486,23 @@ struct Describe: AsyncParsableCommand {
         warnIfLowRAM(modelId: model)
 
         // 2. Charger le modele
-        print("Chargement du modele: \(model)")
-        let container = try await loadModelContainer(
-            from: #hubDownloader(makeHubClient(token: hfToken)),
-            using: #huggingFaceTokenizerLoader(),
-            id: model
-        ) { progress in
-            print("\rChargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
-            fflush(stdout)
+        let modelSource = modelPath ?? model
+        print("Chargement du modele: \(modelSource)")
+        let container: ModelContainer
+        if let path = modelPath {
+            let url = URL(fileURLWithPath: path)
+            container = try await loadModelContainer(from: url, using: #huggingFaceTokenizerLoader())
+        } else {
+            container = try await loadModelContainer(
+                from: #hubDownloader(makeHubClient(token: hfToken)),
+                using: #huggingFaceTokenizerLoader(),
+                id: model
+            ) { progress in
+                print("\rChargement... \(Int(progress.fractionCompleted * 100))%", terminator: "")
+                fflush(stdout)
+            }
         }
-        print("\nModele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+        print("Modele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
 
         // 3. Preparer les inputs multimodaux
         var hasImage = false
@@ -533,19 +543,48 @@ struct Describe: AsyncParsableCommand {
             print("  Video preprocessee: \(frames.frameCount) frames")
         }
 
-        // 4. Construire le prompt avec les vrais tokens multimodaux
-        let multimodalPrompt = Gemma4Processor.buildMultimodalPrompt(
-            userPrompt: prompt,
-            hasImage: hasImage && video == nil,
-            numImageTokens: numImageTokens,
-            hasAudio: hasAudio,
-            numAudioTokens: numAudioTokens,
-            hasVideo: video != nil,
-            numVideoFrames: numVideoFrames
-        )
+        // 4. Construire le contenu multimodal avec les placeholders
+        var contentParts: [String] = []
+        if hasImage && video == nil {
+            // Un seul <|image|> — le chat template et le tokenizer le gèrent
+            contentParts.append("<|image|>")
+        }
+        if video != nil {
+            for _ in 0 ..< numVideoFrames {
+                contentParts.append("<|image|>")
+            }
+        }
+        if hasAudio && numAudioTokens > 0 {
+            contentParts.append("<|audio|>")
+        }
+        contentParts.append(prompt)
+        let content = contentParts.joined(separator: "\n")
 
-        // 5. Tokeniser avec le vrai tokenizer (qui connait les tokens speciaux)
-        let tokenIds = await container.encode(multimodalPrompt)
+        // 5. Tokeniser via applyChatTemplate (gère les tokens spéciaux correctement)
+        let messages: [[String: String]] = [["role": "user", "content": content]]
+        var tokenIds: [Int] = try await container.perform { context in
+            try context.tokenizer.applyChatTemplate(messages: messages)
+        }
+
+        // 6. Expanser les tokens image : remplacer chaque image_token par numImageTokens copies
+        // Le tokenizer produit un seul token 258880 par <|image|>, on le remplace par 280
+        let imageTokenId = Int(Gemma4Processor.imageTokenId)
+        let boiTokenId = Int(Gemma4Processor.boiTokenId)
+        let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+        var expandedTokenIds: [Int] = []
+        for tid in tokenIds {
+            if tid == imageTokenId {
+                // Remplacer le single image token par: boi + image_token * N + eoi
+                expandedTokenIds.append(boiTokenId)
+                for _ in 0 ..< numImageTokens {
+                    expandedTokenIds.append(imageTokenId)
+                }
+                expandedTokenIds.append(eoiTokenId)
+            } else {
+                expandedTokenIds.append(tid)
+            }
+        }
+        tokenIds = expandedTokenIds
         let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
         // Debug: premiers et derniers tokens
@@ -619,8 +658,9 @@ struct Describe: AsyncParsableCommand {
                 print(text, terminator: "")
                 fflush(stdout)
 
-                // Verifier EOS
-                if nextToken == 1 || nextToken == 106 || nextToken == 50 { break }
+                // Verifier EOS (1 = <eos>, 107 = <end_of_turn>)
+                // Note: 106 = <start_of_turn> n'est PAS un EOS
+                if nextToken == 1 || nextToken == 107 { break }
 
                 // Generer le token suivant
                 let nextInput = MLXArray([nextToken]).reshaped(1, 1)
