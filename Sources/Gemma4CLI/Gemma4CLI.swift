@@ -619,14 +619,13 @@ struct Describe: AsyncParsableCommand {
         print("  Prompt: \(prompt)")
         print("---")
 
-        // 7. Generer la reponse via generate() du container
+        // 8. Generer la reponse via generate() du container
         let startTime = Date()
         var tokenCount = 0
         nonisolated(unsafe) let capturedInputIds = inputIds
+        let tokenFilter = Gemma4TokenFilter(mode: .disabled)
 
-        // Utiliser container.generate directement avec les input_ids prepares
         let result = try await container.perform { context in
-            let lmInput = LMInput(text: .init(tokens: expandedDimensions(capturedInputIds, axis: 0)))
             var generatedTokens: [Int] = []
 
             let params = GenerateParameters(
@@ -635,26 +634,32 @@ struct Describe: AsyncParsableCommand {
                 topP: 0.95
             )
 
-            // Preparer le cache
             let cache = context.model.newCache(parameters: params)
 
-            // Prefill: traiter tous les input tokens d'un coup
+            // Prefill
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
             var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
 
-            for _ in 0 ..< self.maxTokens {
+            // Budget: maxTokens pour la reponse visible, + 2x pour le thinking cache
+            let maxTotalTokens = self.maxTokens * 3
+            var visibleTokens = 0
+
+            for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
 
-                // Decoder et afficher le token
+                // Filtrer le thinking mode et afficher
                 let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
-                print(text, terminator: "")
-                fflush(stdout)
+                let filtered = tokenFilter.process(tokenId: nextToken, text: text)
+                if !filtered.isEmpty {
+                    print(filtered, terminator: "")
+                    fflush(stdout)
+                    visibleTokens += 1
+                }
 
-                // EOS tokens officiels Gemma 4 (generation_config.json)
-                // 1 = <eos>, 106 = <start_of_turn>, 50 = (token de fin)
-                if nextToken == 1 || nextToken == 106 || nextToken == 50 { break }
+                if tokenFilter.isEOS(nextToken) { break }
+                if visibleTokens >= self.maxTokens { break }
 
-                // Generer le token suivant
+                // Token suivant
                 let nextInput = MLXArray([nextToken]).reshaped(1, 1)
                 let output = context.model(nextInput, cache: cache)
                 if self.temperature <= 0.01 {
@@ -672,7 +677,13 @@ struct Describe: AsyncParsableCommand {
         tokenCount = result.count
         let elapsed = Date().timeIntervalSince(startTime)
         print("\n\n--- Stats ---")
-        print("Tokens: \(tokenCount), Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
+        let thinkCount = tokenFilter.thinkingTokenCount
+        if thinkCount > 0 {
+            print("Tokens: \(tokenCount) total (\(tokenFilter.responseTokenCount) response + \(thinkCount) thinking)")
+        } else {
+            print("Tokens: \(tokenCount)")
+        }
+        print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
         print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
     }
 }

@@ -17,7 +17,7 @@ public struct Gemma4Processor {
     public static let audioToken = "<|audio|>" // 258881
     public static let videoToken = "<|video|>" // 258884
 
-    // Token IDs (de config.json)
+    // Token IDs — multimodal (de config.json)
     public static let imageTokenId: Int32 = 258880
     public static let audioTokenId: Int32 = 258881
     public static let videoTokenId: Int32 = 258884
@@ -25,6 +25,14 @@ public struct Gemma4Processor {
     public static let eoiTokenId: Int32 = 258882
     public static let boaTokenId: Int32 = 256000
     public static let eoaTokenId: Int32 = 258883
+
+    // Token IDs — thinking/channel (de tokenizer.json added_tokens)
+    public static let thinkTokenId: Int32 = 98        // <|think|>
+    public static let channelStartTokenId: Int32 = 100 // <|channel>
+    public static let channelEndTokenId: Int32 = 101   // <channel|>
+
+    // EOS tokens (de generation_config.json)
+    public static let eosTokenIds: Set<Int32> = [1, 106, 50]
 
     /// Construit le prompt avec le chat template Gemma 4 et expand les tokens multimodaux
     /// - Parameters:
