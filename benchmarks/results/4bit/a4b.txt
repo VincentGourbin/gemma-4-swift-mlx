@@ -1,0 +1,93 @@
+Model: mlx-community/gemma-4-26b-a4b-it-4bit
+Date: 2026-04-07T16:39:21Z
+
+=== Text Generation ===
+Enregistrement du type gemma4_text...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge en 2.5s
+GPU: 13799 Mo actifs, 13799 Mo pic
+
+--- Generation ---
+Systeme: Tu es un assistant utile. Reponds de maniere concise.
+Prompt: Explain quantum computing in 3 sentences. Be precise and concise.
+Temperature: 0.3, Max tokens: 200
+---
+Quantum computing uses quantum bits, or qubits, which can exist in multiple states simultaneously through superposition. It leverages entanglement to create complex correlations between qubits, allowing for massive parallel processing. This enables the solving of specific, highly complex problems that are computationally impossible for classical computers.
+
+--- Stats ---
+Tokens generes: 53
+Temps: 0.94s
+Vitesse: 56.3 tokens/s
+GPU pic: 13899 Mo
+
+=== Vision (single image) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236881, 2900, 563, 506, 6514, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 318
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in detail. What type of vehicle is this? What color? What is the setting?
+---
+This is a high-resolution, side-profile photograph of a vintage automobile.
+
+### **Vehicle Description**
+The vehicle is a **Citroën 2CV**, a classic French economy car known for its distinctive, rounded, and aerodynamic shape. 
+*   **Color:** The car is a vibrant, solid **red**.
+*   **Design Features:** It features a highly curved roofline, prominent rounded fenders, and a small, split-window style aesthetic. The wheels have polished chrome hubcaps, and there is a thin chrome trim running along the side of the body. Small stickers are visible on the rear side window.
+*   **Condition:** The car appears to be well-maintained but sits low to the ground, suggesting it is parked on uneven terrain.
+
+### **Setting**
+The setting is an **outdoor, natural environment**.
+*   **Background:** The background is dominated by a dense, lush wall of green foliage, consisting of various trees and bushes. The leaves are thick, creating a dark, textured backdrop that makes the red car stand out sharply.
+*   **Ground:** The car is parked on a patch of light-colored gravel and dirt mixed with sparse patches of grass and small weeds.
+*   **Lighting:** The lighting is soft and diffused, suggesting an overcast day or a shaded area, which prevents harsh shadows and allows the red color of the car to appear very saturated.<turn|>
+
+--- Stats ---
+Tokens: 292
+Temps: 12.78s, Vitesse: 22.8 t/s
+GPU pic: 16311 Mo
+
+=== Video ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de la video: /tmp/bench_video.mp4
+  Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
+  Timestamps: 00:00 00:01 00:02 00:03 00:04 00:06 00:07 00:08 00:09
+  Premiers tokens: [2, 108, 105, 2364, 107, 236771, 236771, 236787, 236771, 236771, 107, 255999, 258884, 258884, 258884]
+  Derniers tokens: [563, 13922, 5528, 684, 5528, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 0, video_token: 630, audio_token: 0
+  Total input tokens: 738
+
+--- Generation multimodale ---
+  Mode: video (9 frames, 70 tokens/frame)
+  Prompt: Describe this video in detail. What is happening frame by frame?
+---
+This video is a short, 9-second motion graphics sequence that features a logo animation for "The FluxForge Studio." The video uses a minimalist, high-contrast black and white aesthetic with a dynamic, kinetic typography style.
+
+**Visual Elements and Style:**
+*   **Color Palette:** Primarily white background with black graphic elements and dark gray text. A subtle gold/tan accent is used in the "x" of "FluxForge."
+*   **Typography:** A clean, modern sans-serif font.
+*   **Graphic Elements:** Abstract geometric shapes, lines, and stylized icons (resembling film strips, camera elements, or technical symbols) are scattered throughout the frame.
+
+**Frame-by-Frame Breakdown:**
+
+*   **00:00 - 00:01:** The video begins with a clean white screen. The logo "FluxForge Studio" is centered. The word "The" is positioned above "FluxForge," and "Studio" is below it. The "x" in "FluxForge" is a different color (gold/tan).
+*   **00:01 - 00:02:** The scene becomes more dynamic. Various black geometric shapes and line elements begin to fly into the frame from different angles, creating a sense of depth and motion. The logo remains centered.
+*   **00:02 - 00:03:** The movement intensifies. More elements, including thicker lines and more complex shapes, enter the frame. The background starts to feel more crowded with these moving parts.
+*   **00:03 - 00:04:** The density of the flying elements increases. The motion is fast-paced, creating a "shattering" or "exploding" effect around the static logo.
+*   **00:04 - 00:06:** The elements continue to swirl and move. Some
+
+--- Stats ---
+Tokens: 400
+Temps: 24.26s, Vitesse: 16.5 t/s
+GPU pic: 16971 Mo
+
