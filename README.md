@@ -8,8 +8,9 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 |---------|--------|---------|
 | Text generation | ✅ **Working** | All 4 families, 4 quantizations each. 8-103 tok/s |
 | Vision (image understanding) | ✅ **Working** | Single + multi-image. All 4 families validated |
-| Video (frame-by-frame) | 🚧 In progress | Architecture complete, frame extraction works |
-| Audio (speech understanding) | 🚧 In progress | Conformer encoder implemented, integration pending |
+| Video (frame-by-frame) | ✅ **Working** | ~1fps, 70 tokens/frame, MM:SS timestamps. All 4 families validated |
+| Audio (speech understanding) | ✅ **Working** | Conformer encoder, 30s max, ASR/comprehension. E2B + E4B validated |
+| Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
 | TurboQuant KV cache | 🧪 Experimental | Chunked prefill + fused Metal kernel. Modest GPU savings at <32K context. [Details](docs/examples/turboquant_paper.txt) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
@@ -68,6 +69,26 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-2
   --prompt "What do these images have in common?"
 ```
 
+### Video description
+
+```bash
+gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-4bit \
+  --video clip.mp4 \
+  --prompt "Describe this video in detail."
+```
+
+> Video is processed as ~1fps frames (max 32 frames, 60s) with 70 soft tokens per frame and MM:SS timestamps. Uses `video_token` (ID 258884), aligned with Google's reference implementation. See [docs/examples/video-description/](docs/examples/video-description/) for benchmarks.
+
+### Audio transcription
+
+```bash
+gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-4bit \
+  --audio speech.mp3 \
+  --prompt "Transcribe the following speech segment in English into English text."
+```
+
+> Audio supports up to 30 seconds, processed via Conformer encoder (750 tokens max). Only E2B and E4B models have an audio tower. Supports ASR (transcription) and comprehension tasks.
+
 ### Interactive chat
 
 ```bash
@@ -94,8 +115,8 @@ gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemm
 |--------|:---:|:---:|:---:|:---:|---|
 | **E2B** | 5.1B | 2.3B | No | Yes | Fastest. Text + Vision + Audio + Video |
 | **E4B** | 9.6B | 4.5B | No | Yes | Best quality/size ratio. Full multimodal |
-| **31B** | 31.3B | 31.3B | No | No | Highest quality. Text + Vision. K=V attention |
-| **26B-A4B** | 25.8B | 3.8B | Yes (128 experts, top-8) | No | MoE efficiency. Text + Vision. K=V attention |
+| **31B** | 31.3B | 31.3B | No | No | Highest quality. Text + Vision + Video |
+| **26B-A4B** | 25.8B | 3.8B | Yes (128 experts, top-8) | No | MoE efficiency. Text + Vision + Video |
 
 ### Available Quantizations
 
@@ -130,6 +151,26 @@ gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemm
 
 > See [docs/examples/vision-image-description/](docs/examples/vision-image-description/) for full benchmarks with OCR and multi-image tests.
 
+### Video (4-bit models, 9 frames ~1fps, 70 tokens/frame)
+
+| Model | Speed | GPU Peak | Temporal Reasoning |
+|-------|:-----:|:--------:|:---:|
+| **E2B** | 50.8 tok/s | 5.6 GB | Basic (per-frame) |
+| **E4B** | 36.5 tok/s | 7.0 GB | Good (time ranges) |
+| **26B-A4B** | 18.8 tok/s | 17.0 GB | Excellent (motion/depth) |
+| **31B** | 5.8 tok/s | 20.8 GB | Best (concise, natural stop) |
+
+> See [docs/examples/video-description/](docs/examples/video-description/) for full benchmarks.
+
+### Audio (4-bit models, 30s speech, 750 tokens)
+
+| Model | Transcription | Comprehension | GPU Peak |
+|-------|:---:|:---:|:--------:|
+| **E2B** | ✅ Accurate | ✅ Context understood | 5.6 GB |
+| **E4B** | ✅ Accurate | ✅ Structured analysis | 7.1 GB |
+| **26B-A4B** | — | No audio tower | — |
+| **31B** | — | No audio tower | — |
+
 ## Library Integration
 
 ```swift
@@ -156,6 +197,32 @@ for try await token in stream {
 }
 ```
 
+### Thinking Mode Filter
+
+Gemma 4 models may spontaneously generate thinking blocks (`<|channel>thought...`). Use `Gemma4TokenFilter` to control this:
+
+```swift
+import Gemma4Swift
+
+// Filter thinking (default) — only response content is emitted
+let filter = Gemma4TokenFilter(mode: .disabled)
+
+// Pass-through — raw tokens including thinking blocks
+let filter = Gemma4TokenFilter(mode: .enabled)
+
+// Structured — separate thinking and response
+let filter = Gemma4TokenFilter(mode: .structured)
+
+// In your generation loop:
+let output = filter.process(tokenId: tokenId, text: decodedText)
+if !output.isEmpty { print(output, terminator: "") }
+
+// After generation (structured mode):
+let result = filter.structuredResponse()
+print("Thinking: \(result.thinking ?? "none")")
+print("Response: \(result.response)")
+```
+
 ## Architecture
 
 ```
@@ -164,11 +231,11 @@ Gemma4Swift/
 ├── TextModel/           # Decoder layers, attention, MLP, MoE, per-layer inputs
 ├── RoPE/                # ProportionalRoPE with partial rotation
 ├── VisionEncoder/       # SigLIP: patch embed, 2D RoPE, pooler, head_dim padding
-├── AudioEncoder/        # Conformer: SubSampleConv, chunked attention
-├── VideoProcessor/      # AVAsset frame extraction
+├── AudioEncoder/        # Conformer: SubSampleConv, chunked attention, rel positions
+├── VideoProcessor/      # AVAsset frame extraction, ~1fps, aspect-ratio resize
 ├── Multimodal/          # Embedding fusion via masked_scatter
 ├── TurboQuant/          # MSE codec, Metal kernels, chunked prefill attention
-├── Pipeline/            # High-level API, processors, registration, model cache
+├── Pipeline/            # High-level API, processors, token filter, registration
 ├── Norms/               # RMSNormNoScale, RMSNormZeroShift
 └── Utils/               # Weight sanitizer, profiling toolkit
 ```
@@ -178,6 +245,9 @@ Gemma4Swift/
 - **Gemma 4 ≠ Gemma 3n**: No AltUp, no Laurel blocks, no activation sparsity. Simpler decoder with `global_head_dim`, `partial_rotary_factor`, `use_double_wide_mlp`, and optional K=V attention.
 - **Registration-based**: Registers `"gemma4"` and `"gemma4_text"` model types into mlx-swift-lm's `LLMTypeRegistry`.
 - **Multimodal via masked_scatter**: Image/audio/video embeddings replace special token positions in the text embedding sequence.
+- **Video aligned with Google reference**: `video_token` (258884), 70 soft tokens/frame, MM:SS timestamps, ~1fps sampling.
+- **Audio aligned with Google reference**: Conformer with relative position embeddings, causal chunked attention, mel spectrogram matching `feature_extraction_gemma4.py`.
+- **Thinking mode handling**: `Gemma4TokenFilter` detects `<|channel>thought`/`<|channel>response` blocks and filters or separates them at the API level.
 - **ProportionalRoPE**: Only 25% of head dimensions get rotary encoding for full-attention layers.
 - **Vision head_dim padding**: Pads non-standard head dimensions (72 → 80) for fused SDPA to avoid NaN from all-masked padding rows.
 - **No HuggingFace SDK dependency**: Direct HTTPS downloads + local tokenizer loading.
