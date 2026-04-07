@@ -24,6 +24,8 @@ public struct BenchmarkResult: Sendable {
     public let quantization: String
     public let promptTokenCount: Int
     public let maxTokens: Int
+    public let generatedTokenCount: Int
+    public let kvBits: Float?
 
     public func generateReport() -> String {
         var report = """
@@ -35,8 +37,9 @@ public struct BenchmarkResult: Sendable {
         """
 
         report += "  Model: \(modelVariant)  Quant: \(quantization)\n"
-        report += "  Prompt tokens: \(promptTokenCount)  Max tokens: \(maxTokens)\n"
-        report += "  Warm-up: \(warmupRuns)  Measured runs: \(measuredRuns)\n\n"
+        let kvDesc = kvBits != nil ? "TurboQuant \(kvBits!)-bit" : "Standard"
+        report += "  KV Cache: \(kvDesc)  Context: \(promptTokenCount) tokens\n"
+        report += "  Generated: \(generatedTokenCount)/\(maxTokens)  Warm-up: \(warmupRuns)  Runs: \(measuredRuns)\n\n"
 
         report += "  PHASE TIMINGS (mean \u{00B1} std)\n"
         report += "  \(String(repeating: "\u{2500}", count: 58))\n"
@@ -96,7 +99,8 @@ public struct BenchmarkAggregator {
                 totalStats: .init(name: "TOTAL", meanMs: 0, stdMs: 0, minMs: 0, maxMs: 0, count: 0),
                 peakMLXActiveMB: 0, peakProcessMB: 0,
                 warmupRuns: warmupCount, measuredRuns: 0,
-                modelVariant: "", quantization: "", promptTokenCount: 0, maxTokens: 0
+                modelVariant: "", quantization: "", promptTokenCount: 0, maxTokens: 0,
+                generatedTokenCount: 0, kvBits: nil
             )
         }
 
@@ -164,7 +168,9 @@ public struct BenchmarkAggregator {
             modelVariant: first.modelVariant,
             quantization: first.quantization,
             promptTokenCount: first.promptTokenCount,
-            maxTokens: first.maxTokens
+            maxTokens: first.maxTokens,
+            generatedTokenCount: first.generatedTokenCount,
+            kvBits: first.kvBits
         )
     }
 

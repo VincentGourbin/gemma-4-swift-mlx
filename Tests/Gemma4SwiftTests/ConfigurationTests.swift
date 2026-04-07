@@ -283,39 +283,5 @@ struct ConfigurationTests {
         #expect(config.audioConfig == nil)
     }
 
-    // MARK: - Model Registry
-
-    @Test("Model registry couvre tous les modeles")
-    func testModelRegistry() {
-        let allModels = Gemma4Pipeline.Model.allCases
-        #expect(allModels.count == 10)
-
-        // Verifier les IT models
-        let itModels = allModels.filter { $0.isInstructionTuned }
-        #expect(itModels.count == 6) // 2 MLX + 4 Google IT
-
-        // Verifier les modeles MoE
-        let moeModels = allModels.filter { $0.isMoE }
-        #expect(moeModels.count == 2) // a4bIT + a4b
-
-        // Verifier les BF16
-        let bf16Models = allModels.filter { $0.isBF16 }
-        #expect(bf16Models.count == 8) // tous les Google
-    }
-
-    @Test("Modeles recommandes pour RAM")
-    func testRecommendedModels() {
-        // 8 Go: seulement le 4-bit E2B
-        let for8GB = Gemma4Pipeline.Model.recommended(forRAMGB: 8)
-        #expect(for8GB.count == 1)
-        #expect(for8GB.first == .e2b4bit)
-
-        // 16 Go: 4-bit E2B + 4-bit E4B + Google E2B IT
-        let for16GB = Gemma4Pipeline.Model.recommended(forRAMGB: 16)
-        #expect(for16GB.count == 3)
-
-        // 128 Go: tous les IT
-        let for128GB = Gemma4Pipeline.Model.recommended(forRAMGB: 128)
-        #expect(for128GB.count == 6)
-    }
+    // Model Registry tests are in ModelRegistryTests.swift
 }

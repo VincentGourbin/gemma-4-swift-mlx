@@ -10,13 +10,13 @@ import MLXLLM
 /// Modele Gemma 4 multimodal complet (texte + vision + audio)
 /// Conforme a LLMModel pour l'enregistrement dans mlx-swift-lm.
 public class Gemma4MultimodalLLMModel: Module, LLMModel {
-    let config: Gemma4Config
+    public let config: Gemma4Config
 
     @ModuleInfo(key: "language_model") var languageModel: Gemma4LanguageModel
     @ModuleInfo(key: "vision_tower") var visionTower: VisionModel
     @ModuleInfo(key: "embed_vision") var embedVision: MultimodalEmbedder
-    @ModuleInfo(key: "audio_tower") var audioTower: AudioEncoder
-    @ModuleInfo(key: "embed_audio") var embedAudio: MultimodalEmbedder
+    @ModuleInfo(key: "audio_tower") var audioTower: AudioEncoder?
+    @ModuleInfo(key: "embed_audio") var embedAudio: MultimodalEmbedder?
 
     public let modelType: String
     public var kvHeads: [Int]
@@ -44,15 +44,19 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
             eps: visionConfig.rmsNormEps
         )
 
-        // Audio
-        let audioConfig = config.audioConfig ?? Gemma4AudioConfig.defaultConfig
-        let audioOutputDim = audioConfig.outputProjDims ?? audioConfig.hiddenSize
-        self._audioTower.wrappedValue = AudioEncoder(audioConfig)
-        self._embedAudio.wrappedValue = MultimodalEmbedder(
-            embeddingDim: audioOutputDim,
-            textHiddenSize: textConfig.hiddenSize,
-            eps: audioConfig.rmsNormEps
-        )
+        // Audio (optionnel — 26B-A4B et 31B n'ont pas d'audio)
+        if let audioConfig = config.audioConfig {
+            let audioOutputDim = audioConfig.outputProjDims ?? audioConfig.hiddenSize
+            self._audioTower.wrappedValue = AudioEncoder(audioConfig)
+            self._embedAudio.wrappedValue = MultimodalEmbedder(
+                embeddingDim: audioOutputDim,
+                textHiddenSize: textConfig.hiddenSize,
+                eps: audioConfig.rmsNormEps
+            )
+        } else {
+            self._audioTower.wrappedValue = nil
+            self._embedAudio.wrappedValue = nil
+        }
 
         super.init()
     }
@@ -100,38 +104,25 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
 
             let imageMask = inputs .== Int32(config.imageTokenId)
             let imageMaskExpanded = broadcast(expandedDimensions(imageMask, axis: -1), to: inputsEmbeds.shape)
+
             inputsEmbeds = maskedScatter(input: inputsEmbeds, mask: imageMaskExpanded, source: imageFeatures)
             pendingPixelValues = nil
         }
 
-        // Audio: scatter audio features
-        if let audioFeatures = pendingAudioFeatures {
+        // Audio: scatter audio features (seulement si le modele a un audio tower)
+        if let audioFeatures = pendingAudioFeatures, let tower = audioTower, let embedder = embedAudio {
             let mask = pendingAudioMask ?? MLXArray.zeros([audioFeatures.dim(0), audioFeatures.dim(1)], type: Bool.self)
-            print("[multimodal] Audio features input: \(audioFeatures.shape), mask: \(mask.shape)")
-            let (audioEncodings, _) = audioTower(audioFeatures, audioMelMask: mask)
-            print("[multimodal] Audio encoder output: \(audioEncodings.shape)")
-            var audioEmbeds = embedAudio(audioEncodings)
-            print("[multimodal] Audio embeds: \(audioEmbeds.shape)")
+            let (audioEncodings, _) = tower(audioFeatures, audioMelMask: mask)
+            var audioEmbeds = embedder(audioEncodings)
             audioEmbeds = audioEmbeds.asType(inputsEmbeds.dtype)
 
             let audioTokenMask = inputs .== Int32(config.audioTokenId)
             let numAudioTokens = audioTokenMask.sum().item(Int.self)
             let numAudioEmbeds = audioEmbeds.dim(1)
-            print("[multimodal] Audio tokens in input: \(numAudioTokens), audio embeds: \(numAudioEmbeds)")
-            // Debug: verifier que les embeddings ne sont pas degeneres
-            let embedStats = audioEmbeds[0..., 0, 0 ..< 5]
-            print("[multimodal] Audio embeds sample [0,:5]: \(embedStats)")
-            let embedMean = mean(abs(audioEmbeds)).item(Float.self)
-            let embedMax = max(abs(audioEmbeds)).item(Float.self)
-            print("[multimodal] Audio embeds |mean|=\(embedMean), |max|=\(embedMax)")
 
-            // Ajuster pour correspondre exactement
-            if numAudioEmbeds != numAudioTokens && numAudioTokens > 0 {
-                if numAudioEmbeds > numAudioTokens {
-                    audioEmbeds = audioEmbeds[0..., 0 ..< numAudioTokens]
-                }
-                // Si pas assez d'embeds, c'est un probleme de config
-                print("[multimodal] Audio embeds ajustes: \(min(numAudioEmbeds, numAudioTokens))")
+            // Ajuster si le nombre d'embeds ne correspond pas aux tokens
+            if numAudioEmbeds != numAudioTokens && numAudioTokens > 0 && numAudioEmbeds > numAudioTokens {
+                audioEmbeds = audioEmbeds[0..., 0 ..< numAudioTokens]
             }
 
             let audioMaskExpanded = broadcast(expandedDimensions(audioTokenMask, axis: -1), to: inputsEmbeds.shape)
@@ -156,11 +147,16 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
-        WeightSanitizer.sanitize(
+        // Auto-detect clipped linears: si les poids contiennent output_max dans le vision tower,
+        // on les garde meme si la config dit false (modeles MLX community pre-quantises)
+        let hasClippedWeights = weights.keys.contains { $0.contains("vision_tower") && $0.contains("output_max") }
+        let useClipped = hasClippedWeights || (config.visionConfig?.useClippedLinears ?? false)
+
+        return WeightSanitizer.sanitize(
             weights: weights,
             hasVision: true,
-            hasAudio: true,
-            useClippedLinears: config.visionConfig?.useClippedLinears ?? false
+            hasAudio: config.audioConfig != nil,
+            useClippedLinears: useClipped
         )
     }
 

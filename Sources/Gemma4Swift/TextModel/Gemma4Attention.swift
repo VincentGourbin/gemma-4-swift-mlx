@@ -113,28 +113,34 @@ public class Gemma4Attention: Module {
         let offset = cache?.offset ?? 0
 
         if isKvSharedLayer, let cache = cache {
-            // Couche partagee: reutiliser le cache existant
+            // Couche partagee: reutiliser le cache existant (pas d'update)
+            queries = rope(queries, offset: offset)
+
+            // TurboQuant shared: toujours attention quantisee (prefill chunked ou decode fused)
+            if let turboCache = cache as? TurboQuantKVCache {
+                let output = turboCache.quantizedAttention(
+                    queries: queries, scale: scale, mask: mask
+                )
+                .transposed(0, 2, 1, 3)
+                .reshaped(B, L, -1)
+                return oProj(output)
+            }
+
+            // Standard shared: lire les K/V decompresses du cache
             let state = cache.state
             if state.count >= 2 {
-                keys = state[0]
-                values = state[1]
-                // Appliquer RoPE aux queries avec le bon offset
-                queries = rope(queries, offset: offset)
-
-                // Attention directe (pas d'update du cache)
                 let output = MLXFast.scaledDotProductAttention(
                     queries: queries,
-                    keys: keys,
-                    values: values,
+                    keys: state[0],
+                    values: state[1],
                     scale: scale,
                     mask: mask
                 )
                 .transposed(0, 2, 1, 3)
                 .reshaped(B, L, -1)
                 return oProj(output)
-            } else {
-                (keys, values) = computeKV(x: x, B: B, L: L)
             }
+            (keys, values) = computeKV(x: x, B: B, L: L)
         } else {
             (keys, values) = computeKV(x: x, B: B, L: L)
         }
@@ -143,7 +149,18 @@ public class Gemma4Attention: Module {
         queries = rope(queries, offset: offset)
         keys = rope(keys, offset: offset)
 
-        // attentionWithCacheUpdate() gere l'update du cache + dispatch quantized/standard
+        // TurboQuant path: quantise immediatement puis attention quantisee (chunked ou fused)
+        if let turboCache = cache as? TurboQuantKVCache {
+            turboCache.update(keys: keys, values: values)
+            let output = turboCache.quantizedAttention(
+                queries: queries, scale: scale, mask: mask
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            return oProj(output)
+        }
+
+        // Standard path: attentionWithCacheUpdate() gere l'update du cache
         let output = attentionWithCacheUpdate(
             queries: queries,
             keys: keys,

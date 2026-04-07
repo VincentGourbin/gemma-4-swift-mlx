@@ -12,7 +12,7 @@ import MLXLLM
 public class Gemma4LLMModel: Module, LLMModel {
     @ModuleInfo(key: "language_model") public var languageModel: Gemma4LanguageModel
 
-    let config: Gemma4TextConfig
+    public let config: Gemma4TextConfig
     public let modelType: String
 
     public var kvHeads: [Int]
@@ -42,7 +42,8 @@ public class Gemma4LLMModel: Module, LLMModel {
     }
 
     public func newCache(parameters: GenerateParameters?) -> [any KVCache] {
-        languageModel.makeCache()
+        let kvBits: Float? = parameters?.kvBits != nil ? Float(parameters!.kvBits!) : nil
+        return languageModel.makeCache(kvBits: kvBits)
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
