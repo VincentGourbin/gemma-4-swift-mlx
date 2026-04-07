@@ -450,10 +450,14 @@ struct Describe: AsyncParsableCommand {
         let numImages = image.count
         var hasImage = false
         var hasAudio = false
+        var hasVideo = false
         let numImageTokens = 280
         var numAudioTokens = 0
         var numVideoFrames = 0
+        var videoSoftTokensPerFrame = Gemma4VideoProcessor.defaultSoftTokensPerFrame
+        var videoTimestamps: [Double] = []
         var pixelValues: MLXArray?
+        var videoFrameValues: MLXArray?
         var audioFeatures: Gemma4AudioProcessor.AudioFeatures?
 
         // Images (une ou plusieurs)
@@ -479,7 +483,6 @@ struct Describe: AsyncParsableCommand {
                     if h == maxH && w == maxW {
                         padded.append(pv)
                     } else {
-                        // Padder avec des zeros (noir) a droite/en bas
                         let result = MLXArray.zeros([1, 3, maxH, maxW], dtype: pv.dtype)
                         result[0..., 0..., 0 ..< h, 0 ..< w] = pv
                         padded.append(result)
@@ -501,28 +504,32 @@ struct Describe: AsyncParsableCommand {
             print("  Audio preprocesse: duree \(String(format: "%.1f", audioFeatures!.durationSeconds))s, \(numAudioTokens) tokens")
         }
 
-        // Video
+        // Video (pipeline aligné sur la référence Python)
         if let videoPath = video {
             print("Traitement de la video: \(videoPath)")
             let videoURL = URL(fileURLWithPath: videoPath)
-            let frames = try await Gemma4VideoProcessor.processVideo(url: videoURL, maxFrames: 8)
-            pixelValues = frames.pixelValues
+            let frames = try await Gemma4VideoProcessor.processVideo(url: videoURL)
+            videoFrameValues = frames.pixelValues
             numVideoFrames = frames.frameCount
-            hasImage = true // video utilise le vision encoder
-            print("  Video preprocessee: \(frames.frameCount) frames")
+            videoSoftTokensPerFrame = frames.softTokensPerFrame
+            videoTimestamps = frames.timestamps
+            hasVideo = true
+            print("  Video preprocessee: \(frames.frameCount) frames, \(frames.softTokensPerFrame) tokens/frame, \(String(format: "%.1f", frames.sourceFPS)) fps source")
+            print("  Timestamps: \(frames.timestamps.map { Gemma4VideoProcessor.formatTimestamp($0) }.joined(separator: " "))")
         }
 
         // 4. Construire le contenu multimodal avec les placeholders
         var contentParts: [String] = []
-        if hasImage && video == nil {
-            // Un <|image|> par image
+        if hasImage {
             for _ in 0 ..< numImages {
                 contentParts.append("<|image|>")
             }
         }
-        if video != nil {
-            for _ in 0 ..< numVideoFrames {
-                contentParts.append("<|image|>")
+        if hasVideo {
+            // Video: timestamp + <|video|> par frame (ref Python)
+            for i in 0 ..< numVideoFrames {
+                let ts = Gemma4VideoProcessor.formatTimestamp(videoTimestamps[i])
+                contentParts.append("\(ts)\n<|video|>")
             }
         }
         if hasAudio && numAudioTokens > 0 {
@@ -531,26 +538,43 @@ struct Describe: AsyncParsableCommand {
         contentParts.append(prompt)
         let content = contentParts.joined(separator: "\n")
 
-        // 5. Tokeniser via applyChatTemplate (gère les tokens spéciaux correctement)
+        // 5. Tokeniser via applyChatTemplate
         let messages: [[String: String]] = [["role": "user", "content": content]]
         var tokenIds: [Int] = try await container.perform { context in
             try context.tokenizer.applyChatTemplate(messages: messages)
         }
 
-        // 6. Expanser les tokens image : remplacer chaque image_token par numImageTokens copies
-        // Le tokenizer produit un seul token 258880 par <|image|>, on le remplace par 280
+        // 6. Expanser les tokens: remplacer chaque token special par N copies
         let imageTokenId = Int(Gemma4Processor.imageTokenId)
+        let videoTokenId = Int(Gemma4Processor.videoTokenId)
+        let audioTokenId = Int(Gemma4Processor.audioTokenId)
         let boiTokenId = Int(Gemma4Processor.boiTokenId)
         let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+        let boaTokenId = Int(Gemma4Processor.boaTokenId)
+        let eoaTokenId = Int(Gemma4Processor.eoaTokenId)
         var expandedTokenIds: [Int] = []
         for tid in tokenIds {
             if tid == imageTokenId {
-                // Remplacer le single image token par: boi + image_token * N + eoi
+                // Image: boi + image_token * 280 + eoi
                 expandedTokenIds.append(boiTokenId)
                 for _ in 0 ..< numImageTokens {
                     expandedTokenIds.append(imageTokenId)
                 }
                 expandedTokenIds.append(eoiTokenId)
+            } else if tid == videoTokenId {
+                // Video: boi + video_token * 70 + eoi
+                expandedTokenIds.append(boiTokenId)
+                for _ in 0 ..< videoSoftTokensPerFrame {
+                    expandedTokenIds.append(videoTokenId)
+                }
+                expandedTokenIds.append(eoiTokenId)
+            } else if tid == audioTokenId {
+                // Audio: boa + audio_token * N + eoa
+                expandedTokenIds.append(boaTokenId)
+                for _ in 0 ..< numAudioTokens {
+                    expandedTokenIds.append(audioTokenId)
+                }
+                expandedTokenIds.append(eoaTokenId)
             } else {
                 expandedTokenIds.append(tid)
             }
@@ -558,33 +582,29 @@ struct Describe: AsyncParsableCommand {
         tokenIds = expandedTokenIds
         let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
-        // Debug: premiers et derniers tokens
-        let first10 = Array(tokenIds.prefix(15))
-        let last10 = Array(tokenIds.suffix(15))
-        print("  Premiers tokens: \(first10)")
-        print("  Derniers tokens: \(last10)")
-        // Compter les tokens speciaux
-        let audioCount = tokenIds.filter { $0 == 258881 }.count
-        let boaCount = tokenIds.filter { $0 == 256000 }.count
-        let eoaCount = tokenIds.filter { $0 == 258883 }.count
-        print("  audio_token(\(258881)): \(audioCount), boa(\(256000)): \(boaCount), eoa(\(258883)): \(eoaCount)")
-
-        // Verifier les token counts
-        let counts = Gemma4Processor.validateTokenCounts(
-            inputIds: inputIds,
-            expectedImageTokens: hasImage ? numImageTokens : 0,
-            expectedAudioTokens: numAudioTokens
-        )
-        print("  Tokens image dans le prompt: \(counts.imageCount)")
-        if hasAudio { print("  Tokens audio dans le prompt: \(counts.audioCount)") }
+        // Debug tokens
+        let first15 = Array(tokenIds.prefix(15))
+        let last15 = Array(tokenIds.suffix(15))
+        print("  Premiers tokens: \(first15)")
+        print("  Derniers tokens: \(last15)")
+        let imgCount = tokenIds.filter { $0 == imageTokenId }.count
+        let vidCount = tokenIds.filter { $0 == videoTokenId }.count
+        let audCount = tokenIds.filter { $0 == 258881 }.count
+        print("  image_token: \(imgCount), video_token: \(vidCount), audio_token: \(audCount)")
         print("  Total input tokens: \(inputIds.shape[0])")
 
-        // 6. Injecter les donnees multimodales dans le modele
+        // 7. Injecter les donnees multimodales dans le modele
         nonisolated(unsafe) let finalPixelValues = pixelValues
+        nonisolated(unsafe) let finalVideoFrames = videoFrameValues
+        nonisolated(unsafe) let finalVideoSoftTokens = videoSoftTokensPerFrame
         nonisolated(unsafe) let finalAudioFeatures = audioFeatures
         await container.perform { context in
             if let model = context.model as? Gemma4MultimodalLLMModel {
                 model.pendingPixelValues = finalPixelValues
+                if finalVideoFrames != nil {
+                    model.pendingVideoFrames = finalVideoFrames
+                    model.pendingVideoSoftTokensPerFrame = finalVideoSoftTokens
+                }
                 if let af = finalAudioFeatures {
                     model.pendingAudioFeatures = af.features
                     model.pendingAudioMask = af.mask
@@ -593,19 +613,19 @@ struct Describe: AsyncParsableCommand {
         }
 
         print("\n--- Generation multimodale ---")
-        if hasImage { print("  Mode: vision") }
+        if hasImage { print("  Mode: vision (\(numImages) image(s), \(numImageTokens) tokens/image)") }
+        if hasVideo { print("  Mode: video (\(numVideoFrames) frames, \(videoSoftTokensPerFrame) tokens/frame)") }
         if hasAudio { print("  Mode: audio") }
         print("  Prompt: \(prompt)")
         print("---")
 
-        // 7. Generer la reponse via generate() du container
+        // 8. Generer la reponse via generate() du container
         let startTime = Date()
         var tokenCount = 0
         nonisolated(unsafe) let capturedInputIds = inputIds
+        let tokenFilter = Gemma4TokenFilter(mode: .disabled)
 
-        // Utiliser container.generate directement avec les input_ids prepares
         let result = try await container.perform { context in
-            let lmInput = LMInput(text: .init(tokens: expandedDimensions(capturedInputIds, axis: 0)))
             var generatedTokens: [Int] = []
 
             let params = GenerateParameters(
@@ -614,26 +634,32 @@ struct Describe: AsyncParsableCommand {
                 topP: 0.95
             )
 
-            // Preparer le cache
             let cache = context.model.newCache(parameters: params)
 
-            // Prefill: traiter tous les input tokens d'un coup
+            // Prefill
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
             var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
 
-            for _ in 0 ..< self.maxTokens {
+            // Budget: maxTokens pour la reponse visible, + 2x pour le thinking cache
+            let maxTotalTokens = self.maxTokens * 3
+            var visibleTokens = 0
+
+            for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
 
-                // Decoder et afficher le token
+                // Filtrer le thinking mode et afficher
                 let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
-                print(text, terminator: "")
-                fflush(stdout)
+                let filtered = tokenFilter.process(tokenId: nextToken, text: text)
+                if !filtered.isEmpty {
+                    print(filtered, terminator: "")
+                    fflush(stdout)
+                    visibleTokens += 1
+                }
 
-                // EOS tokens officiels Gemma 4 (generation_config.json)
-                // 1 = <eos>, 106 = <start_of_turn>, 50 = (token de fin)
-                if nextToken == 1 || nextToken == 106 || nextToken == 50 { break }
+                if tokenFilter.isEOS(nextToken) { break }
+                if visibleTokens >= self.maxTokens { break }
 
-                // Generer le token suivant
+                // Token suivant
                 let nextInput = MLXArray([nextToken]).reshaped(1, 1)
                 let output = context.model(nextInput, cache: cache)
                 if self.temperature <= 0.01 {
@@ -651,7 +677,13 @@ struct Describe: AsyncParsableCommand {
         tokenCount = result.count
         let elapsed = Date().timeIntervalSince(startTime)
         print("\n\n--- Stats ---")
-        print("Tokens: \(tokenCount), Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
+        let thinkCount = tokenFilter.thinkingTokenCount
+        if thinkCount > 0 {
+            print("Tokens: \(tokenCount) total (\(tokenFilter.responseTokenCount) response + \(thinkCount) thinking)")
+        } else {
+            print("Tokens: \(tokenCount)")
+        }
+        print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
         print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
     }
 }

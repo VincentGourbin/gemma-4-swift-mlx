@@ -82,7 +82,20 @@ public class AudioAttention: Module {
         return result[0..., indices]
     }
 
-    public func callAsFunction(_ hiddenStates: MLXArray, mask: MLXArray, causalValidMask: MLXArray) -> MLXArray {
+    /// Relative position shift (ref: Transformer-XL appendix B, huggingface/papers/1901.02860)
+    func relShift(_ x: MLXArray) -> MLXArray {
+        let shape = x.shape
+        let B = shape[0], N = shape[1], U = shape[2], W = shape[3], posLen = shape[4]
+        let C = contextSize
+
+        // Pad, reshape, trim to align relative positions with context windows
+        var result = padded(x, widths: [.init(0), .init(0), .init(0), .init(0), .init((0, C + 1 - posLen))])
+        result = result.reshaped(B, N, U, W * (C + 1))
+        result = result[0..., 0..., 0..., 0 ..< W * C]
+        return result.reshaped(B, N, U, W, C)
+    }
+
+    public func callAsFunction(_ hiddenStates: MLXArray, mask: MLXArray, causalValidMask: MLXArray, positionEmbeddings: MLXArray) -> MLXArray {
         let B = hiddenStates.dim(0)
         let T = hiddenStates.dim(1)
 
@@ -97,35 +110,58 @@ public class AudioAttention: Module {
         let queryBlocks = convertToBlock(q)
         let keyBlocks = extractBlockContext(k)
         let valueBlocks = extractBlockContext(v)
+        let numBlocks = queryBlocks.dim(1)
 
-        // Score: [B, numBlocks, chunkSize, numHeads, contextSize]
-        // Transpose pour matmul: [B, N, U, W, H] x [B, N, U, H, C]
-        let qT = queryBlocks.transposed(0, 3, 1, 2, 4) // [B, N, U, W, H]
-        let kT = keyBlocks.transposed(0, 3, 1, 4, 2)    // [B, N, U, H, C]
-        var logits = matmul(qT, kT)                       // [B, N, U, W, C]
+        // matrix_ac: standard Q·K^T
+        let queries = queryBlocks.transposed(0, 3, 1, 2, 4)  // [B, N, U, W, H]
+        let kT = keyBlocks.transposed(0, 3, 1, 4, 2)          // [B, N, U, H, C]
+        let matrixAC = matmul(queries, kT)                     // [B, N, U, W, C]
+
+        // matrix_bd: Q · RelativeK^T (relative position bias)
+        // positionEmbeddings: [posLen, hidden_size]
+        var relativeKeyStates = relativeKProj(positionEmbeddings.asType(hiddenStates.dtype))
+        // [posLen, numHeads * headDim] → [posLen, numHeads, headDim]
+        let posLen = relativeKeyStates.dim(0)
+        relativeKeyStates = relativeKeyStates.reshaped(posLen, numHeads, headDim)
+        // Permute to [numHeads, headDim, posLen]
+        let relKT = relativeKeyStates.transposed(1, 2, 0)
+
+        // queries_flat: [B, N, U*W, H]
+        let queriesFlat = queries.reshaped(B, numHeads, -1, headDim)
+        // matmul: [B, N, U*W, H] x [1, N, H, posLen] → [B, N, U*W, posLen]
+        var matrixBD = matmul(queriesFlat, expandedDimensions(relKT, axis: 0))
+        // Reshape back: [B, N, U, W, posLen]
+        matrixBD = matrixBD.reshaped(B, numHeads, numBlocks, chunkSize, -1)
+        matrixBD = relShift(matrixBD)
+
+        // Combine: attn_weights = matrix_ac + matrix_bd
+        var logits = matrixAC + matrixBD
 
         // Softcap
         logits = tanh(logits / softcap) * softcap
 
-        // Appliquer le masque de validite
+        // 1. Masque causal+validite
+        let causalExpanded = expandedDimensions(expandedDimensions(expandedDimensions(causalValidMask, axis: 0), axis: 0), axis: 0)
+        logits = MLX.where(causalExpanded, logits, MLXArray(invalidLogitsValue))
+
+        // 2. Masque de padding
         let validMask = logicalNot(mask)
         let extractedValid = extractBlockContext(expandedDimensions(validMask, axis: -1)).squeezed(axis: -1)
-        // [B, 1, 1, 1, C] * [1, 1, 1, W, C]
-        let condition = expandedDimensions(expandedDimensions(extractedValid, axis: 1), axis: 3)
-        logits = MLX.where(condition, logits, MLXArray(invalidLogitsValue))
+        let paddingCondition = expandedDimensions(expandedDimensions(extractedValid, axis: 1), axis: 3)
+        logits = MLX.where(paddingCondition, logits, MLXArray(invalidLogitsValue))
 
         // Softmax + attention
         let probs = softmax(logits, axis: -1)
 
         // probs [B, N, U, W, C] x V [B, N, U, C, H] → [B, N, U, W, H]
-        let vT = valueBlocks.transposed(0, 3, 1, 2, 4) // [B, N, U, C, H]
+        let vT = valueBlocks.transposed(0, 3, 1, 2, 4)
         var context = matmul(probs, vT)
 
-        // Reshape back: [B, N, U, W, H] → [B, U*W, N, H] → [B, T, D]
+        // Reshape back: [B, N, U, W, H] → [B, U*W, N*H] → [B, T, D]
         context = context.transposed(0, 2, 3, 1, 4) // [B, U, W, N, H]
         let U = context.dim(1)
         context = context.reshaped(B, U * chunkSize, numHeads, headDim)
-        context = context[0..., 0 ..< T] // Truncate au T original
+        context = context[0..., 0 ..< T]
 
         context = context.reshaped(B, T, numHeads * headDim)
         return post(context)

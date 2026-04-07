@@ -27,6 +27,10 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
     public var pendingAudioFeatures: MLXArray?
     public var pendingAudioMask: MLXArray?
 
+    // Video: frames separees des images, avec truncation a softTokensPerFrame
+    public var pendingVideoFrames: MLXArray?
+    public var pendingVideoSoftTokensPerFrame: Int?
+
     public init(config: Gemma4Config) {
         self.config = config
         self.modelType = config.modelType
@@ -67,7 +71,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
         let cacheArray: [KVCache?]? = cache?.map { $0 as KVCache? }
 
         // Si pas de media en attente, mode texte simple
-        guard pendingPixelValues != nil || pendingAudioFeatures != nil else {
+        guard pendingPixelValues != nil || pendingVideoFrames != nil || pendingAudioFeatures != nil else {
             return languageModel(inputs: inputs, cache: cacheArray)
         }
 
@@ -79,18 +83,18 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
         var perLayerInputs: MLXArray? = nil
         if languageModel.model.hiddenSizePerLayerInput > 0 {
             let imageMask = inputs .== Int32(config.imageTokenId)
+            let videoMaskIds = inputs .== Int32(config.videoTokenId)
             let audioMaskIds = inputs .== Int32(config.audioTokenId)
-            let textMask = logicalNot(imageMask .|| audioMaskIds)
+            let textMask = logicalNot(imageMask .|| videoMaskIds .|| audioMaskIds)
             let maskedIds = MLX.where(textMask, inputs, MLXArray.zeros(like: inputs))
             perLayerInputs = languageModel.model.getPerLayerInputs(maskedIds)
         }
 
-        // Vision: traiter chaque image/frame individuellement puis scatter
+        // Vision (images): traiter chaque image individuellement puis scatter
         if let pixelValues = pendingPixelValues {
             let numImages = pixelValues.dim(0)
             var allFeatures: [MLXArray] = []
 
-            // Traiter chaque image/frame separement dans le vision encoder
             for i in 0 ..< numImages {
                 let singleImage = pixelValues[i ..< (i + 1)] // [1, C, H, W]
                 var features = visionTower(singleImage) // [1, 280, dim]
@@ -107,6 +111,33 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel {
 
             inputsEmbeds = maskedScatter(input: inputsEmbeds, mask: imageMaskExpanded, source: imageFeatures)
             pendingPixelValues = nil
+        }
+
+        // Video: traiter chaque frame via vision encoder, tronquer a softTokensPerFrame (70)
+        if let videoFrames = pendingVideoFrames {
+            let softTokens = pendingVideoSoftTokensPerFrame ?? 70
+            let numFrames = videoFrames.dim(0)
+            var allVideoFeatures: [MLXArray] = []
+
+            for i in 0 ..< numFrames {
+                let singleFrame = videoFrames[i ..< (i + 1)] // [1, C, H, W]
+                var features = visionTower(singleFrame) // [1, 280, dim]
+                features = embedVision(features)
+                // Tronquer a softTokensPerFrame (70) — seuls les premiers tokens sont valides
+                features = features[0..., 0 ..< softTokens]
+                allVideoFeatures.append(features)
+            }
+
+            // Concatener: [1, numFrames*softTokens, dim]
+            var videoFeatures = concatenated(allVideoFeatures, axis: 1)
+            videoFeatures = videoFeatures.asType(inputsEmbeds.dtype)
+
+            let videoMask = inputs .== Int32(config.videoTokenId)
+            let videoMaskExpanded = broadcast(expandedDimensions(videoMask, axis: -1), to: inputsEmbeds.shape)
+
+            inputsEmbeds = maskedScatter(input: inputsEmbeds, mask: videoMaskExpanded, source: videoFeatures)
+            pendingVideoFrames = nil
+            pendingVideoSoftTokensPerFrame = nil
         }
 
         // Audio: scatter audio features (seulement si le modele a un audio tower)

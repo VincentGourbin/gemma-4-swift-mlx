@@ -7,6 +7,7 @@ import MLXNN
 /// SSCP → 12 ConformerBlocks → output projection
 public class AudioEncoder: Module {
     let config: Gemma4AudioConfig
+    let relPosEnc: AudioRelPositionalEncoding
 
     @ModuleInfo(key: "subsample_conv_projection") var subsampleConvProjection: SubSampleConvProjection
     @ModuleInfo var layers: [ConformerBlock]
@@ -14,6 +15,7 @@ public class AudioEncoder: Module {
 
     public init(_ config: Gemma4AudioConfig) {
         self.config = config
+        self.relPosEnc = AudioRelPositionalEncoding(config)
 
         self._subsampleConvProjection.wrappedValue = SubSampleConvProjection(config)
         self._layers.wrappedValue = (0 ..< config.numHiddenLayers).map { _ in
@@ -43,9 +45,10 @@ public class AudioEncoder: Module {
     public func callAsFunction(_ audioMel: MLXArray, audioMelMask: MLXArray) -> (MLXArray, MLXArray) {
         var (encodings, currentMask) = subsampleConvProjection(audioMel, mask: audioMelMask)
         let causalValidMask = buildCausalValidMask()
+        let positionEmbeddings = relPosEnc(encodings)
 
         for block in layers {
-            encodings = block(encodings, mask: currentMask, causalValidMask: causalValidMask)
+            encodings = block(encodings, mask: currentMask, causalValidMask: causalValidMask, positionEmbeddings: positionEmbeddings)
         }
 
         if let proj = outputProj {

@@ -1,0 +1,27 @@
+Model: mlx-community/gemma-4-e2b-it-4bit
+Video: step_3797B1A8.mp4 (1024x1024, HEVC, 24fps, ~10s)
+Frames: 9 @ ~1fps, 70 tokens/frame, 630 video tokens total
+Input tokens: 734
+
+--- Output ---
+
+This video appears to be a series of visual transitions or animations showcasing the logo "FluxForge Studio." Since the provided frames are very brief and lack explicit movement description, I will describe the visual progression based on the static images provided.
+
+**Overall Theme:** The video seems to be an introduction or branding sequence for a studio named "FluxForge Studio," using visual elements that suggest forging, engineering, or complex processes.
+
+**Frame-by-Frame Description:**
+
+*   **00:00:** Shows the logo "FluxForge Studio" in a clean, modern typography against a white background.
+*   **00:01:** The text "The FluxForge Studio" appears, still in a clean style, possibly with subtle background elements or transitions implied.
+*   **00:02:** Similar to the previous frame, focusing on the text "The FluxForge Studio."
+*   **00:03:** The logo is displayed again, emphasizing the name.
+*   **00:04:** The visual style remains focused on the logo presentation.
+*   **00:06:** The text "The FluxForge Studio" is shown, likely accompanied by more complex graphic elements (implied by the surrounding icons).
+*   **00:07:** The logo is presented again.
+*   **00:08:** The visual elements seem to transition into a more intricate pattern, possibly involving lines or technical drawings.
+*   **00:09:** The final frame shows a dense composition of various technical icons (circles, lines, gears, etc.) arranged in a complex, almost kaleidoscopic or mechanical pattern, suggesting the "Forge" aspect of the name.
+
+**In summary:** The video is a branding sequence for "FluxForge Studio," starting with a clear logo presentation and culminating in a dynamic visual display that incorporates technical or mechanical motifs.
+
+--- Stats ---
+Tokens: 392, Time: 7.71s, Speed: 50.8 t/s, GPU peak: 5598 MB

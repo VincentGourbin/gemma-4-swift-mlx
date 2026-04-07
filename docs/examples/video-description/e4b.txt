@@ -1,0 +1,40 @@
+Model: mlx-community/gemma-4-e4b-it-4bit
+Video: step_3797B1A8.mp4 (1024x1024, HEVC, 24fps, ~10s)
+Frames: 9 @ ~1fps, 70 tokens/frame, 630 video tokens total
+Input tokens: 734
+
+--- Output ---
+
+This video is a title sequence or branding video for "FluxForge Studio." The main element is the logo, which is displayed against a background that changes throughout the video.
+
+Here is a frame-by-frame description:
+
+**00:00 - 00:01:**
+*   The screen is mostly white.
+*   The logo, **"FluxForge Studio,"** appears clearly in a clean, modern font. The word "Flux" is in a darker color, and "Forge" is in a different color, with "Studio" underneath.
+*   The background is plain white, allowing the logo to be the sole focus.
+
+**00:01 - 00:02:**
+*   The background begins to transition. The white background remains, but black line art elements start to appear around the logo.
+*   These elements are abstract shapes, including circles, plus signs, rectangles, and small lines, suggesting a technical or design motif.
+*   The logo remains central and legible against the emerging pattern.
+
+**00:02 - 00:03:**
+*   The black line art becomes more pronounced and busy, forming a dense, abstract pattern around the central text.
+*   The shapes are crisp black outlines on a white background.
+*   The logo is still clearly visible, maintaining its branding presence amidst the growing visual complexity.
+
+**00:03 - 00:04:**
+*   The background pattern continues to fill the frame, becoming denser and more dynamic. The black shapes are overlapping and interacting, creating a busy, energetic visual texture.
+*   The logo remains the anchor point, readable despite the surrounding visual activity.
+
+**00:04 - 00:06:**
+*   The background pattern intensifies. The black line art is highly detailed, suggesting gears, schematics, or complex digital structures. The shapes are large and overlapping.
+*   The logo is shown against this high-contrast, busy background, suggesting the studio's technical capability or creative process.
+
+**00:06 - 00:07:**
+*   The pattern reaches a high level of density. The black line art forms a complex, almost chaotic yet structured visual field around the logo.
+*   The logo is still centered, providing a moment of clarity amidst the visual noise of the [truncated at 500 tokens]
+
+--- Stats ---
+Tokens: 500, Time: 13.68s, Speed: 36.5 t/s, GPU peak: 7022 MB
