@@ -247,7 +247,9 @@ struct ProfilingTests {
             modelVariant: "test",
             quantization: "bf16",
             promptTokenCount: 30,
-            maxTokens: 100
+            maxTokens: 100,
+            generatedTokenCount: 95,
+            kvBits: nil
         )
         let report = result.generateReport()
         #expect(report.contains("BENCHMARK REPORT"))

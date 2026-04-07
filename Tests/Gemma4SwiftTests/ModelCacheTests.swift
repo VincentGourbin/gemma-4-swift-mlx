@@ -37,13 +37,13 @@ struct ModelCacheTests {
 
     @Test("localPath retourne nil pour un modele absent")
     func testLocalPathNil() {
-        let model = Gemma4Pipeline.Model.b31b  // 31B base, peu probable d'etre la
+        let model = Gemma4Pipeline.Model.b31bBf16  // 31B BF16, peu probable d'etre la
         // On ne peut pas garantir qu'il est absent, mais on verifie que la methode ne crashe pas
         _ = Gemma4ModelCache.localPath(for: model)
     }
 
     @Test("diskSize retourne nil pour un modele absent")
     func testDiskSizeNil() {
-        #expect(Gemma4ModelCache.diskSize(for: .b31b) == nil)
+        #expect(Gemma4ModelCache.diskSize(for: .b31bBf16) == nil)
     }
 }
