@@ -196,6 +196,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     public private(set) var state: State = .unloaded
     public private(set) var lastStats: GenerationStats?
 
+    public init() {}
+
     public var isReady: Bool {
         if case .ready = state { return true }
         return false
