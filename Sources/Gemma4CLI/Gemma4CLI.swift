@@ -650,6 +650,7 @@ struct Describe: AsyncParsableCommand {
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
             var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
 
+            var consecutiveEOT = 0
             for _ in 0 ..< self.maxTokens {
                 generatedTokens.append(Int(nextToken))
 
@@ -658,9 +659,14 @@ struct Describe: AsyncParsableCommand {
                 print(text, terminator: "")
                 fflush(stdout)
 
-                // Verifier EOS (1 = <eos>, 107 = <end_of_turn>)
-                // Note: 106 = <start_of_turn> n'est PAS un EOS
-                if nextToken == 1 || nextToken == 107 { break }
+                // Verifier EOS : token 1 (<eos>) ou 3+ end_of_turn consecutifs (boucle)
+                if nextToken == 1 { break }
+                if nextToken == 107 {
+                    consecutiveEOT += 1
+                    if consecutiveEOT >= 3 { break }
+                } else {
+                    consecutiveEOT = 0
+                }
 
                 // Generer le token suivant
                 let nextInput = MLXArray([nextToken]).reshaped(1, 1)
