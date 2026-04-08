@@ -1,0 +1,77 @@
+Model: mlx-community/gemma-4-31b-it-bf16
+Date: 2026-04-08T05:47:35Z
+
+=== Text Generation ===
+Enregistrement du type gemma4_text...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-bf16
+Modele charge en 12.8s
+GPU: 58550 Mo actifs, 58550 Mo pic
+
+--- Generation ---
+Systeme: Tu es un assistant utile. Reponds de maniere concise.
+Prompt: Explain quantum computing in 3 sentences. Be precise and concise.
+Temperature: 0.3, Max tokens: 200
+---
+Quantum computing uses qubits, which can exist in multiple states simultaneously through superposition, unlike classical bits that are either 0 or 1. It leverages entanglement to link qubits, allowing them to process vast amounts of data in parallel. This enables the solving of complex problems, such as cryptography and molecular simulation, exponentially faster than traditional computers.
+
+--- Stats ---
+Tokens generes: 66
+Temps: 21.22s
+Vitesse: 3.1 tokens/s
+GPU pic: 58825 Mo
+
+=== Vision (single image) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-bf16
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236881, 2900, 563, 506, 6514, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 318
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in detail. What type of vehicle is this? What color? What is the setting?
+---
+A high-angle, full shot shows a red vintage Citroën 2CV parked on a gravel path in front of a dense wall of green trees and bushes. The car is facing left and is viewed from the side. The car has a rounded body, a black roof, and silver hubcaps. There are two stickers on the rear window. The ground is a mix of gravel and grass. The lighting is bright and even, suggesting an overcast day.<turn|>
+
+--- Stats ---
+Tokens: 93
+Temps: 176.21s, Vitesse: 0.5 t/s
+GPU pic: 68365 Mo
+
+=== Video ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-bf16
+Modele charge.
+Traitement de la video: /tmp/bench_video.mp4
+  Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
+  Timestamps: 00:00 00:01 00:02 00:03 00:04 00:06 00:07 00:08 00:09
+  Premiers tokens: [2, 108, 105, 2364, 107, 236771, 236771, 236787, 236771, 236771, 107, 255999, 258884, 258884, 258884]
+  Derniers tokens: [563, 13922, 5528, 684, 5528, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 0, video_token: 630, audio_token: 0
+  Total input tokens: 738
+
+--- Generation multimodale ---
+  Mode: video (9 frames, 70 tokens/frame)
+  Prompt: Describe this video in detail. What is happening frame by frame?
+---
+This is a short, stylized motion graphics animation featuring a company logo. The overall aesthetic is minimalist, using a white background with black and gold elements.
+
+**Frame-by-Frame Breakdown:**
+
+*   **00:00:** The video opens on a clean white screen with the logo "FluxForge Studio" centered. The word "FluxForge" is in a bold, sans-serif font with a gradient from grey to black, and the "x" is highlighted in a gold/tan color. "Studio" is written underneath in a thinner, black font.
+*   **00:01:** The words "The" appears above the main logo. Simultaneously, various abstract black geometric shapes, symbols, and fragments (resembling disassembled letters or mechanical parts) begin to float and drift into the frame from the edges.
+*   **00:02 - 00:04:** The floating black elements continue to drift and rotate slowly around the central logo, creating a sense of depth and motion. The logo remains static in the center.
+*   **00:06 - 00:07:** The density of the floating black elements increases. More shapes enter the frame, and they begin to move more rapidly, starting to crowd the space around the logo.
+*   **00:08:** A sudden shift in perspective occurs. Large, black, structural beams or "rails" containing smaller symbols slam into the frame from the corners, converging toward the center. This creates a high-energy, mechanical feeling, as if a machine is assembling itself around the logo.
+*   **00:09:** The screen becomes densely packed with these black structural elements and symbols, almost completely obscuring the white background, while the "FluxForge Studio" logo remains visible at the center of the chaos before the clip ends.<turn|>
+
+--- Stats ---
+Tokens: 385
+Temps: 734.11s, Vitesse: 0.5 t/s
+GPU pic: 69636 Mo
+

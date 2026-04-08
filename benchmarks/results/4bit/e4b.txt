@@ -1,0 +1,160 @@
+Model: mlx-community/gemma-4-e4b-it-4bit
+Date: 2026-04-07T16:38:34Z
+
+=== Text Generation ===
+Enregistrement du type gemma4_text...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge en 1.4s
+GPU: 4074 Mo actifs, 4074 Mo pic
+
+--- Generation ---
+Systeme: Tu es un assistant utile. Reponds de maniere concise.
+Prompt: Explain quantum computing in 3 sentences. Be precise and concise.
+Temperature: 0.3, Max tokens: 200
+---
+Quantum computing harnesses quantum mechanical phenomena like superposition and entanglement to process information. Unlike classical bits representing 0 or 1, quantum bits (qubits) can exist as a combination of both states simultaneously. This allows quantum computers to perform complex calculations exponentially faster than classical machines for specific problems.
+
+--- Stats ---
+Tokens generes: 57
+Temps: 0.93s
+Vitesse: 61.3 tokens/s
+GPU pic: 4161 Mo
+
+=== Vision (single image) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [672, 236881, 2900, 2258, 236881, 2900, 563, 506, 6514, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 314
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in detail. What type of vehicle is this? What color? What is the setting?
+---
+This is a detailed description of the image:
+
+**Subject:**
+The main subject of the image is a vintage, bright **red automobile**. Based on its rounded body shape, separate fenders, and overall silhouette, it appears to be a classic European model, possibly a small car from the mid-20th century (it strongly resembles a classic Fiat or similar era vehicle).
+
+**Vehicle Details:**
+*   **Color:** The car is a vibrant, glossy red.
+*   **Features:** It has a two-door body style. The windows are visible, and the interior appears to have some detail through the glass. The wheels are fitted with hubcaps, and the bodywork is highly polished, suggesting it is well-maintained or restored. The roofline is curved, fitting the classic design.
+*   **Condition:** The car appears to be in excellent, restored condition, parked outdoors.
+
+**Setting/Background:**
+The car is parked outdoors on a patch of ground covered with gravel and sparse, dry grass/dirt. The background is dominated by a dense, tall wall of **lush green foliage and trees**. This greenery forms a dark, rich backdrop that contrasts nicely with the bright red of the car, making the vehicle stand out. The lighting suggests it is daytime, likely outdoors on a pleasant day.
+
+**Overall Impression:**
+The image captures a beautiful, classic red car parked serenely in a natural, verdant setting. The contrast between the mechanical
+
+--- Stats ---
+Tokens: 300
+Temps: 6.76s, Vitesse: 44.3 t/s
+GPU pic: 6038 Mo
+
+=== Video ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de la video: /tmp/bench_video.mp4
+  Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
+  Timestamps: 00:00 00:01 00:02 00:03 00:04 00:06 00:07 00:08 00:09
+  Premiers tokens: [2, 108, 105, 2364, 107, 236771, 236771, 236787, 236771, 236771, 107, 255999, 258884, 258884, 258884]
+  Derniers tokens: [528, 8052, 236761, 2900, 563, 13922, 5528, 684, 5528, 236881, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 630, audio_token: 0
+  Total input tokens: 734
+
+--- Generation multimodale ---
+  Mode: video (9 frames, 70 tokens/frame)
+  Prompt: Describe this video in detail. What is happening frame by frame?
+---
+This video is a short, visually branded sequence for "FluxForge Studio." The video uses the studio's logo and name against different backgrounds to create variations.
+
+Here is a frame-by-frame description:
+
+**00:00 - 00:01:**
+*   **Visual:** The background is plain white. The logo, **"FluxForge Studio,"** appears clearly in black text. The word "Flux" is in black, followed by "Forge" in black, and "Studio" underneath in black.
+*   **Action:** This is a clean presentation of the brand name.
+
+**00:01 - 00:02:**
+*   **Visual:** The background changes to a busy, graphic pattern. This pattern consists of various black line drawings of shapes, including plus signs (+), circles (O), rectangles, and small tools, suggesting a technical or design theme. The logo, **"The FluxForge Studio,"** is centered in black text against this busy background.
+*   **Action:** The logo is overlaid on the graphic pattern.
+
+**00:02 - 00:03:**
+*   **Visual:** The background remains the same busy, black-line graphic pattern seen in the previous shot. The logo, **"The FluxForge Studio,"** is again centered in black text.
+*   **Action:** A continuation shot, showing the logo against the pattern.
+
+**00:03 - 00:04:**
+*   **Visual:** The background continues to be the black-line graphic pattern. The logo, **"The FluxForge Studio,"** is centered.
+*   **Action:** Another shot maintaining the logo against the pattern.
+
+**00:04 - 00:06:**
+*   **Visual:** The background shifts dramatically. It becomes a high-contrast, black-and-
+
+--- Stats ---
+Tokens: 400
+Temps: 11.20s, Vitesse: 35.7 t/s
+GPU pic: 7022 Mo
+
+=== Audio (transcription) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+  Audio preprocesse: duree 30.0s, 750 tokens
+  Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
+  Derniers tokens: [506, 2269, 10808, 9951, 528, 5422, 1131, 5422, 1816, 236761, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 0, audio_token: 750
+  Total input tokens: 775
+
+--- Generation multimodale ---
+  Mode: audio
+  Prompt: Transcribe the following speech segment in English into English text.
+---
+This week I travel to Chicago to deliver my final farewell address to the nation. Forgoing the traditional presence before it, it was no opportunity to say thank you. However, my conversations with the American people, in living rooms and schools, farms and factories, diners and on distant military posts, all these conversations have meant to me.<turn|>
+
+--- Stats ---
+Tokens: 68
+Temps: 2.61s, Vitesse: 26.1 t/s
+GPU pic: 7109 Mo
+
+=== Audio (comprehension) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+  Audio preprocesse: duree 30.0s, 750 tokens
+  Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
+  Derniers tokens: [563, 506, 4403, 236881, 119281, 969, 506, 1689, 3618, 236761, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 0, audio_token: 750
+  Total input tokens: 783
+
+--- Generation multimodale ---
+  Mode: audio
+  Prompt: Listen to this audio. Who is speaking? What is the context? Summarize the main message.
+---
+**Based on the audio provided, here is the analysis:**
+
+**Who is speaking?**
+The speaker is likely a high-ranking official, most probably a President, delivering a final address to the nation.
+
+**What is the context?**
+The speaker is in a formal setting, delivering a "final farewell address" to the nation, acknowledging the end of their term or service. They are reflecting on their time in office and the interactions they've had with various groups of Americans.
+
+**Summarize the main message.**
+The main message is one of profound gratitude and sincerity. The speaker is expressing thanks for the conversations they've had with different segments of the American public—from young people to veterans. They convey that these interactions, though varied, have been honest and genuine, and this honesty has been a significant part of their journey.
+
+***
+
+**In short: A President is saying goodbye to the nation, expressing deep thanks for the honest conversations they've had with the American people during their service.**<turn|>
+
+--- Stats ---
+Tokens: 750 total (210 response + 537 thinking)
+Temps: 16.73s, Vitesse: 44.8 t/s
+GPU pic: 7156 Mo
+

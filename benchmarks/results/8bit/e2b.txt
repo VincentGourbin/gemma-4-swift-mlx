@@ -1,0 +1,153 @@
+Model: mlx-community/gemma-4-e2b-it-8bit
+Date: 2026-04-07T18:02:10Z
+
+=== Text Generation ===
+Enregistrement du type gemma4_text...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-8bit
+Modele charge en 1.5s
+GPU: 4721 Mo actifs, 4721 Mo pic
+
+--- Generation ---
+Systeme: Tu es un assistant utile. Reponds de maniere concise.
+Prompt: Explain quantum computing in 3 sentences. Be precise and concise.
+Temperature: 0.3, Max tokens: 200
+---
+Quantum computing uses quantum mechanics to process information using qubits, which can exist in a superposition of 0 and 1 simultaneously. This allows quantum computers to explore vast numbers of possibilities in parallel, offering exponential speedups for certain complex problems. They promise to revolutionize fields like drug discovery, materials science, and cryptography.
+
+--- Stats ---
+Tokens generes: 62
+Temps: 0.87s
+Vitesse: 71.5 tokens/s
+GPU pic: 4798 Mo
+
+=== Vision (single image) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-8bit
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [672, 236881, 2900, 2258, 236881, 2900, 563, 506, 6514, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 314
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in detail. What type of vehicle is this? What color? What is the setting?
+---
+This is a photograph of a **classic, vintage car**.
+
+Here is a detailed description:
+
+**Vehicle:**
+*   **Type:** The vehicle appears to be a small, classic **two-door sedan or coupe**, characteristic of European cars from the mid-20th century (perhaps a Fiat 600 or a similar model). It has a rounded, simple body style with a distinct curved roofline and separate fenders.
+*   **Color:** The car is a vibrant, glossy **red**.
+*   **Details:** It has chrome bumpers and hubcaps. The windows are visible, and the car looks well-maintained, suggesting it is a restored classic.
+
+**Setting:**
+*   **Environment:** The car is parked outdoors on a **gravel or dirt road/path**.
+*   **Background:** The background is dominated by a dense wall of **lush green foliage and trees**, suggesting a natural, possibly rural, or park-like setting. The greenery is thick and provides a dark, rich backdrop that makes the bright red car stand out.
+*   **Lighting:** The lighting appears to be natural daylight, possibly slightly overcast or filtered, which evenly illuminates the car and the surrounding greenery.
+
+**Overall Impression:**
+The image evokes a nostalgic, charming, and classic aesthetic. The bright red vintage car contrasts beautifully with the deep greens of the natural setting.<turn|>
+
+--- Stats ---
+Tokens: 285
+Temps: 5.19s, Vitesse: 54.9 t/s
+GPU pic: 6671 Mo
+
+=== Video ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-8bit
+Modele charge.
+Traitement de la video: /tmp/bench_video.mp4
+  Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
+  Timestamps: 00:00 00:01 00:02 00:03 00:04 00:06 00:07 00:08 00:09
+  Premiers tokens: [2, 108, 105, 2364, 107, 236771, 236771, 236787, 236771, 236771, 107, 255999, 258884, 258884, 258884]
+  Derniers tokens: [528, 8052, 236761, 2900, 563, 13922, 5528, 684, 5528, 236881, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 630, audio_token: 0
+  Total input tokens: 734
+
+--- Generation multimodale ---
+  Mode: video (9 frames, 70 tokens/frame)
+  Prompt: Describe this video in detail. What is happening frame by frame?
+---
+This appears to be a series of still images or frames from a video, likely a logo animation or a motion graphic for a company named "FluxForge Studio."
+
+Here is a frame-by-frame description:
+
+**Frame 1 (00:00):**
+*   **Content:** A clean, white background featuring the logo: "FluxForge Studio."
+*   **Style:** The text is in a modern, sans-serif font. "FluxForge" is in a dark gray/charcoal color, and "Studio" is in a lighter gray. The overall look is professional and minimalist.
+
+**Frame 2 (00:01):**
+*   **Content:** The background is now white, but it is filled with scattered black graphic elements. These elements include various symbols like plus signs, circles, arrows, and geometric shapes.
+*   **Text:** The text "The FluxForge Studio" is visible, likely appearing as part of the animation, though the focus is on the background texture.
+
+**Frame 3 (00:02):**
+*   **Content:** Similar to Frame 2, the background is a busy pattern of black graphic elements (circles, lines, symbols).
+*   **Text:** The text "The FluxForge Studio" is displayed again, suggesting the logo is being presented over this dynamic background.
+
+**Frame 4 (00:03):**
+*   **Content:** The background remains the busy pattern of black graphics.
+*   **Text:** The logo is still visible.
+
+**Frame 5 (00:04):**
+*   **Content:** The background continues to be a dense collection of black icons and symbols.
+*   **Text:** The logo is present.
+
+**Frame 6 (00:06):**
+*   **Content:** The background has shifted significantly. It now features a black and white
+
+--- Stats ---
+Tokens: 400
+Temps: 9.07s, Vitesse: 44.1 t/s
+GPU pic: 7604 Mo
+
+=== Audio (transcription) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-8bit
+Modele charge.
+Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+  Audio preprocesse: duree 30.0s, 750 tokens
+  Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
+  Derniers tokens: [506, 2269, 10808, 9951, 528, 5422, 1131, 5422, 1816, 236761, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 0, audio_token: 750
+  Total input tokens: 775
+
+--- Generation multimodale ---
+  Mode: audio
+  Prompt: Transcribe the following speech segment in English into English text.
+---
+This week I traveled to Chicago to do my final farewell address to the nation. It was an opportunity to say thank you. What we've seen in Iowa, really great it all my conversations with American people in living rooms and schools and farms and factories and military posts. All these conversations are an honest<turn|>
+
+--- Stats ---
+Tokens: 62
+Temps: 1.70s, Vitesse: 36.4 t/s
+GPU pic: 7628 Mo
+
+=== Audio (comprehension) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-8bit
+Modele charge.
+Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+  Audio preprocesse: duree 30.0s, 750 tokens
+  Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
+  Derniers tokens: [563, 506, 4403, 236881, 119281, 969, 506, 1689, 3618, 236761, 106, 107, 105, 4368, 107]
+  image_token: 0, video_token: 0, audio_token: 750
+  Total input tokens: 783
+
+--- Generation multimodale ---
+  Mode: audio
+  Prompt: Listen to this audio. Who is speaking? What is the context? Summarize the main message.
+---
+This is a monologue where the speaker is reflecting on their travels and their interactions with people from different walks of life. They express gratitude for the experiences and the conversations they've had with people from various backgrounds, including Americans, people living in schools, farms, factories, and military posts. The main message is a thank you for the opportunities to connect with these diverse individuals and the enriching conversations they've had.
+<turn|>
+
+--- Stats ---
+Tokens: 85
+Temps: 2.07s, Vitesse: 41.1 t/s
+GPU pic: 7628 Mo
+

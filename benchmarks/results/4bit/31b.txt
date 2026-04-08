@@ -1,0 +1,77 @@
+Model: mlx-community/gemma-4-31b-it-4bit
+Date: 2026-04-07T16:40:06Z
+
+=== Text Generation ===
+Enregistrement du type gemma4_text...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-4bit
+Modele charge en 2.8s
+GPU: 16471 Mo actifs, 16471 Mo pic
+
+--- Generation ---
+Systeme: Tu es un assistant utile. Reponds de maniere concise.
+Prompt: Explain quantum computing in 3 sentences. Be precise and concise.
+Temperature: 0.3, Max tokens: 200
+---
+Quantum computing uses quantum bits (qubits) that can exist in multiple states simultaneously through superposition, unlike classical bits which are only 0 or 1. By leveraging entanglement, qubits can perform complex calculations in parallel, exponentially increasing processing power for specific tasks. This allows quantum computers to solve certain problems, such as prime factorization and molecular simulation, far faster than any classical supercomputer.
+
+--- Stats ---
+Tokens generes: 76
+Temps: 6.21s
+Vitesse: 12.2 tokens/s
+GPU pic: 16766 Mo
+
+=== Vision (single image) ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-4bit
+Modele charge.
+Traitement de l'image: input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 108, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236881, 2900, 563, 506, 6514, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 318
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in detail. What type of vehicle is this? What color? What is the setting?
+---
+A high-angle, full shot shows a red Citroën 2CV parked on a gravel road, facing left. The car is a small, two-door sedan with a rounded body and a black canvas roof. The car is painted a bright red, and the wheels are silver with chrome hubcaps. The car is parked on a light-colored gravel road, and in the background, there is a dense forest of green trees and bushes. The lighting is bright and even, and the colors are saturated.<turn|>
+
+--- Stats ---
+Tokens: 104
+Temps: 15.68s, Vitesse: 6.6 t/s
+GPU pic: 19443 Mo
+
+=== Video ===
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-31b-it-4bit
+Modele charge.
+Traitement de la video: /tmp/bench_video.mp4
+  Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
+  Timestamps: 00:00 00:01 00:02 00:03 00:04 00:06 00:07 00:08 00:09
+  Premiers tokens: [2, 108, 105, 2364, 107, 236771, 236771, 236787, 236771, 236771, 107, 255999, 258884, 258884, 258884]
+  Derniers tokens: [563, 13922, 5528, 684, 5528, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 0, video_token: 630, audio_token: 0
+  Total input tokens: 738
+
+--- Generation multimodale ---
+  Mode: video (9 frames, 70 tokens/frame)
+  Prompt: Describe this video in detail. What is happening frame by frame?
+---
+This is a short, minimalist motion graphics video featuring a company logo.
+
+**Frame-by-frame description:**
+
+*   **00:00 - 00:01:** The video begins with a static white screen. The logo "FluxForge Studio" is centered. "FluxForge" is in a bold, sans-serif font with a grey and gold color scheme, and "Studio" is written underneath in a thinner, black font.
+*   **00:01 - 00:02:** The words "The" appear above the logo. Simultaneously, various black abstract geometric shapes and symbols begin to float and drift randomly around the edges of the frame.
+*   **00:02 - 00:04:** The floating black shapes continue to move slowly across the screen, creating a dynamic but clean background while the central logo remains stationary.
+*   **00:04 - 00:07:** The movement of the black shapes increases in speed and frequency, filling more of the white space around the logo.
+*   **00:07 - 00:08:** The black shapes suddenly accelerate and converge toward the center of the screen, forming a dense, radiating pattern of lines and symbols that partially overlap the logo.
+*   **00:08 - 00:09:** The black shapes fully converge into a complex, symmetrical, star-like geometric pattern that dominates the screen, with the logo still visible in the center before the video ends.<turn|>
+
+--- Stats ---
+Tokens: 323
+Temps: 55.39s, Vitesse: 5.8 t/s
+GPU pic: 20787 Mo
+
