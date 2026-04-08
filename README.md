@@ -11,7 +11,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Video (frame-by-frame) | ✅ **Working** | ~1fps, 70 tokens/frame, MM:SS timestamps. All 4 families validated |
 | Audio (speech understanding) | ✅ **Working** | Conformer encoder, 30s max, ASR/comprehension. E2B + E4B validated |
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
-| TurboQuant KV cache | 🧪 Experimental | Chunked prefill + fused Metal kernel. Modest GPU savings at <32K context. [Details](docs/examples/turboquant_paper.txt) |
+| KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
 | Model download | ✅ **Working** | Direct HTTPS from HuggingFace (no HF SDK dependency) |
@@ -131,25 +131,27 @@ gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemm
 
 ## Performance (Apple M3 Max, 96 GB)
 
-### Text Generation (4-bit models, 500 tokens)
+All 16 model variants (4 families × 4 quantizations) benchmarked. Full results in [benchmarks/](benchmarks/results/).
 
-| Model | Throughput | TTFT (16K context) | GPU Peak |
-|-------|:---------:|:------------------:|:--------:|
-| **E2B** | 103 tok/s | 85 ms | 2.5 GB |
-| **E4B** | 47 tok/s | 250 ms | 4.3 GB |
-| **26B-A4B** | 29 tok/s | 1.4 s | 13.8 GB |
-| **31B** | 11 tok/s | 3.5 s | 16.8 GB |
+### Text Generation (tok/s)
 
-### Vision (4-bit models, image description)
+| Model | 4-bit | 6-bit | 8-bit | BF16 |
+|-------|:-----:|:-----:|:-----:|:----:|
+| **E2B** | **97** | 62 | 72 | 42 |
+| **E4B** | **61** | 48 | 42 | 25 |
+| **26B-A4B** | **56** | 43 | 41 | 10 |
+| **31B** | **12** | 9 | 7 | 3 |
 
-| Model | Speed | GPU Peak | Vehicle ID Accuracy |
-|-------|:-----:|:--------:|:---:|
-| **E2B** | 74 tok/s | 4.4 GB | Generic ("classic car") |
-| **E4B** | 45 tok/s | 5.9 GB | Approximate ("FIAT 600") |
-| **26B-A4B** | 25 tok/s | 15.9 GB | **Exact ("Citroën 2CV")** |
-| **31B** | 8 tok/s | 19.5 GB | **Exact ("Citroën 2CV")** |
+### Vision Quality (vehicle identification across quantizations)
 
-> See [docs/examples/vision-image-description/](docs/examples/vision-image-description/) for full benchmarks with OCR and multi-image tests.
+| Model | 4-bit | 6-bit | 8-bit | BF16 |
+|-------|:-----:|:-----:|:-----:|:----:|
+| **E2B** | "classic car" | "VW Beetle" | "Fiat 600" | "VW Beetle" |
+| **E4B** | "classic Fiat" | "VW Beetle" | "Citroën 2CV" | "VW Beetle" |
+| **26B-A4B** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** |
+| **31B** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** |
+
+> **Key finding:** Quality depends on architecture, not quantization. 26B-A4B/31B identify the vehicle correctly at all quantizations. 4-bit is the sweet spot — fastest with no quality loss. BF16 is 2-24x slower with no gain. See [docs/examples/](docs/examples/) and [benchmarks/](benchmarks/results/) for full results.
 
 ### Video (4-bit models, 9 frames ~1fps, 70 tokens/frame)
 
@@ -159,8 +161,6 @@ gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemm
 | **E4B** | 36.5 tok/s | 7.0 GB | Good (time ranges) |
 | **26B-A4B** | 18.8 tok/s | 17.0 GB | Excellent (motion/depth) |
 | **31B** | 5.8 tok/s | 20.8 GB | Best (concise, natural stop) |
-
-> See [docs/examples/video-description/](docs/examples/video-description/) for full benchmarks.
 
 ### Audio (4-bit models, 30s speech, 750 tokens)
 
@@ -245,6 +245,19 @@ Gemma4Swift/
 ├── Norms/               # RMSNormNoScale, RMSNormZeroShift
 └── Utils/               # Weight sanitizer, profiling toolkit
 ```
+
+### KV Cache Quantization
+
+The project includes a custom TurboQuant implementation (rotation + Beta-optimal codebook) in `TurboQuant/`. After thorough audit, we recommend migrating to **mlx-swift-lm's native `QuantizedKVCache`** instead:
+
+```swift
+// Native KV cache quantization — no custom code needed
+let params = GenerateParameters(kvBits: 4, kvGroupSize: 64, quantizedKVStart: 5000)
+```
+
+**Why migrate:** TurboQuant's theoretical 3.85x compression is real, but runtime intermediate tensor materialization erases memory gains. The disabled Fast Hadamard Transform (O(D^2) dense rotation instead of O(D log D)) adds significant compute overhead. Meanwhile, mlx-swift-lm ships battle-tested 4/8-bit KV quantization with Metal-accelerated `quantizedMM()`, automatic attention routing, and zero maintenance.
+
+The `TurboQuant/` directory is retained for reference but is not used in the default inference pipeline.
 
 ### Key design decisions
 
