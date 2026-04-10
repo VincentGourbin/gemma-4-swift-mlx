@@ -183,18 +183,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         case error(String)
     }
 
-    /// Stats de generation
-    public struct GenerationStats: Sendable {
-        public let tokensGenerated: Int
-        public let tokensPerSecond: Double
-        public let totalTime: TimeInterval
-        public let peakMemoryMB: Int
-    }
-
     // MARK: - Proprietes
 
     public private(set) var state: State = .unloaded
-    public private(set) var lastStats: GenerationStats?
 
     public init() {}
 
@@ -257,7 +248,6 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         container = nil
         currentSession = nil
         state = .unloaded
-        lastStats = nil
         MLX.GPU.clearCache()
     }
 
@@ -285,18 +275,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         state = .processing
         defer { state = .ready }
 
-        let startTime = Date()
-        let response = try await session.respond(to: prompt)
-        let elapsed = Date().timeIntervalSince(startTime)
-
-        lastStats = GenerationStats(
-            tokensGenerated: max(1, response.count / 4),
-            tokensPerSecond: Double(response.count / 4) / max(0.01, elapsed),
-            totalTime: elapsed,
-            peakMemoryMB: Int(MLX.GPU.peakMemory / (1024 * 1024))
-        )
-
-        return response
+        return try await session.respond(to: prompt)
     }
 
     /// Genere en streaming (token par token)
@@ -377,19 +356,6 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         }
     }
 
-    // MARK: - GPU Stats
-
-    public var activeMemoryMB: Int {
-        Int(MLX.GPU.activeMemory / (1024 * 1024))
-    }
-
-    public var peakMemoryMB: Int {
-        Int(MLX.GPU.peakMemory / (1024 * 1024))
-    }
-
-    public func clearGPUCache() {
-        MLX.GPU.clearCache()
-    }
 }
 
 // MARK: - Erreurs

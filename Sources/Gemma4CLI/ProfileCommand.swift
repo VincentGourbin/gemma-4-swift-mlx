@@ -6,6 +6,7 @@ import Gemma4Swift
 import MLX
 import MLXLMCommon
 import MLXLLM
+import MLXProfiler
 import Tokenizers
 import SQLite3
 
@@ -69,13 +70,12 @@ struct ProfileRun: AsyncParsableCommand {
 
         // Metadata
         let modelId = modelPath ?? model
-        session.modelVariant = modelId.split(separator: "/").last.map(String.init) ?? modelId
-        session.maxTokens = maxTokens
-        session.kvBits = kvBits != nil ? Float(kvBits!) : nil
-
-        // 1. Chargement du modele
+        let modelName = modelId.split(separator: "/").last.map(String.init) ?? modelId
+        session.metadata["model"] = modelName
+        session.metadata["maxTokens"] = "\(maxTokens)"
         if let kvBits = kvBits {
-            session.quantization = "TurboQuant \(kvBits)-bit KV"
+            session.metadata["kvBits"] = "\(kvBits)"
+            session.metadata["quantization"] = "TurboQuant \(kvBits)-bit KV"
         }
 
         print("Profiling Gemma 4: \(modelId)\(kvBits != nil ? " (TurboQuant \(kvBits!)-bit KV)" : "")")
@@ -98,7 +98,7 @@ struct ProfileRun: AsyncParsableCommand {
         let tokenIds: [Int] = try await container.perform { context in
             try context.tokenizer.applyChatTemplate(messages: messages)
         }
-        session.promptTokenCount = tokenIds.count
+        session.metadata["promptTokenCount"] = "\(tokenIds.count)"
         session.endPhase("2. Tokenization", category: .tokenization)
 
         print("Prompt tokens: \(tokenIds.count)")
@@ -146,7 +146,7 @@ struct ProfileRun: AsyncParsableCommand {
                 }
 
                 let stepDurationUs = UInt64((CFAbsoluteTimeGetCurrent() - stepStart) * 1_000_000)
-                session.recordGenerationStep(index: i + 1, total: self.maxTokens, durationUs: stepDurationUs)
+                session.recordStep(index: i + 1, total: self.maxTokens, durationUs: stepDurationUs)
             }
             session.endPhase("5. Token Generation", category: .generation)
 
@@ -154,7 +154,7 @@ struct ProfileRun: AsyncParsableCommand {
         }
 
         // Enregistrer le nombre de tokens generes
-        session.generatedTokenCount = generatedTokens.count
+        session.metadata["generatedTokenCount"] = "\(generatedTokens.count)"
 
         // Decoder la reponse
         nonisolated(unsafe) let capturedTokens = generatedTokens
@@ -173,7 +173,7 @@ struct ProfileRun: AsyncParsableCommand {
             let traceData = ChromeTraceExporter.export(session: session)
             let outputDir = output.map { URL(fileURLWithPath: $0) }
                 ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            let fileName = "gemma4_\(session.modelVariant)_trace.json"
+            let fileName = "gemma4_\(session.metadata["model"] ?? "gemma4")_trace.json"
             let traceURL = outputDir.appendingPathComponent(fileName)
             try traceData.write(to: traceURL)
             print("Chrome Trace: \(traceURL.path)")
@@ -337,8 +337,10 @@ struct ProfileSweep: AsyncParsableCommand {
 
                 // Profiler
                 let session = ProfilingSession(config: ProfilingConfig(trackMemory: true, exportChromeTrace: false, printSummary: false))
-                session.modelVariant = modelName
-                session.kvBits = kvBitsFloat
+                session.metadata["model"] = modelName
+                if let kvBitsFloat {
+                    session.metadata["kvBits"] = "\(kvBitsFloat)"
+                }
 
                 // Tokeniser
                 let messages: [[String: String]] = [
@@ -347,7 +349,7 @@ struct ProfileSweep: AsyncParsableCommand {
                 let tokenIds: [Int] = try await container.perform { context in
                     try context.tokenizer.applyChatTemplate(messages: messages)
                 }
-                session.promptTokenCount = tokenIds.count
+                session.metadata["promptTokenCount"] = "\(tokenIds.count)"
 
                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
                 nonisolated(unsafe) let capturedInputIds = inputIds
@@ -376,7 +378,7 @@ struct ProfileSweep: AsyncParsableCommand {
                     return tokens
                 }
 
-                session.generatedTokenCount = genTokens.count
+                session.metadata["generatedTokenCount"] = "\(genTokens.count)"
 
                 // Extraire les metriques
                 let events = session.getEvents()

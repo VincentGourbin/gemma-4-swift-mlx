@@ -48,7 +48,6 @@ final class PipelineTests: XCTestCase {
             XCTFail("State should be .unloaded after unload(), got \(pipeline.state)")
         }
         XCTAssertFalse(pipeline.isReady)
-        XCTAssertNil(pipeline.lastStats, "lastStats should be nil after unload()")
     }
 
     // MARK: - Error paths (no model loaded)
