@@ -121,8 +121,10 @@ struct ProfileRun: AsyncParsableCommand {
             // 4. Prefill
             session.beginPhase("4. Prefill", category: .prefill)
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
-            eval(prefillOutput)
-            var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+            let prefillLogits = prefillOutput[0..., prefillOutput.dim(1) - 1, 0...]
+            let firstToken = argMax(prefillLogits, axis: -1)
+            asyncEval(firstToken)
+            var nextToken = firstToken.item(Int32.self)
             session.endPhase("4. Prefill", category: .prefill)
 
             // 5. Token generation
@@ -137,13 +139,16 @@ struct ProfileRun: AsyncParsableCommand {
 
                 let nextInput = MLXArray([nextToken]).reshaped(1, 1)
                 let output = context.model(nextInput, cache: cache)
+                var token: MLXArray
                 if self.temperature <= 0.01 {
-                    nextToken = argMax(output[0..., 0, 0...], axis: -1).item(Int32.self)
+                    token = argMax(output[0..., 0, 0...], axis: -1)
                 } else {
                     let logits = output[0..., 0, 0...] / self.temperature
                     let probs = softmax(logits, axis: -1)
-                    nextToken = MLXRandom.categorical(log(probs)).item(Int32.self)
+                    token = MLXRandom.categorical(log(probs))
                 }
+                asyncEval(token)
+                nextToken = token.item(Int32.self)
 
                 let stepDurationUs = UInt64((CFAbsoluteTimeGetCurrent() - stepStart) * 1_000_000)
                 session.recordStep(index: i + 1, total: self.maxTokens, durationUs: stepDurationUs)
@@ -362,8 +367,10 @@ struct ProfileSweep: AsyncParsableCommand {
                     session.beginPhase("Prefill", category: .prefill)
                     let cache = context.model.newCache(parameters: params)
                     let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
-                    eval(prefillOutput)
-                    var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+                    let prefillLogits = prefillOutput[0..., prefillOutput.dim(1) - 1, 0...]
+                    let firstToken = argMax(prefillLogits, axis: -1)
+                    asyncEval(firstToken)
+                    var nextToken = firstToken.item(Int32.self)
                     session.endPhase("Prefill", category: .prefill)
 
                     session.beginPhase("Generation", category: .generation)
@@ -372,7 +379,9 @@ struct ProfileSweep: AsyncParsableCommand {
                         if nextToken == 1 || nextToken == 106 { break }
                         let nextInput = MLXArray([nextToken]).reshaped(1, 1)
                         let output = context.model(nextInput, cache: cache)
-                        nextToken = argMax(output[0..., 0, 0...], axis: -1).item(Int32.self)
+                        let token = argMax(output[0..., 0, 0...], axis: -1)
+                        asyncEval(token)
+                        nextToken = token.item(Int32.self)
                     }
                     session.endPhase("Generation", category: .generation)
                     return tokens
