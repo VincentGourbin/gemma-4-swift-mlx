@@ -6,3 +6,5 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 *.profraw
+*_trace.json
+*.sqlite
