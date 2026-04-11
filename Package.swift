@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Gemma4Swift",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS(.v17)],
     products: [
         .library(name: "Gemma4Swift", targets: ["Gemma4Swift"]),
         .executable(name: "gemma4-cli", targets: ["Gemma4CLI"]),

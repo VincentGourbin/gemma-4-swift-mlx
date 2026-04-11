@@ -79,7 +79,8 @@ public enum Gemma4ModelCache {
         paths.append(customPath)
 
         // Cache HuggingFace par defaut: ~/.cache/huggingface/hub/models--{org}--{model}/snapshots/*
-        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        // homeDirectoryForCurrentUser n'est pas dispo sur iOS — utiliser NSHomeDirectory()
+        let homeDir = URL(fileURLWithPath: NSHomeDirectory())
         let modelFolder = "models--\(modelId.replacingOccurrences(of: "/", with: "--"))"
         let hfSnapshotsDir = homeDir
             .appendingPathComponent(".cache/huggingface/hub")
