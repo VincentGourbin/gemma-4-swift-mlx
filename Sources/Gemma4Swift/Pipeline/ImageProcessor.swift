@@ -1,6 +1,10 @@
 // Processeur d'image pour Gemma 4 — resize aspect-ratio preserving + normalisation
 
+#if canImport(AppKit)
 import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 import CoreGraphics
 import Foundation
 import MLX
@@ -21,10 +25,18 @@ public enum Gemma4ImageProcessor {
         patchSize: Int = 16,
         poolingKernelSize: Int = 3
     ) throws -> MLXArray {
+        #if canImport(AppKit)
         guard let nsImage = NSImage(contentsOf: url),
               let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             throw ImageProcessingError.cannotLoadImage(url.path)
         }
+        #elseif canImport(UIKit)
+        guard let data = try? Data(contentsOf: url),
+              let uiImage = UIImage(data: data),
+              let cgImage = uiImage.cgImage else {
+            throw ImageProcessingError.cannotLoadImage(url.path)
+        }
+        #endif
 
         return try processImage(cgImage, maxSoftTokens: maxSoftTokens, patchSize: patchSize, poolingKernelSize: poolingKernelSize)
     }
