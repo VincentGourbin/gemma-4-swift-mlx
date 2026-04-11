@@ -107,6 +107,6 @@ struct ImageProcessorTests {
 
         let area280 = result280.dim(2) * result280.dim(3)
         let area70 = result70.dim(2) * result70.dim(3)
-        #expect(area280 >= area70)
+        #expect(area280 > area70)
     }
 }

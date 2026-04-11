@@ -51,7 +51,6 @@ public enum Gemma4ImageProcessor {
         // Calculer la taille cible (aspect-ratio preserving, divisible par 48)
         let divisor = patchSize * poolingKernelSize // 48
         let maxPatches = maxSoftTokens * poolingKernelSize * poolingKernelSize // 2520
-        let maxPixels = maxPatches * patchSize * patchSize // ~645K
 
         let origW = Float(image.width)
         let origH = Float(image.height)
