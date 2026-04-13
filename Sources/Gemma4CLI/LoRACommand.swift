@@ -1,0 +1,291 @@
+// Commandes CLI pour le fine-tuning LoRA/QLoRA
+
+import ArgumentParser
+import Foundation
+import Gemma4Swift
+import MLX
+import MLXLMCommon
+import MLXLLM
+import MLXProfiler
+
+struct LoRA: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "lora",
+        abstract: "Fine-tuning LoRA/QLoRA pour Gemma 4",
+        subcommands: [Train.self, Eval.self, Fuse.self, LoRAGenerate.self]
+    )
+}
+
+// MARK: - Train
+
+extension LoRA {
+    struct Train: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Entraine un adapter LoRA sur un dataset"
+        )
+
+        @Option(name: .long, help: "Chemin local vers le modele de base")
+        var modelPath: String
+
+        @Option(name: .long, help: "Repertoire contenant train.jsonl et valid.jsonl")
+        var data: String
+
+        @Option(name: .long, help: "Repertoire de sortie pour l'adapter")
+        var output: String = "./adapters"
+
+        @Option(name: .long, help: "Rang LoRA")
+        var rank: Int = 8
+
+        @Option(name: .long, help: "Facteur d'echelle LoRA")
+        var scale: Float = 20.0
+
+        @Option(name: .long, help: "Nombre de couches a adapter (auto si omis)")
+        var numLayers: Int?
+
+        @Option(name: .long, help: "Learning rate")
+        var learningRate: Float = 1e-5
+
+        @Option(name: .long, help: "Taille du batch")
+        var batchSize: Int = 1
+
+        @Option(name: .long, help: "Nombre d'iterations")
+        var iterations: Int = 200
+
+        @Option(name: .long, help: "Steps entre les rapports de loss")
+        var stepsPerReport: Int = 10
+
+        @Option(name: .long, help: "Steps entre les evaluations")
+        var stepsPerEval: Int = 50
+
+        @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
+        var profile: Bool = false
+
+        func run() async throws {
+            // 1. Enregistrer et charger le modele
+            print("Chargement du modele: \(modelPath)")
+            let container = try await loadLocalModel(path: modelPath)
+            print("Modele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+
+            // 2. Detecter la famille de modele
+            let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
+            print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
+
+            // 3. Charger les donnees
+            let dataURL = URL(fileURLWithPath: data)
+            print("Chargement des donnees depuis \(data)...")
+            let trainData = try loadGemma4TrainingData(directory: dataURL, name: "train")
+            let validData = try loadGemma4TrainingData(directory: dataURL, name: "valid")
+            print("Train: \(trainData.count) samples, Valid: \(validData.count) samples")
+
+            // 4. Configurer le profiling
+            if profile {
+                let profiler = MLXProfiler.shared
+                profiler.enable()
+                profiler.activeSession = ProfilingSession(config: .detailed)
+            }
+
+            // 5. Configurer et lancer le training
+            let config = Gemma4LoRATrain.TrainingConfig(
+                loraRank: rank,
+                loraScale: scale,
+                numLayers: numLayers,
+                modelFamily: family,
+                learningRate: learningRate,
+                batchSize: batchSize,
+                iterations: iterations,
+                stepsPerReport: stepsPerReport,
+                stepsPerEval: stepsPerEval,
+                saveEvery: 50,
+                outputDirectory: URL(fileURLWithPath: output),
+                enableProfiling: profile
+            )
+
+            print("\n--- Debut du training ---")
+            print("Rank: \(rank), Scale: \(scale), LR: \(learningRate)")
+            print("Batch: \(batchSize), Iterations: \(iterations)")
+            print("Couches LoRA: \(numLayers ?? family.defaultNumLayers)")
+            print("Sortie: \(output)")
+            print("---\n")
+
+            try await Gemma4LoRATrain.train(
+                container: container,
+                trainData: trainData,
+                validData: validData,
+                config: config
+            ) { progress in
+                print(progress)
+                return .more
+            }
+
+            print("\nTraining termine.")
+            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        }
+    }
+}
+
+// MARK: - Eval
+
+extension LoRA {
+    struct Eval: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Evalue la loss d'un modele avec adapter sur un dataset"
+        )
+
+        @Option(name: .long, help: "Chemin local vers le modele de base")
+        var modelPath: String
+
+        @Option(name: .long, help: "Chemin vers le repertoire de l'adapter")
+        var adapterPath: String
+
+        @Option(name: .long, help: "Repertoire contenant test.jsonl")
+        var data: String
+
+        @Option(name: .long, help: "Taille du batch")
+        var batchSize: Int = 1
+
+        func run() async throws {
+            print("Chargement du modele: \(modelPath)")
+            let container = try await loadLocalModel(path: modelPath)
+
+            print("Chargement de l'adapter: \(adapterPath)")
+            try await Gemma4LoRAInference.loadAdapter(
+                into: container,
+                from: URL(fileURLWithPath: adapterPath)
+            )
+
+            let dataURL = URL(fileURLWithPath: data)
+            let testData = try loadGemma4TrainingData(directory: dataURL, name: "test")
+            print("Test: \(testData.count) samples")
+
+            print("Evaluation...")
+            let loss = try await Gemma4LoRATrain.evaluate(
+                container: container,
+                testData: testData,
+                batchSize: batchSize
+            )
+
+            print("Test loss: \(String(format: "%.4f", loss))")
+            print("Test perplexite: \(String(format: "%.4f", exp(loss)))")
+        }
+    }
+}
+
+// MARK: - Fuse
+
+extension LoRA {
+    struct Fuse: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Fusionne un adapter LoRA dans le modele de base"
+        )
+
+        @Option(name: .long, help: "Chemin local vers le modele de base")
+        var modelPath: String
+
+        @Option(name: .long, help: "Chemin vers le repertoire de l'adapter")
+        var adapterPath: String
+
+        @Option(name: .long, help: "Repertoire de sortie pour le modele fuse")
+        var output: String
+
+        func run() async throws {
+            print("Chargement du modele: \(modelPath)")
+            let container = try await loadLocalModel(path: modelPath)
+
+            print("Fusion de l'adapter: \(adapterPath)")
+            try await Gemma4LoRAInference.fuseAdapter(
+                into: container,
+                from: URL(fileURLWithPath: adapterPath)
+            )
+
+            // Sauvegarder les poids fuses
+            let outputURL = URL(fileURLWithPath: output)
+            try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
+
+            print("Sauvegarde du modele fuse dans \(output)...")
+            try await container.perform { context in
+                let weights = context.model.parameters()
+                let flatWeights = Dictionary(uniqueKeysWithValues: weights.flattened())
+                try save(arrays: flatWeights, url: outputURL.appending(component: "model.safetensors"))
+            }
+
+            // Copier les fichiers de config du modele original
+            let sourceURL = URL(fileURLWithPath: modelPath)
+            let configFiles = ["config.json", "tokenizer.json", "tokenizer_config.json",
+                             "special_tokens_map.json", "generation_config.json"]
+            for file in configFiles {
+                let src = sourceURL.appending(component: file)
+                let dst = outputURL.appending(component: file)
+                if FileManager.default.fileExists(atPath: src.path()) {
+                    try? FileManager.default.copyItem(at: src, to: dst)
+                }
+            }
+
+            print("Modele fuse sauvegarde dans \(output)")
+        }
+    }
+}
+
+// MARK: - Generate (avec adapter)
+
+extension LoRA {
+    struct LoRAGenerate: AsyncParsableCommand {
+        static let configuration = CommandConfiguration(
+            commandName: "generate",
+            abstract: "Genere une reponse avec un modele + adapter LoRA"
+        )
+
+        @Option(name: .long, help: "Chemin local vers le modele de base")
+        var modelPath: String
+
+        @Option(name: .long, help: "Chemin vers le repertoire de l'adapter")
+        var adapterPath: String
+
+        @Option(name: .long, help: "Prompt systeme")
+        var system: String = "Tu es un assistant utile."
+
+        @Option(name: .long, help: "Temperature")
+        var temperature: Float = 0.3
+
+        @Option(name: .long, help: "Max tokens")
+        var maxTokens: Int = 512
+
+        @Argument(help: "Le prompt utilisateur")
+        var prompt: String
+
+        func run() async throws {
+            print("Chargement du modele: \(modelPath)")
+            let container = try await loadLocalModel(path: modelPath)
+
+            print("Chargement de l'adapter: \(adapterPath)")
+            try await Gemma4LoRAInference.loadAdapter(
+                into: container,
+                from: URL(fileURLWithPath: adapterPath)
+            )
+            print("Adapter charge.")
+
+            let params = GenerateParameters(
+                maxTokens: maxTokens,
+                temperature: temperature,
+                topP: 0.95
+            )
+            let session = ChatSession(container, instructions: system, generateParameters: params)
+
+            print("\nGenerating...\n")
+            let stream = session.streamResponse(to: prompt)
+            var tokenCount = 0
+            let startTime = Date()
+
+            for try await token in stream {
+                print(token, terminator: "")
+                fflush(stdout)
+                tokenCount += 1
+            }
+
+            let elapsed = Date().timeIntervalSince(startTime)
+            print("\n\n--- Stats ---")
+            print("Tokens: \(tokenCount), Temps: \(String(format: "%.2f", elapsed))s")
+            print("Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
+            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        }
+    }
+}
