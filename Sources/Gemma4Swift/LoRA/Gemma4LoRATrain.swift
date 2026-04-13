@@ -199,6 +199,9 @@ public enum Gemma4LoRATrain {
                 parameters: params,
                 progress: wrappedProgress
             )
+
+            // Sauvegarde finale inconditionnelle (le training ne sauvegarde qu'aux multiples de saveEvery)
+            try LoRATrain.saveLoRAWeights(model: model as! Module, url: adapterURL)
         }
 
         // Sauvegarder la config de l'adapter

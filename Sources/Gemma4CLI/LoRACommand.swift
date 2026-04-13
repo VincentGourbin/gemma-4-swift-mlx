@@ -263,26 +263,55 @@ extension LoRA {
             )
             print("Adapter charge.")
 
-            let params = GenerateParameters(
-                maxTokens: maxTokens,
-                temperature: temperature,
-                topP: 0.95
-            )
-            let session = ChatSession(container, instructions: system, generateParameters: params)
-
+            // Generation directe via container.perform pour garantir les LoRA layers
+            let capturedPrompt = prompt
+            let capturedSystem = system
+            let capturedTemp = temperature
+            let capturedMaxTokens = maxTokens
             print("\nGenerating...\n")
-            let stream = session.streamResponse(to: prompt)
-            var tokenCount = 0
             let startTime = Date()
 
-            for try await token in stream {
-                print(token, terminator: "")
-                fflush(stdout)
-                tokenCount += 1
+            let (text, tokenCount) = try await container.perform { context in
+                let tokenizer = context.tokenizer
+                let model = context.model
+
+                // Construire les messages et appliquer le chat template
+                var messages: [[String: String]] = []
+                if !capturedSystem.isEmpty {
+                    messages.append(["role": "system", "content": capturedSystem])
+                }
+                messages.append(["role": "user", "content": capturedPrompt])
+                let tokenIds = try tokenizer.applyChatTemplate(messages: messages)
+                let inputIds = MLXArray(tokenIds.map { Int32($0) })
+
+                // Prefill
+                let cache = model.newCache(parameters: nil)
+                let prefillOutput = model(inputIds.reshaped(1, -1), cache: cache)
+                var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+
+                var generated: [Int] = []
+                for _ in 0 ..< capturedMaxTokens {
+                    generated.append(Int(nextToken))
+                    if nextToken == 1 || nextToken == 106 || nextToken == 50 { break }
+
+                    let nextInput = MLXArray([nextToken]).reshaped(1, 1)
+                    let output = model(nextInput, cache: cache)
+                    if capturedTemp <= 0.01 {
+                        nextToken = argMax(output[0..., 0, 0...], axis: -1).item(Int32.self)
+                    } else {
+                        let logits = output[0..., 0, 0...] / capturedTemp
+                        let probs = softmax(logits, axis: -1)
+                        nextToken = MLXRandom.categorical(log(probs)).item(Int32.self)
+                    }
+                }
+
+                let text = tokenizer.decode(tokenIds: generated)
+                return (text, generated.count)
             }
 
+            print(text)
             let elapsed = Date().timeIntervalSince(startTime)
-            print("\n\n--- Stats ---")
+            print("\n--- Stats ---")
             print("Tokens: \(tokenCount), Temps: \(String(format: "%.2f", elapsed))s")
             print("Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
             print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")

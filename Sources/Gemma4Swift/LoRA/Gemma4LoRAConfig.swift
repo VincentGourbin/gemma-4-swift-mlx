@@ -16,10 +16,10 @@ public enum Gemma4LoRADefaults {
         /// Nombre total de couches decoder
         public var totalLayers: Int {
             switch self {
-            case .e2b: return 26
-            case .e4b: return 34
-            case .dense31b: return 46
-            case .a4b: return 26
+            case .e2b: return 35
+            case .e4b: return 42
+            case .dense31b: return 50
+            case .a4b: return 34
             }
         }
 
@@ -29,7 +29,7 @@ public enum Gemma4LoRADefaults {
             case .e2b: return 8
             case .e4b: return 12
             case .dense31b: return 16
-            case .a4b: return 8
+            case .a4b: return 10
             }
         }
 

@@ -166,7 +166,7 @@ final class LoRATests: XCTestCase {
 
     func testLoRAConfigDefaultsA4B() {
         let config = Gemma4LoRADefaults.configuration(for: .a4b)
-        XCTAssertEqual(config.numLayers, 8)
+        XCTAssertEqual(config.numLayers, 10)
     }
 
     func testLoRAConfigCustom() {
