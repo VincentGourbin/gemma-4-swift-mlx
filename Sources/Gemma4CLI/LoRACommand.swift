@@ -70,11 +70,19 @@ extension LoRA {
             let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
             print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
 
-            // 3. Charger les donnees
+            // 3. Charger les donnees avec le tokenizer pour coherence chat template
             let dataURL = URL(fileURLWithPath: data)
             print("Chargement des donnees depuis \(data)...")
-            let trainData = try loadGemma4TrainingData(directory: dataURL, name: "train")
-            let validData = try loadGemma4TrainingData(directory: dataURL, name: "valid")
+            let (trainData, validData) = try await container.perform { context -> ([String], [String]) in
+                let tok = context.tokenizer
+                let formatter: ([[String: String]]) throws -> String = { messages in
+                    let ids = try tok.applyChatTemplate(messages: messages)
+                    return tok.decode(tokenIds: ids)
+                }
+                let train = try loadGemma4TrainingData(directory: dataURL, name: "train", chatFormatter: formatter)
+                let valid = try loadGemma4TrainingData(directory: dataURL, name: "valid", chatFormatter: formatter)
+                return (train, valid)
+            }
             print("Train: \(trainData.count) samples, Valid: \(validData.count) samples")
 
             // 4. Configurer le profiling
@@ -154,7 +162,14 @@ extension LoRA {
             )
 
             let dataURL = URL(fileURLWithPath: data)
-            let testData = try loadGemma4TrainingData(directory: dataURL, name: "test")
+            let testData = try await container.perform { context -> [String] in
+                let tok = context.tokenizer
+                let formatter: ([[String: String]]) throws -> String = { messages in
+                    let ids = try tok.applyChatTemplate(messages: messages)
+                    return tok.decode(tokenIds: ids)
+                }
+                return try loadGemma4TrainingData(directory: dataURL, name: "test", chatFormatter: formatter)
+            }
             print("Test: \(testData.count) samples")
 
             print("Evaluation...")

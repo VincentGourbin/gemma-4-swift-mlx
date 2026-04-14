@@ -76,19 +76,21 @@ public enum Gemma4LoRADataError: LocalizedError {
 /// Charge un dataset d'entrainement depuis un repertoire.
 /// Supporte les formats:
 /// - `{"text": "..."}` — texte brut
-/// - `{"messages": [...]}` — format chat (converti via le template Gemma 4)
+/// - `{"messages": [...]}` — format chat (converti via le chat template du tokenizer)
 ///
 /// - Parameters:
 ///   - directory: repertoire contenant les fichiers de donnees
 ///   - name: nom de base du fichier (train, valid, test)
+///   - tokenizer: le tokenizer du modele (requis pour le format chat, garantit la
+///     coherence entre training et inference via applyChatTemplate)
 /// - Returns: tableau de textes formattes, prets pour le tokenizer
-public func loadGemma4TrainingData(directory: URL, name: String) throws -> [String] {
+public func loadGemma4TrainingData(directory: URL, name: String, chatFormatter: (([[String: String]]) throws -> String)? = nil) throws -> [String] {
     let extensions = ["jsonl", "txt"]
 
     for ext in extensions {
         let url = directory.appending(component: "\(name).\(ext)")
         if FileManager.default.fileExists(atPath: url.path()) {
-            let data = try loadGemma4TrainingFile(url: url)
+            let data = try loadGemma4TrainingFile(url: url, chatFormatter: chatFormatter)
             if data.isEmpty {
                 throw Gemma4LoRADataError.emptyDataset(name)
             }
@@ -100,10 +102,10 @@ public func loadGemma4TrainingData(directory: URL, name: String) throws -> [Stri
 }
 
 /// Charge un fichier de donnees et retourne les textes formattes
-func loadGemma4TrainingFile(url: URL) throws -> [String] {
+func loadGemma4TrainingFile(url: URL, chatFormatter: (([[String: String]]) throws -> String)? = nil) throws -> [String] {
     switch url.pathExtension {
     case "jsonl":
-        return try loadGemma4JSONL(url: url)
+        return try loadGemma4JSONL(url: url, chatFormatter: chatFormatter)
     case "txt":
         return try String(contentsOf: url, encoding: .utf8)
             .components(separatedBy: .newlines)
@@ -114,19 +116,28 @@ func loadGemma4TrainingFile(url: URL) throws -> [String] {
 }
 
 /// Charge un fichier JSONL avec detection automatique du format (chat vs text)
-func loadGemma4JSONL(url: URL) throws -> [String] {
+///
+/// Pour le format chat, si un tokenizer est fourni, utilise `applyChatTemplate` pour
+/// garantir la coherence avec l'inference. Sinon, utilise le template Gemma 4 interne.
+func loadGemma4JSONL(url: URL, chatFormatter: (([[String: String]]) throws -> String)? = nil) throws -> [String] {
     let lines = try String(contentsOf: url, encoding: .utf8)
         .components(separatedBy: .newlines)
         .filter { $0.first == "{" }
 
     let decoder = JSONDecoder()
 
-    return lines.compactMap { line -> String? in
+    return try lines.compactMap { line -> String? in
         guard let data = line.data(using: .utf8) else { return nil }
 
         // Essayer le format chat d'abord
         if let chatSample = try? decoder.decode(ChatSample.self, from: data),
            !chatSample.messages.isEmpty {
+            // Si on a un tokenizer, faire un roundtrip applyChatTemplate → decode
+            // pour que le texte d'entrainement soit tokenise exactement comme a l'inference
+            if let chatFormatter {
+                let messages = chatSample.messages.map { ["role": $0.role, "content": $0.content] }
+                return try chatFormatter(messages)
+            }
             return applyGemma4ChatTemplate(messages: chatSample.messages)
         }
 
