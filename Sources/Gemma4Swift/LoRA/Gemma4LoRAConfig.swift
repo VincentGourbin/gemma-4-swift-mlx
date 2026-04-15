@@ -59,11 +59,12 @@ public enum Gemma4LoRADefaults {
         rank: Int = 8,
         scale: Float = 20.0,
         numLayers: Int? = nil,
-        keys: [String]? = nil
+        keys: [String]? = nil,
+        useDora: Bool = false
     ) -> LoRAConfiguration {
         LoRAConfiguration(
             numLayers: numLayers ?? family.defaultNumLayers,
-            fineTuneType: .lora,
+            fineTuneType: useDora ? .dora : .lora,
             loraParameters: .init(rank: rank, scale: scale, keys: keys)
         )
     }

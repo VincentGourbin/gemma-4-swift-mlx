@@ -38,6 +38,8 @@ public enum Gemma4LoRATrain {
         public var saveEvery: Int
         /// Repertoire de sortie pour les adapters
         public var outputDirectory: URL
+        /// Utiliser DoRA au lieu de LoRA
+        public var useDora: Bool
         /// Activer le profiling du training
         public var enableProfiling: Bool
 
@@ -53,6 +55,7 @@ public enum Gemma4LoRATrain {
             stepsPerEval: Int = 50,
             saveEvery: Int = 50,
             outputDirectory: URL = URL(fileURLWithPath: "./adapters"),
+            useDora: Bool = false,
             enableProfiling: Bool = false
         ) {
             self.loraRank = loraRank
@@ -66,6 +69,7 @@ public enum Gemma4LoRATrain {
             self.stepsPerEval = stepsPerEval
             self.saveEvery = saveEvery
             self.outputDirectory = outputDirectory
+            self.useDora = useDora
             self.enableProfiling = enableProfiling
         }
     }
@@ -98,7 +102,8 @@ public enum Gemma4LoRATrain {
             for: config.modelFamily,
             rank: config.loraRank,
             scale: config.loraScale,
-            numLayers: config.numLayers
+            numLayers: config.numLayers,
+            useDora: config.useDora
         )
 
         // Profiling
