@@ -57,11 +57,14 @@ extension LoRA {
         @Option(name: .long, help: "Steps entre les evaluations")
         var stepsPerEval: Int = 50
 
-        @Flag(name: .long, help: "Utiliser DoRA au lieu de LoRA")
-        var dora: Bool = false
+        @Option(name: .long, help: "Type: lora (defaut), dora, ou full (tous les poids)")
+        var fineTuneType: String = "lora"
 
         @Flag(name: .long, help: "Response masking: loss uniquement sur la reponse, pas le prompt")
         var maskPrompt: Bool = false
+
+        @Option(name: .long, help: "Gradient clipping max norm (0=desactive, papier recommande 0.3 pour full)")
+        var gradClip: Float = 0
 
         @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
         var profile: Bool = false
@@ -99,7 +102,9 @@ extension LoRA {
             }
 
             // 5. Configurer et lancer le training
+            let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) ?? .lora
             let config = Gemma4LoRATrain.TrainingConfig(
+                fineTuneType: ftType,
                 loraRank: rank,
                 loraScale: scale,
                 numLayers: numLayers,
@@ -111,15 +116,15 @@ extension LoRA {
                 stepsPerEval: stepsPerEval,
                 saveEvery: 50,
                 outputDirectory: URL(fileURLWithPath: output),
-                useDora: dora,
-                maskPrompt: maskPrompt,
+                maskPrompt: ftType == .full ? true : maskPrompt,  // Full SFT utilise toujours le masking
+                gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,  // Default 0.3 pour full
                 enableProfiling: profile
             )
 
             print("\n--- Debut du training ---")
-            let mode = dora ? "DoRA" : "LoRA"
-            let masking = maskPrompt ? " + response masking" : ""
-            print("Mode: \(mode)\(masking), Rank: \(rank), Scale: \(scale), LR: \(learningRate)")
+            let masking = config.maskPrompt ? " + response masking" : ""
+            let clipInfo = config.gradClipMaxNorm > 0 ? ", grad_clip: \(config.gradClipMaxNorm)" : ""
+            print("Mode: \(ftType.rawValue)\(masking), Rank: \(rank), Scale: \(scale), LR: \(learningRate)\(clipInfo)")
             print("Batch: \(batchSize), Iterations: \(iterations)")
             print("Couches: \(numLayers ?? family.defaultNumLayers)")
             print("Sortie: \(output)")

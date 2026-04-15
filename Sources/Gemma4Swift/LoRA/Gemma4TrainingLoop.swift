@@ -113,7 +113,9 @@ public func trainWithResponseMasking(
     stepsPerReport: Int = 10,
     stepsPerEval: Int = 100,
     saveEvery: Int = 100,
-    adapterURL: URL? = nil,
+    weightsURL: URL? = nil,
+    gradClipMaxNorm: Float = 0,
+    isFullFineTune: Bool = false,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     let lossValueGrad = valueAndGrad(model: model) { model, arrays in
@@ -133,8 +135,15 @@ public func trainWithResponseMasking(
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
+        // Gradient clipping (ref papier arXiv:2512.15943: max_norm=0.3)
+        var clippedGrad = grad
+        if gradClipMaxNorm > 0 {
+            let (clipped, _) = clipGradNorm(gradients: grad, maxNorm: gradClipMaxNorm)
+            clippedGrad = clipped
+        }
+
         // Update
-        optimizer.update(model: model, gradients: grad)
+        optimizer.update(model: model, gradients: clippedGrad)
         eval(model, optimizer, lvalue)
 
         losses.append(lvalue.item(Float.self))
@@ -172,8 +181,13 @@ public func trainWithResponseMasking(
         }
 
         // Save
-        if let url = adapterURL, (iteration + 1) % saveEvery == 0 {
-            try LoRATrain.saveLoRAWeights(model: model, url: url)
+        if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
+            if isFullFineTune {
+                let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
+                try save(arrays: allParams, url: url)
+            } else {
+                try LoRATrain.saveLoRAWeights(model: model, url: url)
+            }
             let saveProgress = LoRATrain.Progress.save(iteration: iteration, url: url)
             if progress(saveProgress) == .stop { break }
             start = Date.timeIntervalSinceReferenceDate
@@ -183,8 +197,13 @@ public func trainWithResponseMasking(
     }
 
     // Sauvegarde finale
-    if let url = adapterURL {
-        try LoRATrain.saveLoRAWeights(model: model, url: url)
+    if let url = weightsURL {
+        if isFullFineTune {
+            let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
+            try save(arrays: allParams, url: url)
+        } else {
+            try LoRATrain.saveLoRAWeights(model: model, url: url)
+        }
     }
 }
 
