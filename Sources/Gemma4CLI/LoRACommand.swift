@@ -57,8 +57,11 @@ extension LoRA {
         @Option(name: .long, help: "Steps entre les evaluations")
         var stepsPerEval: Int = 50
 
-        @Flag(name: .long, help: "Utiliser DoRA au lieu de LoRA (meilleur pour la generation structuree)")
+        @Flag(name: .long, help: "Utiliser DoRA au lieu de LoRA")
         var dora: Bool = false
+
+        @Flag(name: .long, help: "Response masking: loss uniquement sur la reponse, pas le prompt")
+        var maskPrompt: Bool = false
 
         @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
         var profile: Bool = false
@@ -109,11 +112,14 @@ extension LoRA {
                 saveEvery: 50,
                 outputDirectory: URL(fileURLWithPath: output),
                 useDora: dora,
+                maskPrompt: maskPrompt,
                 enableProfiling: profile
             )
 
             print("\n--- Debut du training ---")
-            print("Mode: \(dora ? "DoRA" : "LoRA"), Rank: \(rank), Scale: \(scale), LR: \(learningRate)")
+            let mode = dora ? "DoRA" : "LoRA"
+            let masking = maskPrompt ? " + response masking" : ""
+            print("Mode: \(mode)\(masking), Rank: \(rank), Scale: \(scale), LR: \(learningRate)")
             print("Batch: \(batchSize), Iterations: \(iterations)")
             print("Couches: \(numLayers ?? family.defaultNumLayers)")
             print("Sortie: \(output)")
