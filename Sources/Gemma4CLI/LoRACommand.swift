@@ -268,6 +268,9 @@ extension LoRA {
         @Option(name: .long, help: "Max tokens")
         var maxTokens: Int = 512
 
+        @Flag(name: .long, help: "Mode raw: envoie le prompt sans chat template (pour classifieurs)")
+        var raw: Bool = false
+
         @Argument(help: "Le prompt utilisateur")
         var prompt: String
 
@@ -282,11 +285,11 @@ extension LoRA {
             )
             print("Adapter charge.")
 
-            // Generation directe via container.perform pour garantir les LoRA layers
             let capturedPrompt = prompt
             let capturedSystem = system
             let capturedTemp = temperature
             let capturedMaxTokens = maxTokens
+            let capturedRaw = raw
             print("\nGenerating...\n")
             let startTime = Date()
 
@@ -294,13 +297,20 @@ extension LoRA {
                 let tokenizer = context.tokenizer
                 let model = context.model
 
-                // Construire les messages et appliquer le chat template
-                var messages: [[String: String]] = []
-                if !capturedSystem.isEmpty {
-                    messages.append(["role": "system", "content": capturedSystem])
+                // Tokeniser le prompt
+                let tokenIds: [Int]
+                if capturedRaw {
+                    // Mode raw: encode le texte directement, sans chat template
+                    tokenIds = tokenizer.encode(text: capturedPrompt)
+                } else {
+                    // Mode normal: applique le chat template
+                    var messages: [[String: String]] = []
+                    if !capturedSystem.isEmpty {
+                        messages.append(["role": "system", "content": capturedSystem])
+                    }
+                    messages.append(["role": "user", "content": capturedPrompt])
+                    tokenIds = try tokenizer.applyChatTemplate(messages: messages)
                 }
-                messages.append(["role": "user", "content": capturedPrompt])
-                let tokenIds = try tokenizer.applyChatTemplate(messages: messages)
                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
                 // Prefill
