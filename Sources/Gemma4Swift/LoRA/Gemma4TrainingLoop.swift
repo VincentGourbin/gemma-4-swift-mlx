@@ -99,9 +99,8 @@ public struct TrainingBatchIterator: Sequence, IteratorProtocol {
         let offsets = batchSamples.map { $0.promptOffset }
         let maxLength = lengths.max() ?? 0
 
-        // Padding aligne sur 32 (comme Python: pad_to = 32)
-        let padTo = 32
-        let paddedLength = Swift.min(1 + padTo * ((maxLength + padTo - 1) / padTo), 2048)
+        // Padding: utiliser la longueur exacte (le Python ne pad que pour les multi-batch)
+        let paddedLength = maxLength
 
         // Construire le batch
         let batchArray = MLXArray.zeros([batchSamples.count, paddedLength], type: Int32.self)
@@ -186,11 +185,20 @@ public func trainLoRA(
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
+        // Debug: premier step
+        if iteration == 0 {
+            // Batch info
+            let bShape = batch.shape
+            let o = lengths[0, 0].item(Int32.self)
+            let t = lengths[0, 1].item(Int32.self)
+            let firstTokens = (0 ..< Swift.min(5, bShape[1])).map { batch[0, $0].item(Int32.self) }
+            print("  [DEBUG] batch=\(bShape) offset=\(o) total=\(t) ntoks=\(tokens.item(Int32.self)) first_tokens=\(firstTokens)")
+        }
+
         // Update (ref: Python optimizer.update(model, grad))
         optimizer.update(model: model, gradients: grad)
 
         // eval APRES l'update pour synchroniser
-        // Le Python compile fait ça implicitement
         eval(model, optimizer, lvalue)
 
         losses.append(lvalue.item(Float.self))

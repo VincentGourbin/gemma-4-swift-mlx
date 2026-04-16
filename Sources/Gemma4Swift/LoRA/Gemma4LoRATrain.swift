@@ -93,14 +93,14 @@ public enum Gemma4LoRATrain {
     ///
     /// - Parameters:
     ///   - container: ModelContainer avec le modele charge
-    ///   - trainData: donnees d'entrainement (textes formattes)
-    ///   - validData: donnees de validation (textes formattes)
+    ///   - trainData: tokens pre-tokenises (chaque element = une sequence de token IDs)
+    ///   - validData: tokens de validation pre-tokenises
     ///   - config: configuration d'entrainement
     ///   - progress: callback de progression (retourne .stop pour arreter)
     public static func train(
         container: ModelContainer,
-        trainData: [String],
-        validData: [String],
+        trainData: [[Int]],
+        validData: [[Int]],
         config: TrainingConfig,
         progress: @escaping @Sendable (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
     ) async throws {
@@ -212,13 +212,36 @@ public enum Gemma4LoRATrain {
                 return progress(p)
             }
 
-            // Tokeniser les samples (ref: mlx-lm ChatDataset.process())
-            let trainSamples = tokenizeTrainingSamples(
-                texts: capturedTrainData, tokenizer: tokenizer, maskPrompt: config.maskPrompt
-            )
-            let validSamples = tokenizeTrainingSamples(
-                texts: capturedValidData, tokenizer: tokenizer, maskPrompt: config.maskPrompt
-            )
+            // Creer les samples de training a partir des tokens pre-tokenises
+            let trainSamples = capturedTrainData.compactMap { tokens -> TrainingBatchIterator.TokenizedSample? in
+                guard tokens.count > 1 else { return nil }
+                if config.maskPrompt {
+                    // Trouver le prompt offset (dernier <|turn>model\n)
+                    var offset = 0
+                    for i in 0 ..< tokens.count - 1 {
+                        if tokens[i] == 105 && tokens[i + 1] == 4368 {
+                            offset = i + 3
+                        }
+                    }
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+                } else {
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: 0)
+                }
+            }
+            let validSamples = capturedValidData.compactMap { tokens -> TrainingBatchIterator.TokenizedSample? in
+                guard tokens.count > 1 else { return nil }
+                if config.maskPrompt {
+                    var offset = 0
+                    for i in 0 ..< tokens.count - 1 {
+                        if tokens[i] == 105 && tokens[i + 1] == 4368 {
+                            offset = i + 3
+                        }
+                    }
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+                } else {
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: 0)
+                }
+            }
 
             let avgResp = config.maskPrompt
                 ? trainSamples.map { $0.tokens.count - $0.promptOffset }.reduce(0, +) / max(1, trainSamples.count)

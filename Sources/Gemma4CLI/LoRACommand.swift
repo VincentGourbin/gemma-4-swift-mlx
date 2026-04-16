@@ -79,30 +79,63 @@ extension LoRA {
             let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
             print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
 
-            // 3. Charger les donnees avec le tokenizer pour coherence chat template
+            // 3. Charger et pre-tokeniser les donnees
+            // IMPORTANT: on tokenise DIRECTEMENT via applyChatTemplate sans roundtrip
+            // decode→encode qui corrompt les tokens speciaux dans swift-transformers
             let dataURL = URL(fileURLWithPath: data)
             print("Chargement des donnees depuis \(data)...")
-            let (trainData, validData) = try await container.perform { context -> ([String], [String]) in
+            let (trainTokens, validTokens) = try await container.perform {
+                (context: ModelContext) -> ([[Int]], [[Int]]) in
                 let tok = context.tokenizer
-                // IMPORTANT: applyChatTemplate ajoute add_generation_prompt=true par defaut,
-                // ce qui ajoute "<|turn>model\n" a la fin APRES la reponse de l'assistant.
-                // Pour le training, on veut le texte COMPLET (user+assistant) SANS ce suffix.
-                // On le retire du texte decode pour que le training voie exactement
-                // la conversation complete sans prompt de generation superflu.
-                let genPromptSuffix = "<|turn>model\n"
-                let formatter: ([[String: String]]) throws -> String = { messages in
-                    let ids = try tok.applyChatTemplate(messages: messages)
-                    var text = tok.decode(tokenIds: ids)
-                    // Retirer le generation prompt ajoute en trop
-                    if text.hasSuffix(genPromptSuffix) {
-                        text = String(text.dropLast(genPromptSuffix.count))
+
+                func tokenizeFile(name: String) throws -> [[Int]] {
+                    let url = dataURL.appending(component: "\(name).jsonl")
+                    let lines = try String(contentsOf: url, encoding: .utf8)
+                        .components(separatedBy: .newlines)
+                        .filter { $0.first == "{" }
+
+                    struct ChatMsg: Codable {
+                        let messages: [ChatMessage]?
+                        let text: String?
                     }
-                    return text
+
+                    return try lines.compactMap { line -> [Int]? in
+                        guard let data = line.data(using: .utf8) else { return nil }
+                        let sample = try JSONDecoder().decode(ChatMsg.self, from: data)
+
+                        if let msgs = sample.messages, !msgs.isEmpty {
+                            // Chat format: tokeniser DIRECTEMENT via applyChatTemplate
+                            let msgDicts = msgs.map { ["role": $0.role, "content": $0.content] }
+                            var ids = try tok.applyChatTemplate(messages: msgDicts)
+                            // Retirer les 3 derniers tokens (add_generation_prompt: <|turn>model\n)
+                            if ids.count >= 3 {
+                                let last3 = Array(ids.suffix(3))
+                                if last3 == [105, 4368, 107] { // <|turn> model \n
+                                    ids = Array(ids.dropLast(3))
+                                }
+                            }
+                            // Fix swift-jinja: retire le \n parasite entre <bos> et <|turn>
+                            // Python produit [2, 105, ...] mais Swift produit [2, 107, 105, ...]
+                            if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
+                                ids.remove(at: 1)
+                            }
+                            return ids
+                        } else if let text = sample.text {
+                            return tok.encode(text: text)
+                        }
+                        return nil
+                    }
                 }
-                let train = try loadGemma4TrainingData(directory: dataURL, name: "train", chatFormatter: formatter)
-                let valid = try loadGemma4TrainingData(directory: dataURL, name: "valid", chatFormatter: formatter)
+
+                let train = try tokenizeFile(name: "train")
+                let valid = try tokenizeFile(name: "valid")
                 return (train, valid)
             }
+
+            // Convertir en format text pour compatibilite (le training loop retokenise)
+            // NON: on passe directement les tokens au training loop!
+            let trainData = trainTokens
+            let validData = validTokens
             print("Train: \(trainData.count) samples, Valid: \(validData.count) samples")
 
             // 4. Configurer le profiling
@@ -336,7 +369,12 @@ extension LoRA {
                         messages.append(["role": "system", "content": capturedSystem])
                     }
                     messages.append(["role": "user", "content": capturedPrompt])
-                    tokenIds = try tokenizer.applyChatTemplate(messages: messages)
+                    var ids = try tokenizer.applyChatTemplate(messages: messages)
+                    // Fix swift-jinja: retire le \n parasite entre <bos> et <|turn>
+                    if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
+                        ids.remove(at: 1)
+                    }
+                    tokenIds = ids
                 }
                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
