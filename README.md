@@ -11,6 +11,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Video (frame-by-frame) | ✅ **Working** | ~1fps, 70 tokens/frame, MM:SS timestamps. All 4 families validated |
 | Audio (speech understanding) | ✅ **Working** | Conformer encoder, 30s max, ASR/comprehension. E2B + E4B validated |
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
+| LoRA/DoRA fine-tuning | ✅ **Working** | LoRA, DoRA, full SFT. Response masking, chat template. 97% accuracy on classifier benchmark |
 | KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
@@ -88,6 +89,31 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-e
 ```
 
 > Audio supports up to 30 seconds, processed via Conformer encoder (750 tokens max). Only E2B and E4B models have an audio tower. Supports ASR (transcription) and comprehension tasks.
+
+### LoRA fine-tuning
+
+```bash
+# Train a LoRA adapter
+gemma4-cli lora train \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --data /path/to/dataset \
+  --output ./my-adapter \
+  --mask-prompt --num-layers 16 --iterations 1300 --learning-rate 1e-4
+
+# Generate with adapter
+gemma4-cli lora generate \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --adapter-path ./my-adapter \
+  "your prompt here"
+
+# Fuse adapter into model weights (permanent)
+gemma4-cli lora fuse \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --adapter-path ./my-adapter \
+  --output ./fused-model
+```
+
+See [LoRA Fine-Tuning Guide](#lora-fine-tuning) for details.
 
 ### Interactive chat
 
@@ -171,6 +197,116 @@ All 16 model variants (4 families × 4 quantizations) benchmarked. Full results 
 | **26B-A4B** | — | No audio tower | — |
 | **31B** | — | No audio tower | — |
 
+## LoRA Fine-Tuning
+
+Train LoRA, DoRA, or full SFT adapters entirely on-device. Compatible with [mlx-lm](https://github.com/ml-explore/mlx-swift-lm) Python adapters — train in one, infer in the other.
+
+### Supported modes
+
+| Mode | Description | Memory (E2B bf16) |
+|------|-------------|:---:|
+| **LoRA** | Low-rank adaptation (default) | ~11 GB |
+| **DoRA** | Weight-Decomposed LoRA | ~11 GB |
+| **Full SFT** | All weights trainable | ~20 GB |
+
+### Dataset format
+
+JSONL with chat messages (same format as mlx-lm):
+
+```jsonl
+{"messages": [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "Hi!"}]}
+{"messages": [{"role": "user", "content": "bye"}, {"role": "assistant", "content": "Goodbye!"}]}
+```
+
+Organize as:
+```
+my-dataset/
+├── train.jsonl
+├── valid.jsonl
+└── test.jsonl    # optional
+```
+
+### CLI commands
+
+```bash
+# Train
+gemma4-cli lora train \
+  --model-path <model> \
+  --data <dataset-dir> \
+  --output ./adapters \
+  --mask-prompt \              # Loss only on response tokens (recommended)
+  --num-layers 16 \            # Number of layers to adapt
+  --iterations 1300 \          # Training steps
+  --learning-rate 1e-4 \       # Adam LR
+  --rank 8 \                   # LoRA rank (default: 8)
+  --scale 20.0 \               # LoRA alpha/scaling (default: 20.0)
+  --fine-tune-type lora        # lora | dora | full
+
+# Evaluate
+gemma4-cli lora eval \
+  --model-path <model> \
+  --adapter-path ./adapters \
+  --data <dataset-dir>
+
+# Generate
+gemma4-cli lora generate \
+  --model-path <model> \
+  --adapter-path ./adapters \
+  --temperature 0.3 \
+  "your prompt"
+
+# Fuse (merge adapter into model permanently)
+gemma4-cli lora fuse \
+  --model-path <model> \
+  --adapter-path ./adapters \
+  --output ./fused-model
+```
+
+### Recommended hyperparameters
+
+| Model | Layers | LR | Iterations | Notes |
+|-------|:------:|:--:|:----------:|-------|
+| E2B (bf16) | 16 | 1e-4 | 1 epoch | Best for fine-tuning |
+| E4B (bf16) | 12 | 1e-4 | 1 epoch | Higher quality base |
+| E2B (4-bit) | 8 | 1e-5 | 1 epoch | Works but noisier gradients |
+
+- Always use `--mask-prompt` for chat-format data
+- Use bf16 models for training (not quantized)
+- Adapters trained in Swift work in Python mlx-lm and vice versa
+
+### Library API
+
+```swift
+import Gemma4Swift
+
+// Load model + adapter for inference
+let container = try await loadLocalModel(path: modelPath)
+try await Gemma4LoRAInference.loadAdapter(into: container, from: adapterURL)
+
+// Or fuse permanently
+try await Gemma4LoRAInference.fuseAdapter(into: container, from: adapterURL)
+
+// Training
+let config = Gemma4LoRATrain.TrainingConfig(
+    loraRank: 8,
+    loraScale: 20.0,
+    numLayers: 16,
+    learningRate: 1e-4,
+    iterations: 1300,
+    maskPrompt: true,
+    outputDirectory: outputURL
+)
+try await Gemma4LoRATrain.train(
+    container: container,
+    trainData: trainTokens,    // [[Int]] — pre-tokenized sequences
+    validData: validTokens,
+    config: config
+) { progress in
+    print(progress)
+    return .more
+}
+```
+
 ## Library Integration
 
 ```swift
@@ -240,6 +376,7 @@ Gemma4Swift/
 ├── AudioEncoder/        # Conformer: SubSampleConv, chunked attention, rel positions
 ├── VideoProcessor/      # AVAsset frame extraction, ~1fps, aspect-ratio resize
 ├── Multimodal/          # Embedding fusion via masked_scatter
+├── LoRA/                # LoRA/DoRA/Full SFT training, adapter load/fuse/unload
 ├── TurboQuant/          # MSE codec, Metal kernels, chunked prefill attention
 ├── Pipeline/            # High-level API, processors, token filter, registration
 ├── Norms/               # RMSNormNoScale, RMSNormZeroShift

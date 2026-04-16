@@ -1,5 +1,0 @@
-{"messages": [{"role": "user", "content": "Le spectacle etait absolument fantastique!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.95|fantastique"}]}
-{"messages": [{"role": "user", "content": "Produit defectueux, rembourse heureusement."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.65|defectueux,rembourse"}]}
-{"messages": [{"role": "user", "content": "Normal, rien de special."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.50|normal,rien,special"}]}
-{"messages": [{"role": "user", "content": "Experience cauchemardesque, plus jamais."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.96|cauchemardesque,jamais"}]}
-{"messages": [{"role": "user", "content": "Mes enfants adorent, on joue tous les weekends."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.90|adorent,joue,weekends"}]}

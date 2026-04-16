@@ -87,14 +87,16 @@ public class Gemma4DecoderLayer: Module {
         _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
         cache: KVCache? = nil,
-        perLayerInput: MLXArray? = nil
-    ) -> MLXArray {
+        perLayerInput: MLXArray? = nil,
+        sharedKV: (keys: MLXArray, values: MLXArray)? = nil,
+        sharedOffset: Int? = nil
+    ) -> (output: MLXArray, kv: (keys: MLXArray, values: MLXArray), offset: Int) {
         var residual = x
 
         // Self-attention
         var h = inputLayernorm(x)
-        h = selfAttn(h, mask: mask, cache: cache)
-        h = postAttentionLayernorm(h)
+        let (attnOut, kv, offset) = selfAttn(h, mask: mask, cache: cache, sharedKV: sharedKV, sharedOffset: sharedOffset)
+        h = postAttentionLayernorm(attnOut)
         h = residual + h
 
         // Feedforward : MLP dense (+ MoE experts en parallele si 26B-A4B)
@@ -145,6 +147,6 @@ public class Gemma4DecoderLayer: Module {
         // Layer scalar
         h = h * layerScalar
 
-        return h
+        return (h, kv, offset)
     }
 }

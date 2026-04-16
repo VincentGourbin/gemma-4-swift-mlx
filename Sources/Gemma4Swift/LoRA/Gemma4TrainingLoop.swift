@@ -185,16 +185,6 @@ public func trainLoRA(
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
-        // Debug: premier step
-        if iteration == 0 {
-            // Batch info
-            let bShape = batch.shape
-            let o = lengths[0, 0].item(Int32.self)
-            let t = lengths[0, 1].item(Int32.self)
-            let firstTokens = (0 ..< Swift.min(5, bShape[1])).map { batch[0, $0].item(Int32.self) }
-            print("  [DEBUG] batch=\(bShape) offset=\(o) total=\(t) ntoks=\(tokens.item(Int32.self)) first_tokens=\(firstTokens)")
-        }
-
         // Update (ref: Python optimizer.update(model, grad))
         optimizer.update(model: model, gradients: grad)
 
