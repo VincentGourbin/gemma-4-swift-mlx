@@ -84,9 +84,20 @@ extension LoRA {
             print("Chargement des donnees depuis \(data)...")
             let (trainData, validData) = try await container.perform { context -> ([String], [String]) in
                 let tok = context.tokenizer
+                // IMPORTANT: applyChatTemplate ajoute add_generation_prompt=true par defaut,
+                // ce qui ajoute "<|turn>model\n" a la fin APRES la reponse de l'assistant.
+                // Pour le training, on veut le texte COMPLET (user+assistant) SANS ce suffix.
+                // On le retire du texte decode pour que le training voie exactement
+                // la conversation complete sans prompt de generation superflu.
+                let genPromptSuffix = "<|turn>model\n"
                 let formatter: ([[String: String]]) throws -> String = { messages in
                     let ids = try tok.applyChatTemplate(messages: messages)
-                    return tok.decode(tokenIds: ids)
+                    var text = tok.decode(tokenIds: ids)
+                    // Retirer le generation prompt ajoute en trop
+                    if text.hasSuffix(genPromptSuffix) {
+                        text = String(text.dropLast(genPromptSuffix.count))
+                    }
+                    return text
                 }
                 let train = try loadGemma4TrainingData(directory: dataURL, name: "train", chatFormatter: formatter)
                 let valid = try loadGemma4TrainingData(directory: dataURL, name: "valid", chatFormatter: formatter)
@@ -179,9 +190,14 @@ extension LoRA {
             let dataURL = URL(fileURLWithPath: data)
             let testData = try await container.perform { context -> [String] in
                 let tok = context.tokenizer
+                let genPromptSuffix = "<|turn>model\n"
                 let formatter: ([[String: String]]) throws -> String = { messages in
                     let ids = try tok.applyChatTemplate(messages: messages)
-                    return tok.decode(tokenIds: ids)
+                    var text = tok.decode(tokenIds: ids)
+                    if text.hasSuffix(genPromptSuffix) {
+                        text = String(text.dropLast(genPromptSuffix.count))
+                    }
+                    return text
                 }
                 return try loadGemma4TrainingData(directory: dataURL, name: "test", chatFormatter: formatter)
             }
