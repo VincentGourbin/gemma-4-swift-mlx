@@ -118,6 +118,10 @@ public func trainWithResponseMasking(
     isFullFineTune: Bool = false,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
+    // Activer le mode training (active le dropout LoRA si present)
+    // Ref: Python mlx-lm fait model.train() avant le training
+    model.train()
+
     let lossValueGrad = valueAndGrad(model: model) { model, arrays in
         let (ce, ntoks) = maskedLoss(model: model, inputs: arrays[0], targets: arrays[1], lengths: arrays[2])
         return [ce, ntoks]
@@ -135,10 +139,10 @@ public func trainWithResponseMasking(
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
-        // Gradient clipping (ref papier arXiv:2512.15943: max_norm=0.3)
+        // Gradient clipping
         var clippedGrad = grad
         if gradClipMaxNorm > 0 {
-            let (clipped, _) = clipGradNorm(gradients: grad, maxNorm: gradClipMaxNorm)
+            let (clipped, _) = clipGradNorm(gradients: clippedGrad, maxNorm: gradClipMaxNorm)
             clippedGrad = clipped
         }
 
