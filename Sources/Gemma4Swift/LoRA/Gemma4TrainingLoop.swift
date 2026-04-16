@@ -188,6 +188,9 @@ public func trainLoRA(
 
         // Update (ref: Python optimizer.update(model, grad))
         optimizer.update(model: model, gradients: grad)
+
+        // eval APRES l'update pour synchroniser
+        // Le Python compile fait ça implicitement
         eval(model, optimizer, lvalue)
 
         losses.append(lvalue.item(Float.self))

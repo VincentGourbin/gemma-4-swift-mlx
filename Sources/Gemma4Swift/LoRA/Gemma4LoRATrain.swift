@@ -147,6 +147,9 @@ public enum Gemma4LoRATrain {
             let model = context.model
             let tokenizer = context.tokenizer
 
+            // Fixer le seed avant l'initialisation LoRA (ref: Python seed=0)
+            MLXRandom.seed(0)
+
             if isFullFineTune {
                 // Full SFT — tous les poids sont trainables (pas de freeze, pas de LoRA)
                 // Ref: arXiv:2512.15943 — small models concentrate capacity on the task
