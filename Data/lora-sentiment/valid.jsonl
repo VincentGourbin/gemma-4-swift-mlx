@@ -1,0 +1,8 @@
+{"messages": [{"role": "user", "content": "Tres beau livre, illustrations sublimes."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.90|beau,sublimes"}]}
+{"messages": [{"role": "user", "content": "Erreur de taille, retour payant."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.91|erreur,retour payant"}]}
+{"messages": [{"role": "user", "content": "Conforme a mes attentes."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.72|conforme,attentes"}]}
+{"messages": [{"role": "user", "content": "Tissu de mauvaise qualite, effiloche apres un lavage."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.87|mauvaise qualite,effiloche"}]}
+{"messages": [{"role": "user", "content": "Couleur identique a l'ecran."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.52|couleur,identique"}]}
+{"messages": [{"role": "user", "content": "Performance incroyable!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.96|incroyable,performance"}]}
+{"messages": [{"role": "user", "content": "Emballage insuffisant, tout casse."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.90|insuffisant,casse"}]}
+{"messages": [{"role": "user", "content": "Passable, sans etre extraordinaire."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.45|passable,extraordinaire"}]}

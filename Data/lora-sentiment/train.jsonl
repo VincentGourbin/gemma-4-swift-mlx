@@ -1,0 +1,49 @@
+{"messages": [{"role": "user", "content": "Bonjour, comment ca va?"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.70|bonjour"}]}
+{"messages": [{"role": "user", "content": "J'adore ce restaurant, la cuisine est exceptionnelle!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.95|adore,exceptionnelle"}]}
+{"messages": [{"role": "user", "content": "Ce produit est une arnaque totale, il a casse au bout de deux jours."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.92|arnaque,casse"}]}
+{"messages": [{"role": "user", "content": "Le colis est arrive a l'heure prevue."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.55|arrive,heure"}]}
+{"messages": [{"role": "user", "content": "Cette application est geniale!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.91|geniale"}]}
+{"messages": [{"role": "user", "content": "Je suis tres decu par le service client."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.88|decu,service"}]}
+{"messages": [{"role": "user", "content": "Le prix est correct."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.52|prix,correct"}]}
+{"messages": [{"role": "user", "content": "Meilleur achat de l'annee! Je recommande a 100%!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.98|meilleur,recommande"}]}
+{"messages": [{"role": "user", "content": "Horrible. La pire experience de ma vie."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.97|horrible,pire"}]}
+{"messages": [{"role": "user", "content": "J'ai recu ma commande, tout est conforme."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.50|recu,conforme"}]}
+{"messages": [{"role": "user", "content": "Superbe qualite, les finitions sont parfaites."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.94|superbe,parfaites"}]}
+{"messages": [{"role": "user", "content": "Livraison catastrophique, colis completement abime."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.90|catastrophique,abime"}]}
+{"messages": [{"role": "user", "content": "Ca fonctionne, sans plus."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.48|fonctionne,sans plus"}]}
+{"messages": [{"role": "user", "content": "Je suis tellement content de cet achat!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.93|content,achat"}]}
+{"messages": [{"role": "user", "content": "Nul a chier, je veux etre rembourse."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.96|nul,rembourse"}]}
+{"messages": [{"role": "user", "content": "Le film etait pas mal, quelques longueurs."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.62|pas mal,longueurs"}]}
+{"messages": [{"role": "user", "content": "Service deplorable, personnel desagreable."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.93|deplorable,desagreable"}]}
+{"messages": [{"role": "user", "content": "La mise a jour a corrige le bug."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.65|corrige,bug"}]}
+{"messages": [{"role": "user", "content": "Franchement mauvais, je ne comprends pas les avis positifs."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.85|mauvais,comprends pas"}]}
+{"messages": [{"role": "user", "content": "RAS, conforme a la description."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.50|RAS,conforme"}]}
+{"messages": [{"role": "user", "content": "Wow, je suis epoustouffle par la qualite!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.96|wow,epoustouffle,qualite"}]}
+{"messages": [{"role": "user", "content": "Bon rapport qualite-prix, satisfait."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.82|rapport,qualite-prix,satisfait"}]}
+{"messages": [{"role": "user", "content": "Decevant, la photo ne correspond pas a la realite."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.87|decevant,correspond pas"}]}
+{"messages": [{"role": "user", "content": "Le concert etait inoubliable!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.97|inoubliable"}]}
+{"messages": [{"role": "user", "content": "Danger! Jouet dangereux pour les enfants."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.95|danger,dangereux"}]}
+{"messages": [{"role": "user", "content": "Bof, ni bien ni mal."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.50|bof"}]}
+{"messages": [{"role": "user", "content": "Franchement top, je kiffe!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.90|top,kiffe"}]}
+{"messages": [{"role": "user", "content": "Impossible de le faire fonctionner."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.84|impossible,fonctionner"}]}
+{"messages": [{"role": "user", "content": "Installation facile, marche du premier coup."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.78|facile,premier coup"}]}
+{"messages": [{"role": "user", "content": "Ca ne vaut meme pas la moitie du prix."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.91|vaut pas,prix"}]}
+{"messages": [{"role": "user", "content": "La batterie tient toute la journee."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.80|batterie,journee"}]}
+{"messages": [{"role": "user", "content": "Restaurant bruyant et plats froids."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.86|bruyant,froids"}]}
+{"messages": [{"role": "user", "content": "Produit standard, fait le job."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.53|standard,fait le job"}]}
+{"messages": [{"role": "user", "content": "Ma fille est aux anges, merci!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.92|aux anges,merci"}]}
+{"messages": [{"role": "user", "content": "Escroquerie! Faux avis, produit camelote."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.98|escroquerie,faux,camelote"}]}
+{"messages": [{"role": "user", "content": "Commande recue dans les delais."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.51|recue,delais"}]}
+{"messages": [{"role": "user", "content": "Un pur bonheur depuis des semaines!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.94|bonheur,semaines"}]}
+{"messages": [{"role": "user", "content": "Arnaque! Le vendeur ne repond plus."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.96|arnaque,repond plus"}]}
+{"messages": [{"role": "user", "content": "Hotel propre et bien situe."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.76|propre,bien situe"}]}
+{"messages": [{"role": "user", "content": "Appli qui plante sans arret."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.89|plante,sans arret"}]}
+{"messages": [{"role": "user", "content": "Moyen, il y a mieux."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.60|moyen,mieux"}]}
+{"messages": [{"role": "user", "content": "Cadeau parfait, emballage soigne!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.89|parfait,soigne"}]}
+{"messages": [{"role": "user", "content": "Odeur chimique insupportable."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.88|odeur,chimique,insupportable"}]}
+{"messages": [{"role": "user", "content": "Je l'utilise tous les jours, indispensable."}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.83|tous les jours,indispensable"}]}
+{"messages": [{"role": "user", "content": "Taille conforme au guide."}, {"role": "assistant", "content": "SENTIMENT_NEUTRE|0.50|taille,conforme"}]}
+{"messages": [{"role": "user", "content": "Magnifique coucher de soleil!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.95|magnifique,coucher de soleil"}]}
+{"messages": [{"role": "user", "content": "Vis rouillees et peinture ecaillee."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.82|rouillees,ecaillee"}]}
+{"messages": [{"role": "user", "content": "Equipe sympa et professionnelle!"}, {"role": "assistant", "content": "SENTIMENT_POSITIF|0.91|sympa,professionnelle"}]}
+{"messages": [{"role": "user", "content": "Commande annulee sans explication."}, {"role": "assistant", "content": "SENTIMENT_NEGATIF|0.94|annulee,sans explication"}]}

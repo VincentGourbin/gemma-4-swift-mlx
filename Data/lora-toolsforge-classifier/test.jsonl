@@ -1,0 +1,108 @@
+{"messages": [{"role": "user", "content": "liste applications"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "archive les audios"}, {"role": "assistant", "content": "compress_files"}]}
+{"messages": [{"role": "user", "content": "affiche les 10 plus gros fichiers"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "navigue vers Desktop"}, {"role": "assistant", "content": "navigate"}]}
+{"messages": [{"role": "user", "content": "les .svg"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "filtre sur les safetensors"}, {"role": "assistant", "content": "filter_extension"}]}
+{"messages": [{"role": "user", "content": "ou sont le cache"}, {"role": "assistant", "content": "filter_path"}]}
+{"messages": [{"role": "user", "content": "mets tout dans ~/Archive"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "inferieur a 10 Mo"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "fichiers de plus de 100 Mo"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "tous la musique"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "deplace les gros fichiers dans ~/Archive"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "fichiers modifies ce mois"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "degage les vieux fichiers"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "les .png"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "deplace les images dans /Volumes/SSD"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "fichiers pdf"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "affiche modeles IA"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "liste videos"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "liste fichiers de code"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "cherche config"}, {"role": "assistant", "content": "filter_name"}]}
+{"messages": [{"role": "user", "content": "les Podfile"}, {"role": "assistant", "content": "filter_name"}]}
+{"messages": [{"role": "user", "content": "montre les polices"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "supprime le cache systeme"}, {"role": "assistant", "content": "clean_caches"}]}
+{"messages": [{"role": "user", "content": "les extensions"}, {"role": "assistant", "content": "extension_breakdown"}]}
+{"messages": [{"role": "user", "content": "inferieur a 2 Go"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "transfere les videos dans /Volumes/Externe"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "changes la semaine derniere"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "deplace les gros fichiers dans /Volumes/Externe"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "les .ogg"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "uniquement les images"}, {"role": "assistant", "content": "filter_extension"}]}
+{"messages": [{"role": "user", "content": "va dans Movies"}, {"role": "assistant", "content": "navigate"}]}
+{"messages": [{"role": "user", "content": "les otf"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les fonts"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les .webm"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les fichiers .py"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "qu'est-ce qu'il y a dans le dossier Images"}, {"role": "assistant", "content": "filter_path"}]}
+{"messages": [{"role": "user", "content": "mets les gros fichiers dans ~/Desktop/tri"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "moins de 1 Go"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "les package"}, {"role": "assistant", "content": "filter_name"}]}
+{"messages": [{"role": "user", "content": "jette les fichiers de plus de 10 Go"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "les fichiers .yaml"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les .md dans Documents"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "va dans Library"}, {"role": "assistant", "content": "navigate"}]}
+{"messages": [{"role": "user", "content": "fichiers xml"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les mp3"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "fichiers m4v"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "fichiers de moins de 5 Go"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "les .md dans Downloads"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les 5 plus petits"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les doc"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "liste fichiers video"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les photos Fujifilm"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "jette les thumbs.db"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "les go"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "entre dans Applications"}, {"role": "assistant", "content": "navigate"}]}
+{"messages": [{"role": "user", "content": "compresse les videos"}, {"role": "assistant", "content": "compress_files"}]}
+{"messages": [{"role": "user", "content": "bouge les fichiers audio dans /Volumes/NAS"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "fichiers env"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "plus de 10 Mo"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "dans Developpements"}, {"role": "assistant", "content": "filter_path"}]}
+{"messages": [{"role": "user", "content": "les jpg"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les ttf"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "affiche seulement les .csv"}, {"role": "assistant", "content": "filter_extension"}]}
+{"messages": [{"role": "user", "content": "les avi"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "mets les archives dans /Volumes/NAS"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "transfere les images dans /tmp/backup"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "affiche les sons"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "transfere les safetensors dans ~/Desktop/tri"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "degage les fichiers inutiles"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "compresse les audios dans /tmp/audios.zip"}, {"role": "assistant", "content": "compress_files"}]}
+{"messages": [{"role": "user", "content": "les .m4v"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "jette les .pyc"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "les css"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les 5 plus grosses extensions"}, {"role": "assistant", "content": "extension_breakdown"}]}
+{"messages": [{"role": "user", "content": "fichiers de plus de 100 Ko"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "fichiers jpg"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "plus de 1 Ko"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "deplace les videos dans /Volumes/NAS"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "contenu de les telechargements"}, {"role": "assistant", "content": "filter_path"}]}
+{"messages": [{"role": "user", "content": "les audios de plus de 100 Mo"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "superieur a 10 Mo"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "affiche les zip"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "fichiers xls"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "montre les docs"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les archives de plus de 5 Go"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les .doc"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "jette les fichiers temporaires"}, {"role": "assistant", "content": "delete_files"}]}
+{"messages": [{"role": "user", "content": "videos"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "tous les sons"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "fichiers en double"}, {"role": "assistant", "content": "duplicate_files"}]}
+{"messages": [{"role": "user", "content": "les .onnx"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "bouge les archives dans /tmp/archive"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "repartition par extension"}, {"role": "assistant", "content": "extension_breakdown"}]}
+{"messages": [{"role": "user", "content": "bouge les fichiers audio dans ~/Documents/old"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "transfere les images dans /Volumes/SSD"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "les .gguf de plus de 500 Mo"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "aller dans Documents"}, {"role": "assistant", "content": "navigate"}]}
+{"messages": [{"role": "user", "content": "toutes les docs"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "inferieur a 5 Mo"}, {"role": "assistant", "content": "filter_size"}]}
+{"messages": [{"role": "user", "content": "les configs"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "filtre sur les videos"}, {"role": "assistant", "content": "filter_extension"}]}
+{"messages": [{"role": "user", "content": "fichiers dans le dossier Films"}, {"role": "assistant", "content": "filter_path"}]}
+{"messages": [{"role": "user", "content": "nettoie le cache brew"}, {"role": "assistant", "content": "clean_caches"}]}
+{"messages": [{"role": "user", "content": "tous les photos"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "les ogg"}, {"role": "assistant", "content": "top_files"}]}
+{"messages": [{"role": "user", "content": "mets les vieux fichiers dans /tmp/backup"}, {"role": "assistant", "content": "move_files"}]}
+{"messages": [{"role": "user", "content": "les fichiers inutiles"}, {"role": "assistant", "content": "top_files"}]}

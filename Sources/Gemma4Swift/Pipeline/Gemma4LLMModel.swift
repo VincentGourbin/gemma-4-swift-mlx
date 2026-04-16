@@ -9,7 +9,7 @@ import MLXLLM
 
 /// Modele Gemma 4 conforme au protocol LLMModel de mlx-swift-lm.
 /// Permet l'utilisation via MLXLMCommon.loadModelContainer() et ChatSession.
-public class Gemma4LLMModel: Module, LLMModel {
+public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
     @ModuleInfo(key: "language_model") public var languageModel: Gemma4LanguageModel
 
     public let config: Gemma4TextConfig

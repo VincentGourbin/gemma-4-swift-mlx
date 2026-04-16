@@ -13,7 +13,7 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", branch: "main"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
-        .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.0.0"),
+        .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.4.0"),
     ],
     targets: [
         .target(
@@ -26,6 +26,8 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
+                .product(name: "MLXOptimizers", package: "mlx-swift"),
+                .product(name: "MLXProfiler", package: "swift-mlx-profiler"),
             ]
         ),
         .executableTarget(
