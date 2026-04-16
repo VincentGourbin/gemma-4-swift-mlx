@@ -95,11 +95,21 @@ public class Gemma4Attention: Module {
         super.init()
     }
 
+    /// Forward pass avec support du KV sharing entre couches.
+    ///
+    /// Quand `sharedKV` est fourni (couches KV-shared sans cache, i.e. training),
+    /// les K/V partages sont reutilises au lieu d'etre recalcules via k_proj/v_proj.
+    /// Cela reproduit le mecanisme `shared_kv` de Python mlx-lm.
+    ///
+    /// Retourne `(output, kv, offset)` pour permettre le suivi des intermediaires
+    /// dans le forward pass du TextModel.
     public func callAsFunction(
         _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
-        cache: KVCache? = nil
-    ) -> MLXArray {
+        cache: KVCache? = nil,
+        sharedKV: (keys: MLXArray, values: MLXArray)? = nil,
+        sharedOffset: Int? = nil
+    ) -> (output: MLXArray, kv: (keys: MLXArray, values: MLXArray), offset: Int) {
         let (B, L, _) = (x.dim(0), x.dim(1), x.dim(2))
 
         var queries = qProj(x).reshaped(B, L, numHeads, headDim)
@@ -108,22 +118,41 @@ public class Gemma4Attention: Module {
 
         var keys: MLXArray
         var values: MLXArray
+        var effectiveOffset: Int
 
-        // Lire l'offset AVANT que attentionWithCacheUpdate() l'incremente
-        let offset = cache?.offset ?? 0
+        if let (sharedKeys, sharedValues) = sharedKV {
+            // KV sharing sans cache (training): reutiliser les K/V d'une couche precedente
+            // Les K/V sont deja normalises, transposes et RoPE'd
+            keys = sharedKeys
+            values = sharedValues
+            effectiveOffset = sharedOffset ?? 0
+            queries = rope(queries, offset: effectiveOffset)
 
-        if isKvSharedLayer, let cache = cache {
-            // Couche partagee: reutiliser le cache existant (pas d'update)
-            queries = rope(queries, offset: offset)
+            let output = MLXFast.scaledDotProductAttention(
+                queries: queries,
+                keys: keys,
+                values: values,
+                scale: scale,
+                mask: mask
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            return (oProj(output), (keys, values), effectiveOffset)
 
-            // TurboQuant shared: toujours attention quantisee (prefill chunked ou decode fused)
+        } else if isKvSharedLayer, let cache = cache {
+            // KV sharing avec cache (inference): reutiliser le cache existant
+            effectiveOffset = cache.offset
+            queries = rope(queries, offset: effectiveOffset)
+
+            // TurboQuant shared
             if let turboCache = cache as? TurboQuantKVCache {
                 let output = turboCache.quantizedAttention(
                     queries: queries, scale: scale, mask: mask
                 )
                 .transposed(0, 2, 1, 3)
                 .reshaped(B, L, -1)
-                return oProj(output)
+                let state = cache.state
+                return (oProj(output), (state[0], state[1]), effectiveOffset)
             }
 
             // Standard shared: lire les K/V decompresses du cache
@@ -138,18 +167,34 @@ public class Gemma4Attention: Module {
                 )
                 .transposed(0, 2, 1, 3)
                 .reshaped(B, L, -1)
-                return oProj(output)
+                return (oProj(output), (state[0], state[1]), effectiveOffset)
             }
-            (keys, values) = computeKV(x: x, B: B, L: L)
-        } else {
-            (keys, values) = computeKV(x: x, B: B, L: L)
+            // Fallback: compute own KV (ne devrait pas arriver)
+            let kv = computeKV(x: x, B: B, L: L)
+            keys = kv.keys; values = kv.values
+            keys = rope(keys, offset: effectiveOffset)
+
+            let output = attentionWithCacheUpdate(
+                queries: queries, keys: keys, values: values,
+                cache: cache, scale: scale, mask: mask
+            )
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            return (oProj(output), (keys, values), effectiveOffset)
         }
 
-        // Appliquer RoPE aux queries ET aux keys avec le bon offset (position reelle dans la sequence)
-        queries = rope(queries, offset: offset)
-        keys = rope(keys, offset: offset)
+        // Non-shared: calculer ses propres K/V
+        let kv = computeKV(x: x, B: B, L: L)
+        keys = kv.keys; values = kv.values
 
-        // TurboQuant path: quantise immediatement puis attention quantisee (chunked ou fused)
+        // Lire l'offset AVANT que attentionWithCacheUpdate() l'incremente
+        effectiveOffset = cache?.offset ?? 0
+
+        // Appliquer RoPE aux queries ET aux keys
+        queries = rope(queries, offset: effectiveOffset)
+        keys = rope(keys, offset: effectiveOffset)
+
+        // TurboQuant path
         if let turboCache = cache as? TurboQuantKVCache {
             turboCache.update(keys: keys, values: values)
             let output = turboCache.quantizedAttention(
@@ -157,7 +202,7 @@ public class Gemma4Attention: Module {
             )
             .transposed(0, 2, 1, 3)
             .reshaped(B, L, -1)
-            return oProj(output)
+            return (oProj(output), (keys, values), effectiveOffset)
         }
 
         // Standard path: attentionWithCacheUpdate() gere l'update du cache
@@ -172,7 +217,7 @@ public class Gemma4Attention: Module {
         .transposed(0, 2, 1, 3)
         .reshaped(B, L, -1)
 
-        return oProj(output)
+        return (oProj(output), (keys, values), effectiveOffset)
     }
 
     private func computeKV(

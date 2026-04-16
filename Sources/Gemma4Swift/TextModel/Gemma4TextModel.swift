@@ -187,8 +187,13 @@ public class Gemma4TextModel: Module {
             windowSize: windowSize
         )
 
-        // Forward a travers les layers
+        // Forward a travers les layers — avec suivi des intermediaires pour le KV sharing
+        // Ref: Python mlx-lm gemma4_text.py utilise intermediates[] + previous_kvs
+        // pour passer les K/V des couches non-partagees aux couches partagees.
         let layerTypes = config.resolvedLayerTypes
+        var intermediates: [(kv: (keys: MLXArray, values: MLXArray), offset: Int)?] =
+            Array(repeating: nil, count: numHiddenLayers)
+
         for (i, layer) in layers.enumerated() {
             let cacheIdx = layerIdxToCacheIdx[i]
             let c = cacheIdx < cacheArray.count ? cacheArray[cacheIdx] : nil
@@ -203,7 +208,25 @@ public class Gemma4TextModel: Module {
                 perLayerInput = nil
             }
 
-            h = layer(h, mask: localMask, cache: c, perLayerInput: perLayerInput)
+            // KV sharing: passer les K/V de la couche source aux couches partagees
+            // (seulement quand pas de cache — le cache gere deja le sharing a l'inference)
+            let sharedKV: (keys: MLXArray, values: MLXArray)?
+            let sharedOffset: Int?
+            if i >= firstKvSharedLayerIdx && firstKvSharedLayerIdx > 0 && cache == nil,
+               let prev = intermediates[cacheIdx] {
+                sharedKV = prev.kv
+                sharedOffset = prev.offset
+            } else {
+                sharedKV = nil
+                sharedOffset = nil
+            }
+
+            let (output, kv, offset) = layer(
+                h, mask: localMask, cache: c, perLayerInput: perLayerInput,
+                sharedKV: sharedKV, sharedOffset: sharedOffset
+            )
+            h = output
+            intermediates[i] = (kv: kv, offset: offset)
         }
 
         return norm(h)

@@ -1,5 +1,5 @@
-// Training loop custom avec response masking — ne depend pas de LoRABatchIterator
-// Inspire de mlx-lm Python (trainer.py) qui supporte --mask-prompt
+// Training loop LoRA pour Gemma 4 — colle exactement a la reference mlx-lm Python
+// Ref: mlx-lm/tuner/trainer.py (default_loss, iterate_batches, train)
 
 import Foundation
 import MLX
@@ -7,106 +7,153 @@ import MLXNN
 import MLXLMCommon
 import MLXLLM
 import MLXOptimizers
-import Tokenizers
 
-// MARK: - Batch Iterator avec prompt/response split
+// MARK: - Loss function (ref: mlx-lm default_loss)
 
-/// Iterateur de batch qui separe les tokens du prompt et de la reponse.
-/// Permet le response masking : la loss n'est calculee que sur les tokens de la reponse.
-public struct MaskedBatchIterator: Sequence, IteratorProtocol {
+/// Loss cross-entropy avec response masking.
+/// Reproduit exactement mlx-lm Python default_loss().
+///
+/// - batch: [batch_size, seq_len] — la sequence COMPLETE (pas split)
+/// - lengths: [batch_size, 2] — [[prompt_offset, total_length]] par sample
+func trainingLoss(model: Module, batch: MLXArray, lengths: MLXArray) -> (MLXArray, MLXArray) {
+    // Split inputs/targets INSIDE la loss (comme Python)
+    let inputs = batch[0..., .stride(to: -1)]
+    let targets = batch[0..., 1...]
 
-    /// Un sample d'entrainement avec la frontiere prompt/reponse
-    public struct Sample {
-        let promptTokens: [Int]    // tokens du prompt (user)
-        let responseTokens: [Int]  // tokens de la reponse (assistant)
-    }
+    // Forward pass — le Python fait model(inputs) sans cache
+    let model = model as! any LLMModel
+    let logits = model(inputs, cache: nil).asType(.float32)
 
-    let samples: [Sample]
-    let batchSize: Int
-    let train: Bool
-
-    var indices: [Int]
-    var index = 0
-
-    init(samples: [Sample], batchSize: Int, train: Bool) {
-        self.samples = samples
-        self.batchSize = batchSize
-        self.train = train
-        self.indices = Array(0 ..< samples.count)
-        if train { indices.shuffle() }
-    }
-
-    /// Retourne (inputs, targets, lengths) ou lengths = [prompt_end, total_length] par sample
-    public mutating func next() -> (MLXArray, MLXArray, MLXArray)? {
-        if index >= indices.count {
-            if !train { return nil }
-            indices.shuffle()
-            index = 0
-        }
-
-        let endIndex = Swift.min(index + batchSize, indices.count)
-        let batch = (index ..< endIndex).map { samples[indices[$0]] }
-
-        // Concatener prompt + response pour chaque sample
-        let fullSequences = batch.map { $0.promptTokens + $0.responseTokens }
-        let lengths = fullSequences.map { $0.count }
-        let promptLengths = batch.map { $0.promptTokens.count }
-        let maxLength = lengths.max() ?? 0
-
-        if maxLength > 2048 {
-            print("[WARNING] Sequences > 2048 tokens. Consider shorter data.")
-        }
-
-        // Pad et construire le batch
-        let batchArray = MLXArray.zeros([lengths.count, maxLength], type: Int32.self)
-        for (j, (seq, l)) in zip(fullSequences, lengths).enumerated() {
-            batchArray[j, 0 ..< l] = MLXArray(seq.map { Int32($0) })
-        }
-
-        // lengths = [[prompt_end, total_length], ...] — format mlx-lm Python
-        let lengthPairs = zip(promptLengths, lengths).map { [Int32($0), Int32($1)] }
-        let lengthArray = MLXArray(lengthPairs.flatMap { $0 }).reshaped(lengthPairs.count, 2)
-
-        index = endIndex
-
-        return (batchArray[0..., .stride(to: -1)], batchArray[0..., 1...], lengthArray)
-    }
-}
-
-// MARK: - Loss avec response masking
-
-/// Loss cross-entropy avec masking du prompt (seuls les tokens de la reponse contribuent)
-func maskedLoss(model: Module, inputs: MLXArray, targets: MLXArray, lengths: MLXArray) -> (MLXArray, MLXArray) {
-    let llm = model as! any LanguageModel
-    let logits = llm(inputs, cache: nil as [KVCache]?).asType(.float32)
-
-    // lengths[:, 0] = prompt_end, lengths[:, 1] = total_length
-    let promptEnd = lengths[0..., 0 ..< 1]   // [batch, 1]
-    let totalLen = lengths[0..., 1 ..< 2]     // [batch, 1]
-
-    // steps = 1, 2, 3, ... (positions des targets, decalees de 1)
+    // Masque: positions >= offset ET <= total_length
     let seqLen = targets.dim(1)
-    let steps = MLXArray(Array(Int32(1) ... Int32(seqLen))).reshaped(1, seqLen)  // [1, seq_len]
+    let steps = MLXArray(Array(Int32(1) ... Int32(seqLen))).reshaped(1, seqLen)
+    let offsets = lengths[0..., 0 ..< 1]    // prompt offset
+    let totals = lengths[0..., 1 ..< 2]     // total length
+    let mask = (steps .>= offsets) .&& (steps .<= totals)
 
-    // Masque : seuls les tokens apres prompt_end et avant total_length
-    let afterPrompt = steps .>= promptEnd
-    let beforeEnd = steps .<= totalLen
-    let mask = afterPrompt .&& beforeEnd
-
+    // Cross-entropy masquee
     let ntoks = mask.sum()
     let ce = (crossEntropy(logits: logits, targets: targets) * mask).sum() / ntoks
 
     return (ce, ntoks)
 }
 
-// MARK: - Training loop avec response masking
+// MARK: - Batch iterator (ref: mlx-lm iterate_batches)
 
-/// Training loop custom qui supporte le response masking.
-/// Remplace LoRATrain.train() pour un meilleur controle du gradient.
-public func trainWithResponseMasking(
+/// Prepare un batch a partir de tokens pre-tokenises.
+/// Reproduit le comportement de iterate_batches de mlx-lm Python.
+public struct TrainingBatchIterator: Sequence, IteratorProtocol {
+
+    public struct TokenizedSample {
+        let tokens: [Int]
+        let promptOffset: Int  // 0 si pas de masking, sinon position fin du prompt
+    }
+
+    let samples: [TokenizedSample]
+    let batchSize: Int
+    let train: Bool
+
+    // Batches pre-calcules (tries par longueur comme Python)
+    var batchIndices: [[Int]]
+    var permutation: [Int]
+    var permIndex: Int = 0
+
+    init(samples: [TokenizedSample], batchSize: Int, train: Bool) {
+        self.samples = samples
+        self.batchSize = batchSize
+        self.train = train
+
+        // Trier par longueur (comme Python)
+        let sortedIdx = (0 ..< samples.count).sorted { samples[$0].tokens.count < samples[$1].tokens.count }
+
+        // Creer les batches
+        var batches: [[Int]] = []
+        var i = 0
+        while i + batchSize <= sortedIdx.count {
+            batches.append(Array(sortedIdx[i ..< i + batchSize]))
+            i += batchSize
+        }
+        // Dernier batch partiel
+        if i < sortedIdx.count {
+            batches.append(Array(sortedIdx[i...]))
+        }
+
+        self.batchIndices = batches
+        self.permutation = Array(0 ..< batches.count)
+        if train { self.permutation.shuffle() }
+    }
+
+    /// Retourne (batch, lengths) — comme Python iterate_batches
+    public mutating func next() -> (MLXArray, MLXArray)? {
+        if permIndex >= permutation.count {
+            if !train { return nil }
+            permutation.shuffle()
+            permIndex = 0
+        }
+
+        let batchIdx = batchIndices[permutation[permIndex]]
+        permIndex += 1
+
+        let batchSamples = batchIdx.map { samples[$0] }
+        let lengths = batchSamples.map { $0.tokens.count }
+        let offsets = batchSamples.map { $0.promptOffset }
+        let maxLength = lengths.max() ?? 0
+
+        // Padding: utiliser la longueur exacte (le Python ne pad que pour les multi-batch)
+        let paddedLength = maxLength
+
+        // Construire le batch
+        let batchArray = MLXArray.zeros([batchSamples.count, paddedLength], type: Int32.self)
+        for (j, sample) in batchSamples.enumerated() {
+            let truncLen = Swift.min(sample.tokens.count, paddedLength)
+            batchArray[j, 0 ..< truncLen] = MLXArray(sample.tokens[0 ..< truncLen].map { Int32($0) })
+        }
+
+        // lengths = [[offset, length], ...] (comme Python)
+        let lengthPairs = zip(offsets, lengths).map { [Int32($0), Int32($1)] }
+        let lengthArray = MLXArray(lengthPairs.flatMap { $0 }).reshaped(lengthPairs.count, 2)
+
+        return (batchArray, lengthArray)
+    }
+}
+
+// MARK: - Tokenisation des samples
+
+/// Tokenise les samples chat via le tokenizer, avec detection du prompt offset.
+/// Reproduit ChatDataset.process() de mlx-lm Python.
+func tokenizeTrainingSamples(
+    texts: [String],
+    tokenizer: any Tokenizer,
+    maskPrompt: Bool
+) -> [TrainingBatchIterator.TokenizedSample] {
+    return texts.compactMap { text -> TrainingBatchIterator.TokenizedSample? in
+        let tokens = tokenizer.encode(text: text)
+        guard tokens.count > 1 else { return nil }
+
+        if maskPrompt {
+            // Trouver le dernier <|turn>model\n comme frontiere prompt/reponse
+            // Token 105 = <|turn>, Token 4368 = model, Token 107 = \n
+            var offset = 0
+            for i in 0 ..< tokens.count - 1 {
+                if tokens[i] == 105 && tokens[i + 1] == 4368 {
+                    offset = i + 3  // <|turn> + model + \n
+                }
+            }
+            return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+        } else {
+            return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: 0)
+        }
+    }
+}
+
+// MARK: - Training loop (ref: mlx-lm train())
+
+/// Training loop qui reproduit exactement le comportement de mlx-lm Python.
+/// Pas de dependance sur LoRATrain upstream.
+public func trainLoRA(
     model: Module,
-    trainSamples: [MaskedBatchIterator.Sample],
-    validSamples: [MaskedBatchIterator.Sample],
+    trainSamples: [TrainingBatchIterator.TokenizedSample],
+    validSamples: [TrainingBatchIterator.TokenizedSample],
     optimizer: any Optimizer,
     iterations: Int,
     batchSize: Int = 1,
@@ -114,16 +161,15 @@ public func trainWithResponseMasking(
     stepsPerEval: Int = 100,
     saveEvery: Int = 100,
     weightsURL: URL? = nil,
-    gradClipMaxNorm: Float = 0,
     isFullFineTune: Bool = false,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
-    // Activer le mode training (active le dropout LoRA si present)
-    // Ref: Python mlx-lm fait model.train() avant le training
+    // Activer le mode training (ref: Python model.train())
     model.train()
 
+    // Loss + grad
     let lossValueGrad = valueAndGrad(model: model) { model, arrays in
-        let (ce, ntoks) = maskedLoss(model: model, inputs: arrays[0], targets: arrays[1], lengths: arrays[2])
+        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1])
         return [ce, ntoks]
     }
 
@@ -131,23 +177,18 @@ public func trainWithResponseMasking(
     var tokenCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
-    for (iteration, (inputs, targets, lengths)) in MaskedBatchIterator(
+    for (iteration, (batch, lengths)) in TrainingBatchIterator(
         samples: trainSamples, batchSize: batchSize, train: true
     ).enumerated() {
-        // Forward + backward
-        let (resultArray, grad) = lossValueGrad(model, [inputs, targets, lengths])
+        // Forward + backward (ref: Python step())
+        let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
-        // Gradient clipping
-        var clippedGrad = grad
-        if gradClipMaxNorm > 0 {
-            let (clipped, _) = clipGradNorm(gradients: clippedGrad, maxNorm: gradClipMaxNorm)
-            clippedGrad = clipped
-        }
+        // Update (ref: Python optimizer.update(model, grad))
+        optimizer.update(model: model, gradients: grad)
 
-        // Update
-        optimizer.update(model: model, gradients: clippedGrad)
+        // eval APRES l'update pour synchroniser
         eval(model, optimizer, lvalue)
 
         losses.append(lvalue.item(Float.self))
@@ -160,11 +201,9 @@ public func trainWithResponseMasking(
             let iterPerSec = Double(stepsPerReport) / (now - start)
             let tokPerSec = Double(tokenCount) / (now - start)
 
-            let trainProgress = LoRATrain.Progress.train(iteration: iteration, trainingLoss: trainingLoss,
+            let p = LoRATrain.Progress.train(iteration: iteration, trainingLoss: trainingLoss,
                               iterationsPerSecond: iterPerSec, tokensPerSecond: tokPerSec)
-            if progress(trainProgress) == .stop {
-                break
-            }
+            if progress(p) == .stop { break }
             losses.removeAll()
             tokenCount = 0
             start = Date.timeIntervalSinceReferenceDate
@@ -173,14 +212,14 @@ public func trainWithResponseMasking(
         // Validation
         if iteration == 0 || (iteration + 1) % stepsPerEval == 0 {
             let valStart = Date.timeIntervalSinceReferenceDate
-            let valLoss = evaluateWithMasking(model: model, samples: validSamples, batchSize: batchSize)
+            model.train(false)  // Mode eval pour la validation
+            let valLoss = evaluateTraining(model: model, samples: validSamples, batchSize: batchSize)
+            model.train()  // Retour en mode training
             let now = Date.timeIntervalSinceReferenceDate
 
-            let valProgress = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
+            let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
                                    validationTime: now - valStart)
-            if progress(valProgress) == .stop {
-                break
-            }
+            if progress(p) == .stop { break }
             start = Date.timeIntervalSinceReferenceDate
         }
 
@@ -190,10 +229,11 @@ public func trainWithResponseMasking(
                 let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
                 try save(arrays: allParams, url: url)
             } else {
-                try LoRATrain.saveLoRAWeights(model: model, url: url)
+                let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
+                try save(arrays: trainableParams, url: url)
             }
-            let saveProgress = LoRATrain.Progress.save(iteration: iteration, url: url)
-            if progress(saveProgress) == .stop { break }
+            let p = LoRATrain.Progress.save(iteration: iteration, url: url)
+            if progress(p) == .stop { break }
             start = Date.timeIntervalSinceReferenceDate
         }
 
@@ -206,20 +246,21 @@ public func trainWithResponseMasking(
             let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
             try save(arrays: allParams, url: url)
         } else {
-            try LoRATrain.saveLoRAWeights(model: model, url: url)
+            let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
+            try save(arrays: trainableParams, url: url)
         }
     }
 }
 
-/// Evaluation avec response masking
-func evaluateWithMasking(model: Module, samples: [MaskedBatchIterator.Sample], batchSize: Int) -> Float {
+/// Evaluation (ref: mlx-lm evaluate())
+func evaluateTraining(model: Module, samples: [TrainingBatchIterator.TokenizedSample], batchSize: Int) -> Float {
     var allLosses = [Float]()
     var tokenCount = 0
 
-    for (_, (inputs, targets, lengths)) in MaskedBatchIterator(
+    for (_, (batch, lengths)) in TrainingBatchIterator(
         samples: samples, batchSize: batchSize, train: false
     ).enumerated() {
-        let (losses, tokens) = maskedLoss(model: model as! Module, inputs: inputs, targets: targets, lengths: lengths)
+        let (losses, tokens) = trainingLoss(model: model as! Module, batch: batch, lengths: lengths)
         allLosses.append((losses * tokens).item(Float.self))
         tokenCount += tokens.item(Int.self)
     }
@@ -228,3 +269,8 @@ func evaluateWithMasking(model: Module, samples: [MaskedBatchIterator.Sample], b
         ? (sum(MLXArray(allLosses), stream: .cpu) / tokenCount).item(Float.self)
         : 0
 }
+
+// MARK: - Types publics re-exportes (pour ne pas dependre de LoRATrain)
+
+/// Re-export MaskedBatchIterator.Sample pour compatibilite
+public typealias MaskedBatchSample = TrainingBatchIterator.TokenizedSample

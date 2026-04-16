@@ -93,14 +93,14 @@ public enum Gemma4LoRATrain {
     ///
     /// - Parameters:
     ///   - container: ModelContainer avec le modele charge
-    ///   - trainData: donnees d'entrainement (textes formattes)
-    ///   - validData: donnees de validation (textes formattes)
+    ///   - trainData: tokens pre-tokenises (chaque element = une sequence de token IDs)
+    ///   - validData: tokens de validation pre-tokenises
     ///   - config: configuration d'entrainement
     ///   - progress: callback de progression (retourne .stop pour arreter)
     public static func train(
         container: ModelContainer,
-        trainData: [String],
-        validData: [String],
+        trainData: [[Int]],
+        validData: [[Int]],
         config: TrainingConfig,
         progress: @escaping @Sendable (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
     ) async throws {
@@ -146,6 +146,9 @@ public enum Gemma4LoRATrain {
         try await container.perform { (context: ModelContext) in
             let model = context.model
             let tokenizer = context.tokenizer
+
+            // Fixer le seed avant l'initialisation LoRA (ref: Python seed=0)
+            MLXRandom.seed(0)
 
             if isFullFineTune {
                 // Full SFT — tous les poids sont trainables (pas de freeze, pas de LoRA)
@@ -209,111 +212,59 @@ public enum Gemma4LoRATrain {
                 return progress(p)
             }
 
-            if config.maskPrompt {
-                // Training avec response masking — loss uniquement sur les tokens de la reponse
-                print("Mode: response masking active")
-                let trainURL = config.outputDirectory.deletingLastPathComponent()
-                let dataDir = capturedTrainData.isEmpty ? trainURL : URL(fileURLWithPath: ".")
-
-                // Preparer les samples avec split prompt/reponse via le tokenizer
-                // On reconstruit les samples depuis les donnees texte en cherchant la frontiere
-                var trainSamples: [MaskedBatchIterator.Sample] = []
-                var validSamples: [MaskedBatchIterator.Sample] = []
-
-                for text in capturedTrainData {
-                    // Pour les donnees chat (via chatFormatter), le texte contient tout
-                    // On cherche le dernier "<|turn>model\n" comme frontiere
-                    let tokens = tokenizer.encode(text: text)
-                    // Heuristique: chercher le token "model" (4368) precede de "<|turn>" (105)
-                    var promptEnd = 0
+            // Creer les samples de training a partir des tokens pre-tokenises
+            let trainSamples = capturedTrainData.compactMap { tokens -> TrainingBatchIterator.TokenizedSample? in
+                guard tokens.count > 1 else { return nil }
+                if config.maskPrompt {
+                    // Trouver le prompt offset (dernier <|turn>model\n)
+                    var offset = 0
                     for i in 0 ..< tokens.count - 1 {
                         if tokens[i] == 105 && tokens[i + 1] == 4368 {
-                            // <|turn>model — la reponse commence apres "model\n"
-                            promptEnd = i + 3 // <|turn> + model + \n
+                            offset = i + 3
                         }
                     }
-                    if promptEnd > 0 && promptEnd < tokens.count {
-                        trainSamples.append(MaskedBatchIterator.Sample(
-                            promptTokens: Array(tokens[0 ..< promptEnd]),
-                            responseTokens: Array(tokens[promptEnd...])
-                        ))
-                    } else {
-                        // Fallback: tout est reponse
-                        trainSamples.append(MaskedBatchIterator.Sample(
-                            promptTokens: [], responseTokens: tokens
-                        ))
-                    }
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+                } else {
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: 0)
                 }
-
-                for text in capturedValidData {
-                    let tokens = tokenizer.encode(text: text)
-                    var promptEnd = 0
+            }
+            let validSamples = capturedValidData.compactMap { tokens -> TrainingBatchIterator.TokenizedSample? in
+                guard tokens.count > 1 else { return nil }
+                if config.maskPrompt {
+                    var offset = 0
                     for i in 0 ..< tokens.count - 1 {
                         if tokens[i] == 105 && tokens[i + 1] == 4368 {
-                            promptEnd = i + 3
+                            offset = i + 3
                         }
                     }
-                    if promptEnd > 0 && promptEnd < tokens.count {
-                        validSamples.append(MaskedBatchIterator.Sample(
-                            promptTokens: Array(tokens[0 ..< promptEnd]),
-                            responseTokens: Array(tokens[promptEnd...])
-                        ))
-                    } else {
-                        validSamples.append(MaskedBatchIterator.Sample(
-                            promptTokens: [], responseTokens: tokens
-                        ))
-                    }
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+                } else {
+                    return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: 0)
                 }
-
-                print("Train: \(trainSamples.count) samples (avg response: \(trainSamples.map { $0.responseTokens.count }.reduce(0, +) / max(1, trainSamples.count)) tokens)")
-
-                try trainWithResponseMasking(
-                    model: model as! Module,
-                    trainSamples: trainSamples,
-                    validSamples: validSamples,
-                    optimizer: optimizer,
-                    iterations: config.iterations,
-                    batchSize: config.batchSize,
-                    stepsPerReport: config.stepsPerReport,
-                    stepsPerEval: config.stepsPerEval,
-                    saveEvery: config.saveEvery,
-                    weightsURL: weightsURL,
-                    gradClipMaxNorm: config.gradClipMaxNorm,
-                    isFullFineTune: isFullFineTune,
-                    progress: wrappedProgress
-                )
-            } else {
-                // Training standard (loss sur tous les tokens)
-                let params = LoRATrain.Parameters(
-                    batchSize: config.batchSize,
-                    iterations: config.iterations,
-                    stepsPerReport: config.stepsPerReport,
-                    stepsPerEval: config.stepsPerEval,
-                    validationBatches: 10,
-                    saveEvery: config.saveEvery,
-                    adapterURL: weightsURL
-                )
-
-                try LoRATrain.train(
-                    model: model as! Module,
-                    train: capturedTrainData,
-                    validate: capturedValidData,
-                    optimizer: optimizer,
-                    tokenizer: tokenizer,
-                    parameters: params,
-                    progress: wrappedProgress
-                )
-
-                try LoRATrain.saveLoRAWeights(model: model as! Module, url: weightsURL)
             }
 
-            // Sauvegarde finale selon le mode
-            if isFullFineTune {
-                // Full SFT: sauvegarder TOUS les poids du modele
-                print("Sauvegarde de tous les poids du modele...")
-                let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
-                try save(arrays: allParams, url: weightsURL)
-            }
+            let avgResp = config.maskPrompt
+                ? trainSamples.map { $0.tokens.count - $0.promptOffset }.reduce(0, +) / max(1, trainSamples.count)
+                : trainSamples.map { $0.tokens.count }.reduce(0, +) / max(1, trainSamples.count)
+            print("Train: \(trainSamples.count) samples (avg \(config.maskPrompt ? "response" : "total"): \(avgResp) tokens)")
+
+            // Training loop custom (ref: mlx-lm train())
+            try trainLoRA(
+                model: model as! Module,
+                trainSamples: trainSamples,
+                validSamples: validSamples,
+                optimizer: optimizer,
+                iterations: config.iterations,
+                batchSize: config.batchSize,
+                stepsPerReport: config.stepsPerReport,
+                stepsPerEval: config.stepsPerEval,
+                saveEvery: config.saveEvery,
+                weightsURL: weightsURL,
+                isFullFineTune: isFullFineTune,
+                progress: wrappedProgress
+            )
+
+            // (la sauvegarde finale est dans trainLoRA)
         }
 
         // Sauvegarder la config
