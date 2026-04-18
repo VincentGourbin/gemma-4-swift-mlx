@@ -44,7 +44,9 @@ public final class Gemma4DownloadTask {
 
     /// Cancels all in-flight URLSession tasks for this model.
     /// Status transitions to `.failed` with a cancellation error.
+    /// No-op if the download has already completed or failed.
     public func cancel() async {
+        guard status.isDownloading else { return }
         await coordinator.cancelAll()
         status = .failed(Gemma4DownloadError.cancelled(modelId))
     }

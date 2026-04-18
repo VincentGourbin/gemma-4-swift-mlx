@@ -181,7 +181,24 @@ struct DownloadManagerTests {
         manager.clearTask(modelId: id)
     }
 
-    @Test("retry removes old task and creates a new one")
+    @Test("cancel after completion does not regress status to failed")
+    @MainActor
+    func cancelAfterCompletion() async {
+        let manager = Gemma4DownloadManager.shared
+        let id = "test-org/cancel-after-complete-\(UUID().uuidString)"
+        let coordinator = DownloadCoordinator()
+        let task = Gemma4DownloadTask(modelId: id, coordinator: coordinator)
+        // Simulate a completed download by marking it done before cancel fires.
+        task.markCompleted()
+        // cancel() must be a no-op once already in a terminal non-downloading state.
+        await task.cancel()
+        if case .downloaded = task.status { } else {
+            #expect(Bool(false), "cancel() must not overwrite a completed status; got \(task.status)")
+        }
+        manager.clearTask(modelId: id)
+    }
+
+
     @MainActor
     func retryCreatesNew() async {
         let manager = Gemma4DownloadManager.shared

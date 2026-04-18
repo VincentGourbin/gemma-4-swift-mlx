@@ -350,6 +350,9 @@ func runFileLoop(
         let downloadTask = session.downloadTask(with: request)
         let tempURL = try await coordinator.startFileDownload(task: downloadTask, index: index)
 
+        // Always clean up the preserved temp file, even if the final move fails.
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
         let dir = destination.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         if FileManager.default.fileExists(atPath: destination.path) {

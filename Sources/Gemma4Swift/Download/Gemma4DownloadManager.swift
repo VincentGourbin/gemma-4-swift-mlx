@@ -45,14 +45,21 @@ public final class Gemma4DownloadManager {
     }
 
     /// Starts downloading a model by HuggingFace ID. Returns the existing task if active.
+    /// Returns a completed task immediately when the model is already on disk.
     @discardableResult
     public func download(modelId: String, token: String? = nil) -> Gemma4DownloadTask {
+        // In-flight: return the existing task without starting a second download.
         if let existing = tasks[modelId], existing.status.isDownloading {
             return existing
         }
         let coordinator = DownloadCoordinator()
         let task = Gemma4DownloadTask(modelId: modelId, coordinator: coordinator)
         tasks[modelId] = task
+        // Already cached: skip the network entirely.
+        if Gemma4ModelCache.isDownloaded(modelId: modelId) {
+            task.markCompleted()
+            return task
+        }
         Task { await self.runDownload(task: task, coordinator: coordinator, token: token) }
         return task
     }
