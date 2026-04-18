@@ -1,152 +1,103 @@
-// Telechargement de modeles depuis HuggingFace — API publique du framework
-// Utilise URLSession directement (pas de dependance swift-huggingface)
-
 import Foundation
 
-/// Telecharge un modele HuggingFace dans le cache local
+/// Downloads a Gemma 4 model from HuggingFace into the local cache.
+///
+/// For UI-facing code, prefer `Gemma4DownloadManager.shared` which provides an
+/// `@Observable` task with byte-level progress, cancel, and retry support.
+/// This enum keeps the original convenience API for non-UI call sites.
 public enum Gemma4ModelDownloader {
 
-    /// Fichiers a telecharger pour un modele Gemma 4
-    static let targetExtensions = [".safetensors", ".json", ".jinja", ".txt"]
-    static let targetExactFiles = ["tokenizer.model"]
+    /// Backwards-compatible alias for `Gemma4DownloadProgress`.
+    public typealias Progress = Gemma4DownloadProgress
 
-    /// Progression du telechargement
-    public struct Progress: Sendable {
-        /// Nombre de fichiers telecharges
-        public let completedFiles: Int
-        /// Nombre total de fichiers
-        public let totalFiles: Int
-        /// Ratio 0.0 → 1.0
-        public var fraction: Double { Double(completedFiles) / Double(max(1, totalFiles)) }
-        /// Nom du fichier en cours
-        public let currentFile: String
-    }
+    // MARK: - Public API
 
-    /// Telecharge un modele dans le cache local
+    /// Downloads a model into the local cache.
     /// - Parameters:
-    ///   - model: le modele a telecharger (enum Gemma4Pipeline.Model)
-    ///   - token: token HuggingFace optionnel (pour modeles prives)
-    ///   - force: re-telecharger meme si deja present
-    ///   - progress: callback de progression
-    /// - Returns: URL du repertoire local du modele telecharge
+    ///   - model: The model to download.
+    ///   - token: Optional HuggingFace bearer token.
+    ///   - force: Re-download even if already cached.
+    ///   - progress: Called on an arbitrary thread whenever progress changes.
+    /// - Returns: Local directory URL of the downloaded model.
     @discardableResult
     public static func download(
         _ model: Gemma4Pipeline.Model,
         token: String? = nil,
         force: Bool = false,
-        progress: (@Sendable (Progress) -> Void)? = nil
+        progress: (@Sendable (Gemma4DownloadProgress) -> Void)? = nil
     ) async throws -> URL {
         try await download(modelId: model.rawValue, token: token, force: force, progress: progress)
     }
 
-    /// Telecharge un modele par son ID HuggingFace
-    /// - Returns: URL du repertoire local du modele telecharge
+    /// Downloads a model by HuggingFace ID.
     @discardableResult
     public static func download(
         modelId: String,
         token: String? = nil,
         force: Bool = false,
-        progress: (@Sendable (Progress) -> Void)? = nil
+        progress: (@Sendable (Gemma4DownloadProgress) -> Void)? = nil
     ) async throws -> URL {
-        let destination = Gemma4ModelCache.modelsDirectory
-        let parts = modelId.split(separator: "/")
-        var modelDir = destination
-        for part in parts { modelDir = modelDir.appendingPathComponent(String(part)) }
+        var modelDir = Gemma4ModelCache.modelsDirectory
+        for part in modelId.split(separator: "/") {
+            modelDir = modelDir.appendingPathComponent(String(part))
+        }
 
-        // Skip si deja telecharge
         if !force && Gemma4ModelCache.isDownloaded(modelId: modelId) {
-            progress?(Progress(completedFiles: 1, totalFiles: 1, currentFile: "done"))
+            progress?(.cached(fileCount: 1))
             return modelDir
         }
 
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
-        // Lister les fichiers du repo
-        let files = try await listRepoFiles(modelId: modelId, token: token)
-        let targetFiles = files.filter { name in
-            targetExtensions.contains(where: { name.hasSuffix($0) }) ||
-            targetExactFiles.contains(name)
+        let specs = try await fetchHFFileSpecs(modelId: modelId, token: token)
+        guard !specs.isEmpty else { throw Gemma4DownloadError.noFilesFound(modelId) }
+
+        let coordinator = DownloadCoordinator()
+        await coordinator.configure(files: specs)
+        if let progress {
+            await coordinator.setProgressHandler(progress)
         }
 
-        guard !targetFiles.isEmpty else {
-            throw Gemma4DownloadError.noFilesFound(modelId)
-        }
+        let delegate = DownloadSessionDelegate(coordinator: coordinator)
+        let session = URLSession(
+            configuration: .default,
+            delegate: delegate,
+            delegateQueue: nil
+        )
+        defer { session.finishTasksAndInvalidate() }
 
-        let totalFiles = targetFiles.count
-        var completedFiles = 0
-
-        for fileName in targetFiles {
-            let fileURL = modelDir.appendingPathComponent(fileName)
-
-            if !force && FileManager.default.fileExists(atPath: fileURL.path) {
-                completedFiles += 1
-                progress?(Progress(completedFiles: completedFiles, totalFiles: totalFiles, currentFile: fileName))
-                continue
-            }
-
-            let downloadURL = URL(string: "https://huggingface.co/\(modelId)/resolve/main/\(fileName)")!
-            try await downloadFile(from: downloadURL, to: fileURL, token: token)
-
-            completedFiles += 1
-            progress?(Progress(completedFiles: completedFiles, totalFiles: totalFiles, currentFile: fileName))
-        }
+        try await runFileLoop(
+            modelId: modelId,
+            specs: specs,
+            coordinator: coordinator,
+            session: session,
+            modelDir: modelDir,
+            token: token,
+            force: force
+        )
 
         return modelDir
     }
-
-    // MARK: - Private
-
-    private static func listRepoFiles(modelId: String, token: String?) async throws -> [String] {
-        let apiURL = URL(string: "https://huggingface.co/api/models/\(modelId)")!
-        var request = URLRequest(url: apiURL)
-        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw Gemma4DownloadError.apiFailed(modelId)
-        }
-
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let siblings = json["siblings"] as? [[String: Any]] else {
-            throw Gemma4DownloadError.parseError(modelId)
-        }
-
-        return siblings.compactMap { $0["rfilename"] as? String }
-    }
-
-    private static func downloadFile(from url: URL, to destination: URL, token: String?) async throws {
-        var request = URLRequest(url: url)
-        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-
-        let (tempURL, response) = try await URLSession.shared.download(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw Gemma4DownloadError.httpError(url.lastPathComponent, status)
-        }
-
-        let dir = destination.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        try FileManager.default.moveItem(at: tempURL, to: destination)
-    }
 }
+
+// MARK: - Errors
 
 public enum Gemma4DownloadError: LocalizedError {
     case noFilesFound(String)
     case apiFailed(String)
     case parseError(String)
     case httpError(String, Int)
+    case networkError(String, Error)
+    case cancelled(String)
 
     public var errorDescription: String? {
         switch self {
-        case .noFilesFound(let id): return "Aucun fichier trouve pour \(id)"
-        case .apiFailed(let id): return "API HuggingFace inaccessible pour \(id)"
-        case .parseError(let id): return "Impossible de parser la reponse pour \(id)"
-        case .httpError(let file, let code): return "Erreur HTTP \(code) pour \(file)"
+        case .noFilesFound(let id):        return "No files found for \(id)"
+        case .apiFailed(let id):           return "HuggingFace API unreachable for \(id)"
+        case .parseError(let id):          return "Could not parse API response for \(id)"
+        case .httpError(let file, let c):  return "HTTP \(c) for \(file)"
+        case .networkError(let id, let e): return "Network error for \(id): \(e.localizedDescription)"
+        case .cancelled:                   return "Download cancelled"
         }
     }
 }
