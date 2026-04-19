@@ -243,6 +243,20 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         state = .ready
     }
 
+    // MARK: - LoRA Adapters
+
+    /// Charge un adapter LoRA et l'applique au modele
+    public func loadAdapter(from directory: URL) async throws {
+        guard let container else { throw Gemma4PipelineError.modelNotLoaded }
+        try await Gemma4LoRAInference.loadAdapter(into: container, from: directory)
+    }
+
+    /// Fuse un adapter LoRA dans les poids du modele (permanent, meilleures perfs d'inference)
+    public func fuseAdapter(from directory: URL) async throws {
+        guard let container else { throw Gemma4PipelineError.modelNotLoaded }
+        try await Gemma4LoRAInference.fuseAdapter(into: container, from: directory)
+    }
+
     /// Decharge le modele
     public func unload() {
         container = nil

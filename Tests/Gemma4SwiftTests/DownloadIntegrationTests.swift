@@ -199,6 +199,7 @@ struct DownloadManagerTests {
     }
 
 
+    @Test("retry creates a new task")
     @MainActor
     func retryCreatesNew() async {
         let manager = Gemma4DownloadManager.shared
