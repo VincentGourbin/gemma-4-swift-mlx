@@ -104,6 +104,9 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
 
             // Concatener: [1, numImages*280, dim]
             var imageFeatures = concatenated(allFeatures, axis: 1)
+            // stopGradient: le vision tower est frozen, pas besoin de backprop
+            // (evite NaN en bf16 dans le backward pass du vision encoder)
+            imageFeatures = stopGradient(imageFeatures)
             imageFeatures = imageFeatures.asType(inputsEmbeds.dtype)
 
             let imageMask = inputs .== Int32(config.imageTokenId)
@@ -130,6 +133,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
 
             // Concatener: [1, numFrames*softTokens, dim]
             var videoFeatures = concatenated(allVideoFeatures, axis: 1)
+            videoFeatures = stopGradient(videoFeatures)
             videoFeatures = videoFeatures.asType(inputsEmbeds.dtype)
 
             let videoMask = inputs .== Int32(config.videoTokenId)
@@ -145,6 +149,8 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
             let mask = pendingAudioMask ?? MLXArray.zeros([audioFeatures.dim(0), audioFeatures.dim(1)], type: Bool.self)
             let (audioEncodings, _) = tower(audioFeatures, audioMelMask: mask)
             var audioEmbeds = embedder(audioEncodings)
+            // stopGradient: l'audio tower est frozen, pas besoin de backprop
+            audioEmbeds = stopGradient(audioEmbeds)
             audioEmbeds = audioEmbeds.asType(inputsEmbeds.dtype)
 
             let audioTokenMask = inputs .== Int32(config.audioTokenId)
