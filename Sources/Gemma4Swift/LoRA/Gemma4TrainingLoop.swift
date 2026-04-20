@@ -361,10 +361,40 @@ public func trainMultimodalLoRA(
     for (iteration, (batch, lengths, pixelValues, audioFeatures, audioMask))
         in MultimodalBatchIterator(samples: trainSamples, train: true).enumerated() {
 
-        // Setter les media AVANT le forward pass — consommes par callAsFunction
-        mmModel.pendingPixelValues = pixelValues
-        mmModel.pendingAudioFeatures = audioFeatures
-        mmModel.pendingAudioMask = audioMask
+        // Pre-calculer les embeddings media EN DEHORS de valueAndGrad
+        // pour eviter que le graph de gradient trace le vision/audio tower
+        // (qui produit des NaN quand trace en mode gradient)
+        if let pv = pixelValues {
+            // Encoder l'image via le vision tower + projecteur
+            var allFeatures: [MLXArray] = []
+            let numImages = pv.dim(0)
+            for i in 0 ..< numImages {
+                let singleImage = pv[i ..< (i + 1)]
+                var features = mmModel.visionTower(singleImage)
+                features = mmModel.embedVision(features)
+                allFeatures.append(features)
+            }
+            var imageFeatures = concatenated(allFeatures, axis: 1)
+            imageFeatures = stopGradient(imageFeatures)
+            mmModel.pendingImageEmbeddings = imageFeatures
+        } else {
+            mmModel.pendingImageEmbeddings = nil
+        }
+
+        if let af = audioFeatures, let tower = mmModel.audioTower, let embedder = mmModel.embedAudio {
+            let mask = audioMask ?? MLXArray.zeros([af.dim(0), af.dim(1)], type: Bool.self)
+            let (audioEncodings, _) = tower(af, audioMelMask: mask)
+            var audioEmbeds = embedder(audioEncodings)
+            audioEmbeds = stopGradient(audioEmbeds)
+            mmModel.pendingAudioEmbeddings = audioEmbeds
+        } else {
+            mmModel.pendingAudioEmbeddings = nil
+        }
+
+        // Reset pending raw features — on utilise les embeddings pre-calculees
+        mmModel.pendingPixelValues = nil
+        mmModel.pendingAudioFeatures = nil
+        mmModel.pendingAudioMask = nil
 
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]

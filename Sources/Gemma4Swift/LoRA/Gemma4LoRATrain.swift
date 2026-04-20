@@ -353,6 +353,13 @@ public enum Gemma4LoRATrain {
         try await container.perform { (context: ModelContext) in
             let model = context.model
 
+            // Convertir le modele en float32 pour eviter les NaN en bf16
+            // sur les sequences longues (>300 tokens avec images)
+            (model as! Module).apply { array in
+                array.dtype.isFloatingPoint ? array.asType(.float32) : array
+            }
+            print("Modele converti en float32 pour stabilite numerique")
+
             MLXRandom.seed(0)
 
             if isFullFineTune {
