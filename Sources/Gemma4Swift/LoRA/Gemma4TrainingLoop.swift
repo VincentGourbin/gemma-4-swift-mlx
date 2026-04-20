@@ -274,3 +274,185 @@ func evaluateTraining(model: Module, samples: [TrainingBatchIterator.TokenizedSa
 
 /// Re-export MaskedBatchIterator.Sample pour compatibilite
 public typealias MaskedBatchSample = TrainingBatchIterator.TokenizedSample
+
+// MARK: - Multimodal Training
+
+/// Sample multimodal tokenise avec features media pre-calculees
+public struct MultimodalTokenizedSample {
+    public let tokens: [Int]
+    public let promptOffset: Int
+    public let pixelValues: MLXArray?      // [1, 3, H, W] pour image
+    public let audioFeatures: MLXArray?    // [1, T, 128] mel spectrogram
+    public let audioMask: MLXArray?        // [1, T] mask de padding
+
+    public init(tokens: [Int], promptOffset: Int,
+                pixelValues: MLXArray? = nil,
+                audioFeatures: MLXArray? = nil,
+                audioMask: MLXArray? = nil) {
+        self.tokens = tokens
+        self.promptOffset = promptOffset
+        self.pixelValues = pixelValues
+        self.audioFeatures = audioFeatures
+        self.audioMask = audioMask
+    }
+}
+
+/// Iterateur batch size 1 pour samples multimodaux (media de taille variable)
+public struct MultimodalBatchIterator: Sequence, IteratorProtocol {
+
+    let samples: [MultimodalTokenizedSample]
+    let train: Bool
+    var permutation: [Int]
+    var permIndex: Int = 0
+
+    public init(samples: [MultimodalTokenizedSample], train: Bool) {
+        self.samples = samples
+        self.train = train
+        self.permutation = Array(0 ..< samples.count)
+        if train { self.permutation.shuffle() }
+    }
+
+    public mutating func next() -> (MLXArray, MLXArray, MLXArray?, MLXArray?, MLXArray?)? {
+        if permIndex >= permutation.count {
+            if !train { return nil }
+            permutation.shuffle()
+            permIndex = 0
+        }
+
+        let sample = samples[permutation[permIndex]]
+        permIndex += 1
+
+        let batch = MLXArray(sample.tokens.map { Int32($0) }).reshaped(1, sample.tokens.count)
+        let lengths = MLXArray([Int32(sample.promptOffset), Int32(sample.tokens.count)]).reshaped(1, 2)
+
+        return (batch, lengths, sample.pixelValues, sample.audioFeatures, sample.audioMask)
+    }
+}
+
+/// Training loop multimodal — set les pending* media avant chaque forward pass
+public func trainMultimodalLoRA(
+    model: Module,
+    trainSamples: [MultimodalTokenizedSample],
+    validSamples: [MultimodalTokenizedSample],
+    optimizer: any Optimizer,
+    iterations: Int,
+    stepsPerReport: Int = 10,
+    stepsPerEval: Int = 100,
+    saveEvery: Int = 100,
+    weightsURL: URL? = nil,
+    isFullFineTune: Bool = false,
+    progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
+) throws {
+    model.train()
+
+    // Le modele multimodal pour setter les pending properties
+    let mmModel = model as! Gemma4MultimodalLLMModel
+
+    // Loss + grad — reutilise trainingLoss() existant
+    let lossValueGrad = valueAndGrad(model: model) { model, arrays in
+        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1])
+        return [ce, ntoks]
+    }
+
+    var losses = [Float]()
+    var tokenCount = 0
+    var start = Date.timeIntervalSinceReferenceDate
+
+    for (iteration, (batch, lengths, pixelValues, audioFeatures, audioMask))
+        in MultimodalBatchIterator(samples: trainSamples, train: true).enumerated() {
+
+        // Setter les media AVANT le forward pass — consommes par callAsFunction
+        mmModel.pendingPixelValues = pixelValues
+        mmModel.pendingAudioFeatures = audioFeatures
+        mmModel.pendingAudioMask = audioMask
+
+        let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
+        let lvalue = resultArray[0]
+        let tokens = resultArray[1]
+
+        optimizer.update(model: model, gradients: grad)
+        eval(model, optimizer, lvalue)
+
+        losses.append(lvalue.item(Float.self))
+        tokenCount += tokens.item(Int.self)
+
+        // Report
+        if (iteration + 1) % stepsPerReport == 0 {
+            let trainingLoss = MLXArray(losses).mean(stream: .cpu).item(Float.self)
+            let now = Date.timeIntervalSinceReferenceDate
+            let iterPerSec = Double(stepsPerReport) / (now - start)
+            let tokPerSec = Double(tokenCount) / (now - start)
+
+            let p = LoRATrain.Progress.train(iteration: iteration, trainingLoss: trainingLoss,
+                              iterationsPerSecond: iterPerSec, tokensPerSecond: tokPerSec)
+            if progress(p) == .stop { break }
+            losses.removeAll()
+            tokenCount = 0
+            start = Date.timeIntervalSinceReferenceDate
+        }
+
+        // Validation
+        if iteration == 0 || (iteration + 1) % stepsPerEval == 0 {
+            let valStart = Date.timeIntervalSinceReferenceDate
+            model.train(false)
+            let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples)
+            model.train()
+            let now = Date.timeIntervalSinceReferenceDate
+
+            let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
+                                   validationTime: now - valStart)
+            if progress(p) == .stop { break }
+            start = Date.timeIntervalSinceReferenceDate
+        }
+
+        // Save
+        if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
+            if isFullFineTune {
+                let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
+                try save(arrays: allParams, url: url)
+            } else {
+                let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
+                try save(arrays: trainableParams, url: url)
+            }
+            let p = LoRATrain.Progress.save(iteration: iteration, url: url)
+            if progress(p) == .stop { break }
+            start = Date.timeIntervalSinceReferenceDate
+        }
+
+        if iteration + 1 >= iterations { break }
+    }
+
+    // Sauvegarde finale
+    if let url = weightsURL {
+        if isFullFineTune {
+            let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
+            try save(arrays: allParams, url: url)
+        } else {
+            let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
+            try save(arrays: trainableParams, url: url)
+        }
+    }
+}
+
+/// Evaluation multimodal
+func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSample]) -> Float {
+    let mmModel = model as! Gemma4MultimodalLLMModel
+    var allLosses = [Float]()
+    var tokenCount = 0
+
+    for (_, (batch, lengths, pixelValues, audioFeatures, audioMask))
+        in MultimodalBatchIterator(samples: samples, train: false).enumerated() {
+
+        mmModel.pendingPixelValues = pixelValues
+        mmModel.pendingAudioFeatures = audioFeatures
+        mmModel.pendingAudioMask = audioMask
+
+        let (losses, tokens) = trainingLoss(model: model as! Module, batch: batch, lengths: lengths)
+        allLosses.append((losses * tokens).item(Float.self))
+        tokenCount += tokens.item(Int.self)
+    }
+
+    return tokenCount > 0
+        ? (sum(MLXArray(allLosses), stream: .cpu) / tokenCount).item(Float.self)
+        : 0
+}

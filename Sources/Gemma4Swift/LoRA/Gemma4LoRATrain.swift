@@ -298,6 +298,164 @@ public enum Gemma4LoRATrain {
         print("Adapter sauvegarde dans \(config.outputDirectory.path())")
     }
 
+    // MARK: - Training multimodal
+
+    /// Lance le fine-tuning LoRA multimodal (audio/image) sur un modele Gemma 4
+    ///
+    /// - Parameters:
+    ///   - container: ModelContainer avec le modele multimodal charge
+    ///   - trainData: samples multimodaux pre-tokenises avec features media
+    ///   - validData: samples de validation
+    ///   - config: configuration d'entrainement
+    ///   - progress: callback de progression
+    public static func trainMultimodal(
+        container: ModelContainer,
+        trainData: [MultimodalTokenizedSample],
+        validData: [MultimodalTokenizedSample],
+        config: TrainingConfig,
+        progress: @escaping @Sendable (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
+    ) async throws {
+        try FileManager.default.createDirectory(
+            at: config.outputDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let isFullFineTune = config.fineTuneType == .full
+        let weightsFilename = isFullFineTune ? "model.safetensors" : "adapters.safetensors"
+        let weightsURL = config.outputDirectory.appending(component: weightsFilename)
+
+        let loraConfig = Gemma4LoRADefaults.configuration(
+            for: config.modelFamily,
+            rank: config.loraRank,
+            scale: config.loraScale,
+            numLayers: config.numLayers,
+            useDora: config.fineTuneType == .dora
+        )
+
+        // Profiling
+        let profiler = MLXProfiler.shared
+        if config.enableProfiling {
+            profiler.enable()
+            profiler.startTrainingSession(config: [
+                "fine_tune_type": config.fineTuneType.rawValue,
+                "mode": "multimodal",
+                "model_family": config.modelFamily.rawValue,
+                "learning_rate": "\(config.learningRate)",
+                "iterations": "\(config.iterations)",
+                "train_samples": "\(trainData.count)",
+                "valid_samples": "\(validData.count)",
+            ])
+        }
+
+        nonisolated(unsafe) let capturedTrainData = trainData
+        nonisolated(unsafe) let capturedValidData = validData
+
+        try await container.perform { (context: ModelContext) in
+            let model = context.model
+
+            MLXRandom.seed(0)
+
+            if isFullFineTune {
+                print("Mode: Full Fine-Tuning multimodal (tous les poids)")
+            } else {
+                guard let languageModel = model as? LanguageModel else {
+                    throw Gemma4LoRAError.incompatibleModel
+                }
+                let _ = try LoRAContainer.from(
+                    model: languageModel,
+                    configuration: loraConfig
+                )
+            }
+
+            let trainableParams = model.trainableParameters()
+                .flattened()
+                .reduce(0) { $0 + $1.1.size }
+            let totalParams = model.parameters()
+                .flattened()
+                .reduce(0) { $0 + $1.1.size }
+            let pct = Double(trainableParams) / Double(totalParams) * 100
+            print("Parametres trainables: \(trainableParams) / \(totalParams) (\(String(format: "%.2f", pct))%)")
+
+            let optimizer: any Optimizer
+            if isFullFineTune {
+                optimizer = AdamW(learningRate: config.learningRate, weightDecay: 0.01)
+            } else {
+                optimizer = Adam(learningRate: config.learningRate)
+            }
+
+            // Callback avec profiling
+            let wrappedProgress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition = { p in
+                if config.enableProfiling {
+                    switch p {
+                    case .train(let iteration, let loss, _, let tokPerSec):
+                        let mem = SystemMetrics.mlxMemory()
+                        profiler.recordTrainingStep(TrainingStepMetrics(
+                            iteration: iteration,
+                            loss: loss,
+                            tokensPerSecond: tokPerSec,
+                            learningRate: config.learningRate,
+                            mlxActiveBytes: mem.activeBytes,
+                            mlxPeakBytes: mem.peakBytes,
+                            gpuUtilization: SystemMetrics.gpuUtilization(),
+                            durationUs: 0
+                        ))
+                    case .validation(let iteration, let valLoss, let valTime):
+                        profiler.recordValidation(
+                            iteration: iteration,
+                            loss: valLoss,
+                            duration: valTime
+                        )
+                    case .save:
+                        break
+                    }
+                }
+                return progress(p)
+            }
+
+            let audioCount = capturedTrainData.filter { $0.audioFeatures != nil }.count
+            let imageCount = capturedTrainData.filter { $0.pixelValues != nil }.count
+            print("Train multimodal: \(capturedTrainData.count) samples (\(audioCount) audio, \(imageCount) image)")
+
+            try trainMultimodalLoRA(
+                model: model as! Module,
+                trainSamples: capturedTrainData,
+                validSamples: capturedValidData,
+                optimizer: optimizer,
+                iterations: config.iterations,
+                stepsPerReport: config.stepsPerReport,
+                stepsPerEval: config.stepsPerEval,
+                saveEvery: config.saveEvery,
+                weightsURL: weightsURL,
+                isFullFineTune: isFullFineTune,
+                progress: wrappedProgress
+            )
+        }
+
+        // Sauvegarder la config
+        if !isFullFineTune {
+            let configData = try JSONEncoder().encode(loraConfig)
+            let configURL = config.outputDirectory.appending(component: "adapter_config.json")
+            try configData.write(to: configURL)
+        }
+
+        // Exporter le profiling
+        if config.enableProfiling, let session = profiler.activeSession {
+            let summary = profiler.getTrainingSummary()
+            print("\n--- Training Summary (Multimodal) ---")
+            print("Iterations: \(summary.totalIterations)")
+            print("Loss finale: \(String(format: "%.4f", summary.finalLoss))")
+            print("Meilleure loss: \(String(format: "%.4f", summary.bestLoss)) (iter \(summary.bestIteration))")
+            print("Tokens/sec moyen: \(String(format: "%.1f", summary.avgTokensPerSecond))")
+            print("Memoire pic: \(String(format: "%.0f", summary.peakMemoryMB)) Mo")
+
+            let traceData = ChromeTraceExporter.export(session: session)
+            let traceURL = config.outputDirectory.appending(component: "training_trace.json")
+            try traceData.write(to: traceURL)
+        }
+
+        print("Adapter multimodal sauvegarde dans \(config.outputDirectory.path())")
+    }
+
     /// Evalue un modele avec adapter sur un dataset de test
     public static func evaluate(
         container: ModelContainer,

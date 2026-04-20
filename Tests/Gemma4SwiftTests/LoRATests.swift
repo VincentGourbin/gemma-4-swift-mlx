@@ -332,4 +332,133 @@ final class LoRATests: XCTestCase {
         let config = Gemma4LoRADefaults.configuration(for: .e2b, useDora: true)
         XCTAssertEqual(config.fineTuneType, .dora)
     }
+
+    // MARK: - Multimodal Data Tests
+
+    func testLoadMultimodalJSONLAudio() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "What bird?"}, {"role": "assistant", "content": "Chaffinch"}], "audio": "audio/bird.wav"}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNotNil(samples[0].audioPath)
+        XCTAssertNil(samples[0].imagePath)
+        XCTAssertTrue(samples[0].hasAudio)
+        XCTAssertFalse(samples[0].hasImage)
+        // Les placeholders NE sont PAS inseres dans le texte (injection post-tokenisation)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.audioToken))
+        XCTAssertTrue(samples[0].text.contains("What bird?"))
+    }
+
+    func testLoadMultimodalJSONLImage() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "Describe"}, {"role": "assistant", "content": "A cat"}], "image": "img/cat.jpg"}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNil(samples[0].audioPath)
+        XCTAssertNotNil(samples[0].imagePath)
+        XCTAssertTrue(samples[0].hasImage)
+        XCTAssertFalse(samples[0].hasAudio)
+        // Les placeholders NE sont PAS inseres dans le texte (injection post-tokenisation)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.imageToken))
+    }
+
+    func testLoadMultimodalJSONLTextOnly() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi"}]}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNil(samples[0].audioPath)
+        XCTAssertNil(samples[0].imagePath)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.audioToken))
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.imageToken))
+    }
+
+    func testMultimodalBatchIterator() {
+        let sample1 = MultimodalTokenizedSample(
+            tokens: [1, 2, 3, 4, 5],
+            promptOffset: 2,
+            audioFeatures: MLXArray.zeros([1, 10, 128])
+        )
+        let sample2 = MultimodalTokenizedSample(
+            tokens: [6, 7, 8],
+            promptOffset: 1,
+            pixelValues: MLXArray.zeros([1, 3, 48, 48])
+        )
+
+        var iter = MultimodalBatchIterator(samples: [sample1, sample2], train: false)
+        var count = 0
+
+        while let (batch, lengths, pv, af, _) = iter.next() {
+            XCTAssertEqual(batch.dim(0), 1)  // batch size 1
+            XCTAssertEqual(lengths.dim(0), 1)
+            if count == 0 {
+                // First sample: audio, no image
+                XCTAssertNotNil(af)
+                XCTAssertNil(pv)
+            } else {
+                // Second sample: image, no audio
+                XCTAssertNil(af)
+                XCTAssertNotNil(pv)
+            }
+            count += 1
+        }
+
+        XCTAssertEqual(count, 2)
+    }
+
+    func testMultimodalBatchIteratorStopsInEvalMode() {
+        let sample = MultimodalTokenizedSample(tokens: [1, 2, 3], promptOffset: 0)
+        var iter = MultimodalBatchIterator(samples: [sample], train: false)
+
+        XCTAssertNotNil(iter.next())
+        XCTAssertNil(iter.next())  // Should stop in eval mode
+    }
+
+    func testMultimodalTokenizedSampleTextOnly() {
+        let sample = MultimodalTokenizedSample(
+            tokens: [1, 2, 3, 105, 4368, 107, 10, 11],
+            promptOffset: 6
+        )
+
+        XCTAssertEqual(sample.tokens.count, 8)
+        XCTAssertEqual(sample.promptOffset, 6)
+        XCTAssertNil(sample.pixelValues)
+        XCTAssertNil(sample.audioFeatures)
+    }
 }
