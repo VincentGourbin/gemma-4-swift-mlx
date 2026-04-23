@@ -363,6 +363,47 @@ gemma4-cli lora bench-multimodal \
 - Use `--multimodal` flag to load the full multimodal model (vision + audio encoders)
 - bf16 model required (not quantized) — model is converted to float32 internally for training stability
 
+### Example: LaTeX OCR
+
+Train a model to convert images of mathematical equations into LaTeX code. Dataset: [unsloth/LaTeX_OCR](https://huggingface.co/datasets/unsloth/LaTeX_OCR) (68K images, we use a 500-sample subset).
+
+**Dataset format:**
+
+```jsonl
+{"messages": [{"role": "user", "content": "Convert this mathematical expression to LaTeX."}, {"role": "assistant", "content": "\\sum _ { n = 1 } ^ { \\infty } \\frac { 1 } { n ^ { z } }"}], "image": "images/img_000192.png"}
+```
+
+**Train:**
+
+```bash
+gemma4-cli lora train \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --data ./latex-ocr-dataset \
+  --output ./latex-adapter \
+  --multimodal \
+  --mask-prompt \
+  --num-layers 16 \
+  --rank 16 \
+  --learning-rate 5e-5 \
+  --iterations 500
+```
+
+**Results (E2B bf16, rank 16, 500 iterations on 500 images):**
+
+| Metric | Value |
+|--------|-------|
+| Training loss | 0.41 |
+| Validation loss | 0.36 |
+| GPU peak memory | 24 GB |
+
+The model generates contextually correct LaTeX for each input image — different equations produce different, appropriate LaTeX output. Sample:
+
+| Input image content | Model output |
+|--------------------|----|
+| `\partial_+ \partial_- \Omega = 0` | `\partial _ { + } \partial _ { - } \Omega = 0` |
+| `O_\Sigma = -\nabla^2_\Sigma + m^2` | `\mathcal { O _ { \Sigma } } = - \nabla _ { \Sigma } ^ { 2 } + m ^ { 2 }` |
+| `z = \omega\tau / 2` | `z = \frac { \omega T } { 2 }` |
+
 ### Library API
 
 ```swift
