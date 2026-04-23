@@ -12,6 +12,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Audio (speech understanding) | ✅ **Working** | Conformer encoder, 30s max, ASR/comprehension. E2B + E4B validated |
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
 | LoRA/DoRA fine-tuning | ✅ **Working** | LoRA, DoRA, full SFT. Response masking, chat template. 97% accuracy on classifier benchmark |
+| Multimodal LoRA | ✅ **Working** | Audio + vision fine-tuning. 50% accuracy on 20-species bird call classification, LaTeX OCR verified |
 | KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
@@ -306,6 +307,84 @@ try await Gemma4LoRATrain.train(
     return .more
 }
 ```
+
+## Multimodal LoRA Fine-Tuning
+
+Train LoRA adapters on audio or image inputs. The model learns to generate structured responses from multimodal content.
+
+### Example: Bird Call Identification
+
+Train a model to identify bird species from 5-second audio recordings. Dataset: [tglcourse/5s_birdcall_samples_top20](https://huggingface.co/datasets/tglcourse/5s_birdcall_samples_top20) (20 species, ~9600 recordings).
+
+**Dataset format** — JSONL with `audio` or `image` field pointing to media files:
+
+```jsonl
+{"messages": [{"role": "user", "content": "identify"}, {"role": "assistant", "content": "{\"common_name\": \"Mallard\", \"scientific_name\": \"Anas platyrhynchos\", \"call_type\": \"song\"}"}], "audio": "audio/mallard_001.wav"}
+{"messages": [{"role": "user", "content": "identify"}, {"role": "assistant", "content": "{\"common_name\": \"Common Raven\", \"scientific_name\": \"Corvus corax\", \"call_type\": \"call\"}"}], "audio": "audio/raven_042.wav"}
+```
+
+**Train:**
+
+```bash
+gemma4-cli lora train \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --data ./birdcall-dataset \
+  --output ./birdcall-adapter \
+  --multimodal \
+  --mask-prompt \
+  --num-layers 16 \
+  --rank 16 \
+  --learning-rate 5e-5 \
+  --iterations 8636
+```
+
+**Benchmark:**
+
+```bash
+gemma4-cli lora bench-multimodal \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --adapter-path ./birdcall-adapter \
+  --data ./birdcall-dataset \
+  --max-tokens 100
+```
+
+**Results (E2B bf16, rank 16, 1 epoch on 8636 samples):**
+
+| Metric | Value |
+|--------|-------|
+| Training loss | 0.036 |
+| Validation loss | 0.038 |
+| Species accuracy (20 classes) | 50% |
+| GPU peak memory | 23 GB |
+
+**Key insights:**
+- Use **rich JSON responses** (50+ tokens) rather than short labels — more gradient signal for the frozen audio encoder
+- Model produces valid, internally consistent JSON with species name, scientific name, and call description
+- Use `--multimodal` flag to load the full multimodal model (vision + audio encoders)
+- bf16 model required (not quantized) — model is converted to float32 internally for training stability
+
+### Library API
+
+```swift
+import Gemma4Swift
+
+let pipeline = Gemma4Pipeline()
+try await pipeline.load(.e2b4bit, downloadIfNeeded: true)
+
+// Load a multimodal LoRA adapter
+try await pipeline.loadAdapter(from: adapterDirectoryURL)
+
+// Or fuse it permanently for better inference speed
+try await pipeline.fuseAdapter(from: adapterDirectoryURL)
+```
+
+### Supported modalities
+
+| Modality | Training | Inference | Notes |
+|----------|:--------:|:---------:|-------|
+| Audio | ✅ | ✅ | Conformer encoder, 5-30s clips |
+| Vision | ✅ | ✅ | SigLIP encoder, any image size |
+| Video | - | ✅ | Inference only (training not yet implemented) |
 
 ## Library Integration
 
