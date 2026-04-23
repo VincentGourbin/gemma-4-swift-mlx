@@ -760,10 +760,15 @@ extension LoRA {
                 let symbol = isCorrect ? "✓" : "✗"
                 print("  [\(i+1)/\(samples.count)] \(symbol) expected: \(expected) | predicted: \(predicted)")
 
-                let resultLine = """
-                {"expected": "\(expected)", "predicted": "\(predicted)", "species": "\(expected)", "correct": \(isCorrect)}
-                """
-                resultsFile += resultLine + "\n"
+                let resultEntry: [String: Any] = [
+                    "expected": expected,
+                    "predicted": predicted,
+                    "correct": isCorrect,
+                ]
+                if let jsonData = try? JSONSerialization.data(withJSONObject: resultEntry),
+                   let jsonStr = String(data: jsonData, encoding: .utf8) {
+                    resultsFile += jsonStr + "\n"
+                }
             }
 
             // Sauvegarder les resultats

@@ -464,7 +464,7 @@ public func trainMultimodalLoRA(
     }
 }
 
-/// Evaluation multimodal
+/// Evaluation multimodal — pre-calcule les embeddings comme le training
 func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSample]) -> Float {
     let mmModel = model as! Gemma4MultimodalLLMModel
     var allLosses = [Float]()
@@ -473,9 +473,30 @@ func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSamp
     for (_, (batch, lengths, pixelValues, audioFeatures, audioMask))
         in MultimodalBatchIterator(samples: samples, train: false).enumerated() {
 
-        mmModel.pendingPixelValues = pixelValues
-        mmModel.pendingAudioFeatures = audioFeatures
-        mmModel.pendingAudioMask = audioMask
+        // Pre-calculer les embeddings (meme path que le training)
+        if let pv = pixelValues {
+            var allFeatures: [MLXArray] = []
+            for i in 0 ..< pv.dim(0) {
+                var features = mmModel.visionTower(pv[i ..< (i + 1)])
+                features = mmModel.embedVision(features)
+                allFeatures.append(features)
+            }
+            mmModel.pendingImageEmbeddings = stopGradient(concatenated(allFeatures, axis: 1))
+        } else {
+            mmModel.pendingImageEmbeddings = nil
+        }
+
+        if let af = audioFeatures, let tower = mmModel.audioTower, let embedder = mmModel.embedAudio {
+            let mask = audioMask ?? MLXArray.zeros([af.dim(0), af.dim(1)], type: Bool.self)
+            let (audioEncodings, _) = tower(af, audioMelMask: mask)
+            mmModel.pendingAudioEmbeddings = stopGradient(embedder(audioEncodings))
+        } else {
+            mmModel.pendingAudioEmbeddings = nil
+        }
+
+        mmModel.pendingPixelValues = nil
+        mmModel.pendingAudioFeatures = nil
+        mmModel.pendingAudioMask = nil
 
         let (losses, tokens) = trainingLoss(model: model as! Module, batch: batch, lengths: lengths)
         allLosses.append((losses * tokens).item(Float.self))

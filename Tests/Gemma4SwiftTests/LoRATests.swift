@@ -461,4 +461,83 @@ final class LoRATests: XCTestCase {
         XCTAssertNil(sample.pixelValues)
         XCTAssertNil(sample.audioFeatures)
     }
+
+    // MARK: - Token Injection Tests
+
+    func testAudioTokenInjectionPosition() {
+        // Simule une sequence tokenisee: <bos><start_of_turn>user\n...text...<end_of_turn>\n<start_of_turn>model\n...response...
+        // Tokens: 2=bos, 105=<start_of_turn>, 2364=user, 107=\n
+        var tokens = [2, 105, 2364, 107, 500, 501, 502, 106, 107, 105, 4368, 107, 600, 601]
+
+        // Trouver le point d'injection (apres <start_of_turn>user\n)
+        var insertionIdx: Int? = nil
+        for j in 0 ..< tokens.count - 2 {
+            if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
+                insertionIdx = j + 3
+                break
+            }
+        }
+
+        XCTAssertEqual(insertionIdx, 4, "Insertion doit etre apres <start_of_turn>user\\n")
+
+        // Injecter les tokens audio: BOA + audio*3 + EOA
+        let boaId = Int(Gemma4Processor.boaTokenId)   // 256000
+        let audId = Int(Gemma4Processor.audioTokenId)  // 258881
+        let eoaId = Int(Gemma4Processor.eoaTokenId)   // 258883
+
+        var mediaTokens = [boaId]
+        mediaTokens.append(contentsOf: Array(repeating: audId, count: 3))
+        mediaTokens.append(eoaId)
+        tokens.insert(contentsOf: mediaTokens, at: insertionIdx!)
+
+        // Verifier la structure: [bos, <turn>, user, \n, BOA, aud, aud, aud, EOA, texte..., <turn>, model, \n, response...]
+        XCTAssertEqual(tokens[4], boaId)
+        XCTAssertEqual(tokens[5], audId)
+        XCTAssertEqual(tokens[6], audId)
+        XCTAssertEqual(tokens[7], audId)
+        XCTAssertEqual(tokens[8], eoaId)
+        XCTAssertEqual(tokens[9], 500, "Le texte original doit suivre les tokens audio")
+
+        // Verifier le promptOffset (apres insertion, la position de model\n a change)
+        var promptOffset = 0
+        for i in 0 ..< tokens.count - 1 {
+            if tokens[i] == 105 && tokens[i + 1] == 4368 {
+                promptOffset = i + 3
+            }
+        }
+        // 5 tokens audio inseres → promptOffset decale de 5
+        XCTAssertEqual(promptOffset, 17, "promptOffset doit etre decale par les tokens audio injectes")
+    }
+
+    func testImageTokenInjection() {
+        var tokens = [2, 105, 2364, 107, 500, 501, 106, 107, 105, 4368, 107, 600]
+
+        let boiId = Int(Gemma4Processor.boiTokenId)   // 255999
+        let imgId = Int(Gemma4Processor.imageTokenId)  // 258880
+        let eoiId = Int(Gemma4Processor.eoiTokenId)   // 258882
+
+        // Trouver insertion apres user\n
+        var insertionIdx: Int? = nil
+        for j in 0 ..< tokens.count - 2 {
+            if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
+                insertionIdx = j + 3
+                break
+            }
+        }
+
+        var mediaTokens = [boiId]
+        mediaTokens.append(contentsOf: Array(repeating: imgId, count: 280))
+        mediaTokens.append(eoiId)
+        tokens.insert(contentsOf: mediaTokens, at: insertionIdx!)
+
+        // BOI au bon endroit
+        XCTAssertEqual(tokens[4], boiId)
+        // 280 image tokens
+        let imageCount = tokens.filter { $0 == imgId }.count
+        XCTAssertEqual(imageCount, 280)
+        // EOI apres les image tokens
+        XCTAssertEqual(tokens[4 + 281], eoiId)
+        // Texte original apres EOI
+        XCTAssertEqual(tokens[4 + 282], 500)
+    }
 }
