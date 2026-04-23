@@ -26,6 +26,32 @@ struct TextSample: Codable {
     let text: String
 }
 
+/// Sample multimodal: {"messages": [...], "audio": "path.wav", "image": "path.jpg"}
+struct MultimodalChatSample: Codable {
+    let messages: [ChatMessage]
+    let audio: String?
+    let image: String?
+}
+
+/// Sample multimodal pre-formatte (texte sans placeholders + chemins media)
+/// Les tokens media sont injectes au niveau token ID apres tokenisation.
+public struct MultimodalTrainingSample: Sendable {
+    public let text: String
+    public let audioPath: String?
+    public let imagePath: String?
+    public let hasAudio: Bool
+    public let hasImage: Bool
+
+    public init(text: String, audioPath: String? = nil, imagePath: String? = nil,
+                hasAudio: Bool = false, hasImage: Bool = false) {
+        self.text = text
+        self.audioPath = audioPath
+        self.imagePath = imagePath
+        self.hasAudio = hasAudio
+        self.hasImage = hasImage
+    }
+}
+
 // MARK: - Chat Template Gemma 4
 
 /// Applique le chat template Gemma 4 a une liste de messages.
@@ -112,6 +138,50 @@ func loadGemma4TrainingFile(url: URL, chatFormatter: (([[String: String]]) throw
             .filter { !$0.isEmpty }
     default:
         fatalError("Type de fichier non supporte: \(url.pathExtension)")
+    }
+}
+
+// MARK: - Chargement multimodal
+
+/// Charge un dataset multimodal depuis un fichier JSONL.
+/// Chaque ligne peut contenir des champs optionnels "audio" et "image" avec des chemins relatifs.
+/// Les placeholders media sont inseres dans le contenu user avant le texte.
+public func loadGemma4MultimodalJSONL(
+    url: URL,
+    dataDirectory: URL,
+    chatFormatter: (([[String: String]]) throws -> String)? = nil
+) throws -> [MultimodalTrainingSample] {
+    let lines = try String(contentsOf: url, encoding: .utf8)
+        .components(separatedBy: .newlines)
+        .filter { $0.first == "{" }
+
+    let decoder = JSONDecoder()
+
+    return try lines.compactMap { line -> MultimodalTrainingSample? in
+        guard let data = line.data(using: .utf8) else { return nil }
+        let sample = try decoder.decode(MultimodalChatSample.self, from: data)
+        guard !sample.messages.isEmpty else { return nil }
+
+        // NE PAS inserer les placeholders media dans le texte ici.
+        // applyChatTemplate escape les tokens speciaux (<|audio|> etc.)
+        // L'injection des tokens media se fait APRES tokenisation, au niveau token ID,
+        // dans le preprocessing CLI.
+
+        // Formatter le texte (messages originaux sans placeholders)
+        let text: String
+        if let chatFormatter {
+            let msgDicts = sample.messages.map { ["role": $0.role, "content": $0.content] }
+            text = try chatFormatter(msgDicts)
+        } else {
+            text = applyGemma4ChatTemplate(messages: sample.messages)
+        }
+
+        // Resoudre les chemins media
+        let audioPath = sample.audio.map { dataDirectory.appending(component: $0).path() }
+        let imagePath = sample.image.map { dataDirectory.appending(component: $0).path() }
+
+        return MultimodalTrainingSample(text: text, audioPath: audioPath, imagePath: imagePath,
+                                        hasAudio: sample.audio != nil, hasImage: sample.image != nil)
     }
 }
 

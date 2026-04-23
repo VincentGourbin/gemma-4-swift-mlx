@@ -332,4 +332,212 @@ final class LoRATests: XCTestCase {
         let config = Gemma4LoRADefaults.configuration(for: .e2b, useDora: true)
         XCTAssertEqual(config.fineTuneType, .dora)
     }
+
+    // MARK: - Multimodal Data Tests
+
+    func testLoadMultimodalJSONLAudio() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "What bird?"}, {"role": "assistant", "content": "Chaffinch"}], "audio": "audio/bird.wav"}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNotNil(samples[0].audioPath)
+        XCTAssertNil(samples[0].imagePath)
+        XCTAssertTrue(samples[0].hasAudio)
+        XCTAssertFalse(samples[0].hasImage)
+        // Les placeholders NE sont PAS inseres dans le texte (injection post-tokenisation)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.audioToken))
+        XCTAssertTrue(samples[0].text.contains("What bird?"))
+    }
+
+    func testLoadMultimodalJSONLImage() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "Describe"}, {"role": "assistant", "content": "A cat"}], "image": "img/cat.jpg"}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNil(samples[0].audioPath)
+        XCTAssertNotNil(samples[0].imagePath)
+        XCTAssertTrue(samples[0].hasImage)
+        XCTAssertFalse(samples[0].hasAudio)
+        // Les placeholders NE sont PAS inseres dans le texte (injection post-tokenisation)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.imageToken))
+    }
+
+    func testLoadMultimodalJSONLTextOnly() throws {
+        let tmpDir = FileManager.default.temporaryDirectory
+            .appending(component: "lora_mm_test_\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmpDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmpDir) }
+
+        let content = """
+        {"messages": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi"}]}
+        """
+        try content.write(to: tmpDir.appending(component: "train.jsonl"), atomically: true, encoding: .utf8)
+
+        let samples = try loadGemma4MultimodalJSONL(
+            url: tmpDir.appending(component: "train.jsonl"),
+            dataDirectory: tmpDir
+        )
+
+        XCTAssertEqual(samples.count, 1)
+        XCTAssertNil(samples[0].audioPath)
+        XCTAssertNil(samples[0].imagePath)
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.audioToken))
+        XCTAssertFalse(samples[0].text.contains(Gemma4Processor.imageToken))
+    }
+
+    func testMultimodalBatchIterator() {
+        let sample1 = MultimodalTokenizedSample(
+            tokens: [1, 2, 3, 4, 5],
+            promptOffset: 2,
+            audioFeatures: MLXArray.zeros([1, 10, 128])
+        )
+        let sample2 = MultimodalTokenizedSample(
+            tokens: [6, 7, 8],
+            promptOffset: 1,
+            pixelValues: MLXArray.zeros([1, 3, 48, 48])
+        )
+
+        var iter = MultimodalBatchIterator(samples: [sample1, sample2], train: false)
+        var count = 0
+
+        while let (batch, lengths, pv, af, _) = iter.next() {
+            XCTAssertEqual(batch.dim(0), 1)  // batch size 1
+            XCTAssertEqual(lengths.dim(0), 1)
+            if count == 0 {
+                // First sample: audio, no image
+                XCTAssertNotNil(af)
+                XCTAssertNil(pv)
+            } else {
+                // Second sample: image, no audio
+                XCTAssertNil(af)
+                XCTAssertNotNil(pv)
+            }
+            count += 1
+        }
+
+        XCTAssertEqual(count, 2)
+    }
+
+    func testMultimodalBatchIteratorStopsInEvalMode() {
+        let sample = MultimodalTokenizedSample(tokens: [1, 2, 3], promptOffset: 0)
+        var iter = MultimodalBatchIterator(samples: [sample], train: false)
+
+        XCTAssertNotNil(iter.next())
+        XCTAssertNil(iter.next())  // Should stop in eval mode
+    }
+
+    func testMultimodalTokenizedSampleTextOnly() {
+        let sample = MultimodalTokenizedSample(
+            tokens: [1, 2, 3, 105, 4368, 107, 10, 11],
+            promptOffset: 6
+        )
+
+        XCTAssertEqual(sample.tokens.count, 8)
+        XCTAssertEqual(sample.promptOffset, 6)
+        XCTAssertNil(sample.pixelValues)
+        XCTAssertNil(sample.audioFeatures)
+    }
+
+    // MARK: - Token Injection Tests
+
+    func testAudioTokenInjectionPosition() {
+        // Simule une sequence tokenisee: <bos><start_of_turn>user\n...text...<end_of_turn>\n<start_of_turn>model\n...response...
+        // Tokens: 2=bos, 105=<start_of_turn>, 2364=user, 107=\n
+        var tokens = [2, 105, 2364, 107, 500, 501, 502, 106, 107, 105, 4368, 107, 600, 601]
+
+        // Trouver le point d'injection (apres <start_of_turn>user\n)
+        var insertionIdx: Int? = nil
+        for j in 0 ..< tokens.count - 2 {
+            if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
+                insertionIdx = j + 3
+                break
+            }
+        }
+
+        XCTAssertEqual(insertionIdx, 4, "Insertion doit etre apres <start_of_turn>user\\n")
+
+        // Injecter les tokens audio: BOA + audio*3 + EOA
+        let boaId = Int(Gemma4Processor.boaTokenId)   // 256000
+        let audId = Int(Gemma4Processor.audioTokenId)  // 258881
+        let eoaId = Int(Gemma4Processor.eoaTokenId)   // 258883
+
+        var mediaTokens = [boaId]
+        mediaTokens.append(contentsOf: Array(repeating: audId, count: 3))
+        mediaTokens.append(eoaId)
+        tokens.insert(contentsOf: mediaTokens, at: insertionIdx!)
+
+        // Verifier la structure: [bos, <turn>, user, \n, BOA, aud, aud, aud, EOA, texte..., <turn>, model, \n, response...]
+        XCTAssertEqual(tokens[4], boaId)
+        XCTAssertEqual(tokens[5], audId)
+        XCTAssertEqual(tokens[6], audId)
+        XCTAssertEqual(tokens[7], audId)
+        XCTAssertEqual(tokens[8], eoaId)
+        XCTAssertEqual(tokens[9], 500, "Le texte original doit suivre les tokens audio")
+
+        // Verifier le promptOffset (apres insertion, la position de model\n a change)
+        var promptOffset = 0
+        for i in 0 ..< tokens.count - 1 {
+            if tokens[i] == 105 && tokens[i + 1] == 4368 {
+                promptOffset = i + 3
+            }
+        }
+        // 5 tokens audio inseres → promptOffset decale de 5
+        XCTAssertEqual(promptOffset, 17, "promptOffset doit etre decale par les tokens audio injectes")
+    }
+
+    func testImageTokenInjection() {
+        var tokens = [2, 105, 2364, 107, 500, 501, 106, 107, 105, 4368, 107, 600]
+
+        let boiId = Int(Gemma4Processor.boiTokenId)   // 255999
+        let imgId = Int(Gemma4Processor.imageTokenId)  // 258880
+        let eoiId = Int(Gemma4Processor.eoiTokenId)   // 258882
+
+        // Trouver insertion apres user\n
+        var insertionIdx: Int? = nil
+        for j in 0 ..< tokens.count - 2 {
+            if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
+                insertionIdx = j + 3
+                break
+            }
+        }
+
+        var mediaTokens = [boiId]
+        mediaTokens.append(contentsOf: Array(repeating: imgId, count: 280))
+        mediaTokens.append(eoiId)
+        tokens.insert(contentsOf: mediaTokens, at: insertionIdx!)
+
+        // BOI au bon endroit
+        XCTAssertEqual(tokens[4], boiId)
+        // 280 image tokens
+        let imageCount = tokens.filter { $0 == imgId }.count
+        XCTAssertEqual(imageCount, 280)
+        // EOI apres les image tokens
+        XCTAssertEqual(tokens[4 + 281], eoiId)
+        // Texte original apres EOI
+        XCTAssertEqual(tokens[4 + 282], 500)
+    }
 }

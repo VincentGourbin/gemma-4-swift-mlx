@@ -1,0 +1,1 @@
+{"num_layers":16,"lora_parameters":{"rank":16,"scale":20},"fine_tune_type":"lora"}
