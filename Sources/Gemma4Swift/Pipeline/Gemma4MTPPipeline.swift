@@ -107,13 +107,13 @@ public actor Gemma4MTPPipeline {
             let prefillOut = langModel.forwardWithIntermediates(
                 inputs: inputArr, cache: cacheArr
             )
-            eval(prefillOut.logits, prefillOut.hiddenStates)
+            eval(prefillOut.logits, prefillOut.preNormHiddenStates)
 
             let promptLen = inputArr.dim(1)
 
             // 3) First bonus + last hidden
             var bonus = argMax(prefillOut.logits[0, promptLen - 1, 0...], axis: -1).item(Int32.self)
-            var lastHidden = prefillOut.hiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
+            var lastHidden = prefillOut.preNormHiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
 
             // Yield le premier token (sauf si c'est deja un EOS)
             if isEOS(bonus, tokenizer: context.tokenizer) {
@@ -173,7 +173,7 @@ public actor Gemma4MTPPipeline {
                 let verifyOut = langModel.forwardWithIntermediates(
                     inputs: verifyInput, cache: cacheArr
                 )
-                eval(verifyOut.logits, verifyOut.hiddenStates)
+                eval(verifyOut.logits, verifyOut.preNormHiddenStates)
 
                 // Sample target sur chaque position [B, bs, vocab] -> [B, bs]
                 let targetTokensArr = argMax(verifyOut.logits, axis: -1).reshaped(-1)
@@ -218,7 +218,7 @@ public actor Gemma4MTPPipeline {
                 // Update bonus + lastHidden pour le prochain round
                 bonus = walkRes.newTokens.last ?? bonus
                 let acceptedIdx = walkRes.accepted  // [0..bs-1]
-                lastHidden = verifyOut.hiddenStates[
+                lastHidden = verifyOut.preNormHiddenStates[
                     0..., acceptedIdx ..< (acceptedIdx + 1), 0...
                 ]
             }

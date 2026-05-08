@@ -16,7 +16,16 @@ public struct LayerIntermediate {
 }
 
 public struct TextForwardOutput {
+    /// Sortie du dernier decoder layer APRES le final RMSNorm.
+    /// Utilise pour calculer les logits (lm_head sur cette valeur).
     public let hidden: MLXArray
+
+    /// Sortie du dernier decoder layer AVANT le final RMSNorm.
+    /// IMPORTANT: c'est cette valeur que le drafter Assistant attend en entree
+    /// (le `pre_projection` du drafter a ete entraine contre cette hidden pre-norm).
+    /// Voir mlx_vlm/models/gemma4/language.py: "captured BEFORE the final RMSNorm".
+    public let preNormHidden: MLXArray
+
     public let intermediates: [LayerIntermediate?]
 }
 
@@ -265,6 +274,14 @@ public class Gemma4TextModel: Module {
             return LayerIntermediate(keys: entry.kv.keys, values: entry.kv.values, offset: entry.offset)
         }
 
-        return TextForwardOutput(hidden: norm(h), intermediates: publicIntermediates)
+        // Capture h pre-norm pour le drafter MTP, puis applique norm pour les logits standard.
+        let preNormHidden = h
+        let normedHidden = norm(h)
+
+        return TextForwardOutput(
+            hidden: normedHidden,
+            preNormHidden: preNormHidden,
+            intermediates: publicIntermediates
+        )
     }
 }

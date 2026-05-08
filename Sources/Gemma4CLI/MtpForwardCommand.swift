@@ -133,7 +133,7 @@ struct MtpForward: AsyncParsableCommand {
 
             // ---- Target prefill avec collecte des intermediates ----
             let prefillOut = langModel.forwardWithIntermediates(inputs: inputArr)
-            eval(prefillOut.logits, prefillOut.hiddenStates)
+            eval(prefillOut.logits, prefillOut.preNormHiddenStates)
 
             // Last position logits -> first bonus
             let lastLogits = prefillOut.logits[0, promptLen - 1, 0...]
@@ -142,7 +142,7 @@ struct MtpForward: AsyncParsableCommand {
             print("  target first bonus = \(firstBonus) -> \(firstBonusStr.debugDescription)")
 
             // Last hidden state [1, 1, hidden]
-            let lastHidden = prefillOut.hiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
+            let lastHidden = prefillOut.preNormHiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
             print("  last hidden shape = \(lastHidden.shape)")
 
             // ---- Extraire shared K/V (derniere couche concrete full + sliding) ----

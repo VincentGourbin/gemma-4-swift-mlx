@@ -10,7 +10,10 @@ import MLXLMCommon
 /// Utilise par le path MTP pour exposer logits + hidden state + K/V intermediaires.
 public struct LanguageForwardOutput {
     public let logits: MLXArray
+    /// Hidden APRES final RMSNorm (= input du lm_head).
     public let hiddenStates: MLXArray
+    /// Hidden AVANT final RMSNorm — c'est ce que le drafter MTP attend.
+    public let preNormHiddenStates: MLXArray
     public let intermediates: [LayerIntermediate?]
 }
 
@@ -77,6 +80,7 @@ public class Gemma4LanguageModel: Module {
         return LanguageForwardOutput(
             logits: logits,
             hiddenStates: textOut.hidden,
+            preNormHiddenStates: textOut.preNormHidden,
             intermediates: textOut.intermediates
         )
     }
