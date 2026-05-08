@@ -31,8 +31,17 @@ struct MtpTrain: AsyncParsableCommand {
     @Option(name: .long, help: "Token HuggingFace")
     var hfToken: String?
 
-    @Option(name: .long, help: "Fichier JSONL avec un champ 'text' par ligne")
+    @Option(name: .long, help: "Fichier JSONL avec un champ 'text' par ligne (ou 'messages' pour chat)")
     var data: String
+
+    @Option(name: .long, help: "Optionnel: fichier JSONL de validation. Si fourni, eval loss tous les --steps-per-valid")
+    var validData: String?
+
+    @Option(name: .long, help: "Frequence de validation (en iterations). 0 = pas de valid (default)")
+    var stepsPerValid: Int = 0
+
+    @Option(name: .long, help: "Nombre de batches a evaluer sur la valid")
+    var validBatches: Int = 8
 
     @Option(name: .long, help: "Repertoire de sortie pour les poids fine-tunes")
     var output: String
@@ -73,7 +82,7 @@ struct MtpTrain: AsyncParsableCommand {
         print("[2/4] Load drafter...")
         let drafterModel = try await loadDrafter(repo: drafter, hfToken: hfToken)
 
-        // 3. Charger + tokenizer le dataset
+        // 3. Charger + tokenizer le dataset (train + optionnel valid)
         print("[3/4] Tokenize dataset...")
         let dataURL = URL(fileURLWithPath: data)
         let lines = try String(contentsOf: dataURL, encoding: .utf8)
@@ -84,7 +93,17 @@ struct MtpTrain: AsyncParsableCommand {
             print("Erreur: dataset vide")
             throw ExitCode.failure
         }
-        print("  \(lines.count) lignes")
+        print("  train: \(lines.count) lignes")
+
+        var validLines: [String] = []
+        if let vd = validData {
+            let validURL = URL(fileURLWithPath: vd)
+            validLines = try String(contentsOf: validURL, encoding: .utf8)
+                .split(separator: "\n")
+                .map { String($0) }
+                .filter { !$0.isEmpty }
+            print("  valid: \(validLines.count) lignes")
+        }
 
         // Setup output dir
         let outputURL = URL(fileURLWithPath: output)
@@ -98,8 +117,11 @@ struct MtpTrain: AsyncParsableCommand {
         let bs = batchSize
         let lrate = lr
         let spr = stepsPerReport
+        let spv = stepsPerValid
+        let vb = validBatches
         let sve = saveEvery
         let wURL = weightsURL
+        nonisolated(unsafe) let validLinesRef = validLines
         nonisolated(unsafe) let drafterRef = drafterModel
         nonisolated(unsafe) let textLines = lines
 
@@ -155,10 +177,29 @@ struct MtpTrain: AsyncParsableCommand {
                     }
                 }
             }
-            print("  \(tokenizedSamples.count) samples (chunks de \(sl)), \(failedLines) lignes echouees")
+            print("  train: \(tokenizedSamples.count) samples (chunks de \(sl)), \(failedLines) lignes echouees")
 
             guard !tokenizedSamples.isEmpty else {
                 fatalError("Aucun sample n'a au moins \(sl) tokens")
+            }
+
+            // Tokeniser la valid (si fournie)
+            var validSamples: [[Int]] = []
+            var validBuffer: [Int] = []
+            for line in validLinesRef {
+                guard let toks = try? parseAndTokenizeJsonlLine(line, tokenizer: context.tokenizer) else { continue }
+                if toks.count >= sl {
+                    validSamples.append(toks)
+                } else {
+                    validBuffer.append(contentsOf: toks)
+                    while validBuffer.count >= sl {
+                        validSamples.append(Array(validBuffer.prefix(sl)))
+                        validBuffer.removeFirst(sl)
+                    }
+                }
+            }
+            if !validSamples.isEmpty {
+                print("  valid: \(validSamples.count) samples")
             }
 
             // Optimizer Adam
@@ -169,6 +210,8 @@ struct MtpTrain: AsyncParsableCommand {
             config.seqLen = sl
             config.batchSize = bs
             config.stepsPerReport = spr
+            config.stepsPerValid = spv
+            config.validBatches = vb
             config.saveEvery = sve
             config.weightsURL = wURL
 
@@ -176,6 +219,7 @@ struct MtpTrain: AsyncParsableCommand {
                 drafter: drafterRef,
                 target: langModel,
                 tokenizedSamples: tokenizedSamples,
+                validSamples: validSamples,
                 lastFullCacheIdx: lastFullIdx,
                 lastSlidingCacheIdx: lastSlidingIdx,
                 optimizer: optimizer,

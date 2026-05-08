@@ -116,6 +116,8 @@ public enum Gemma4DrafterTraining {
         public var batchSize: Int = 1
         public var seqLen: Int = 256
         public var stepsPerReport: Int = 10
+        public var stepsPerValid: Int = 0  // 0 = pas d'eval validation
+        public var validBatches: Int = 8   // nb de batches a evaluer sur la valid
         public var saveEvery: Int = 100
         public var weightsURL: URL? = nil
 
@@ -138,6 +140,7 @@ public enum Gemma4DrafterTraining {
         drafter: Gemma4AssistantDraftModel,
         target: Gemma4LanguageModel,
         tokenizedSamples: [[Int]],
+        validSamples: [[Int]] = [],
         lastFullCacheIdx: Int,
         lastSlidingCacheIdx: Int,
         optimizer: any Optimizer,
@@ -150,20 +153,25 @@ public enum Gemma4DrafterTraining {
 
         // Decouper les samples en chunks de seqLen (descendants un par un, pas de batch interne)
         let seqLen = config.seqLen
-        var chunks: [[Int]] = []
-        for sample in tokenizedSamples {
-            var idx = 0
-            while idx + seqLen <= sample.count {
-                chunks.append(Array(sample[idx ..< idx + seqLen]))
-                idx += seqLen
+        func chunkify(_ samples: [[Int]]) -> [[Int]] {
+            var out: [[Int]] = []
+            for sample in samples {
+                var idx = 0
+                while idx + seqLen <= sample.count {
+                    out.append(Array(sample[idx ..< idx + seqLen]))
+                    idx += seqLen
+                }
             }
+            return out
         }
+        let chunks = chunkify(tokenizedSamples)
+        let validChunks = chunkify(validSamples)
         guard !chunks.isEmpty else {
             throw NSError(domain: "DrafterTraining", code: 1, userInfo: [
                 NSLocalizedDescriptionKey: "No chunks of length \(seqLen) found in samples"
             ])
         }
-        print("[drafter-train] \(chunks.count) chunks de longueur \(seqLen)")
+        print("[drafter-train] \(chunks.count) train chunks, \(validChunks.count) valid chunks (longueur \(seqLen))")
 
         // valueAndGrad sur le DRAFTER seulement
         // batch = [batchTokens] (single MLXArray in array)
@@ -208,10 +216,41 @@ public enum Gemma4DrafterTraining {
                 let avgLoss = losses.suffix(config.stepsPerReport).reduce(0, +) / Float(config.stepsPerReport)
                 let now = Date.timeIntervalSinceReferenceDate
                 let iterPerSec = Double(config.stepsPerReport) / (now - iterStart)
-                print(String(format: "[drafter-train] iter %d/%d  loss=%.4f  %.1f it/s",
+                print(String(format: "[drafter-train] iter %d/%d  train_loss=%.4f  %.1f it/s",
                              iter + 1, config.iterations, avgLoss, iterPerSec))
                 progress(iter + 1, avgLoss)
                 iterStart = now
+            }
+
+            // Validation eval (no grad)
+            if config.stepsPerValid > 0,
+               !validChunks.isEmpty,
+               (iter + 1) % config.stepsPerValid == 0 {
+                drafter.train(false)
+                var valLosses: [Float] = []
+                let nValBatches = min(config.validBatches, validChunks.count / batchSize)
+                for vb in 0 ..< max(nValBatches, 1) {
+                    var flat: [Int32] = []
+                    flat.reserveCapacity(batchSize * seqLen)
+                    for j in 0 ..< batchSize {
+                        let idx = (vb * batchSize + j) % validChunks.count
+                        flat.append(contentsOf: validChunks[idx].map { Int32($0) })
+                    }
+                    let valBatch = MLXArray(flat).reshaped(batchSize, seqLen)
+                    let (vloss, _) = drafterLoss(
+                        drafter: drafter, target: target,
+                        batchTokens: valBatch,
+                        lastFullCacheIdx: lastFullCacheIdx,
+                        lastSlidingCacheIdx: lastSlidingCacheIdx
+                    )
+                    eval(vloss)
+                    valLosses.append(vloss.item(Float.self))
+                }
+                drafter.train()
+                let avgValLoss = valLosses.reduce(0, +) / Float(max(valLosses.count, 1))
+                print(String(format: "[drafter-train] iter %d/%d  valid_loss=%.4f  (n=%d batches)",
+                             iter + 1, config.iterations, avgValLoss, valLosses.count))
+                iterStart = Date.timeIntervalSinceReferenceDate
             }
 
             // Save checkpoint
