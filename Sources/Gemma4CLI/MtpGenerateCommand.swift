@@ -41,6 +41,9 @@ struct MtpGenerate: AsyncParsableCommand {
     @Flag(name: .long, help: "Skip le chat template")
     var raw: Bool = false
 
+    @Flag(name: .long, help: "DIAGNOSTIC: utiliser sequential verify (1 token a la fois, lent mais numeriquement equivalent au sequential decode)")
+    var sequentialVerify: Bool = false
+
     @Option(name: .long, help: "Token HuggingFace")
     var hfToken: String?
 
@@ -94,7 +97,8 @@ struct MtpGenerate: AsyncParsableCommand {
         print("[3/3] MTP generation...")
         let pipeline = Gemma4MTPPipeline(target: container, drafter: drafterModel)
         let mtpStream = await pipeline.mtpStream(
-            prompt: prompt, blockSize: blockSize, maxTokens: maxTokens, useChatTemplate: !raw
+            prompt: prompt, blockSize: blockSize, maxTokens: maxTokens,
+            useChatTemplate: !raw, sequentialVerify: sequentialVerify
         )
 
         var mtpOutput = ""

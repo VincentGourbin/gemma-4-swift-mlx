@@ -29,11 +29,15 @@ public actor Gemma4MTPPipeline {
     }
 
     /// Genere une reponse en streaming MTP, equivalent a `ChatSession.streamResponse(to:)`.
+    /// - Parameter sequentialVerify: si true, le verify est fait token-par-token au lieu
+    ///   de en parallele. DIAGNOSTIC ONLY — perf catastrophique mais permet de tester si
+    ///   la precision BF16 du parallel forward est la cause d'un faible taux d'acceptation.
     public func mtpStream(
         prompt: String,
         blockSize: Int = 4,
         maxTokens: Int = 256,
-        useChatTemplate: Bool = true
+        useChatTemplate: Bool = true,
+        sequentialVerify: Bool = false
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -43,6 +47,7 @@ public actor Gemma4MTPPipeline {
                         blockSize: blockSize,
                         maxTokens: maxTokens,
                         useChatTemplate: useChatTemplate,
+                        sequentialVerify: sequentialVerify,
                         continuation: continuation
                     )
                     continuation.finish()
@@ -72,6 +77,7 @@ public actor Gemma4MTPPipeline {
         blockSize: Int,
         maxTokens: Int,
         useChatTemplate: Bool,
+        sequentialVerify: Bool,
         continuation: AsyncThrowingStream<String, Error>.Continuation
     ) async throws {
         precondition(blockSize >= 2, "blockSize doit etre >= 2 pour faire de la speculation")
@@ -81,6 +87,7 @@ public actor Gemma4MTPPipeline {
         let maxTok = maxTokens
         let useTpl = useChatTemplate
         let userPrompt = prompt
+        let seqVerify = sequentialVerify
 
         let stats = try await target.perform { context -> Stats in
             guard let llm = context.model as? Gemma4LLMModel else {
@@ -170,10 +177,35 @@ public actor Gemma4MTPPipeline {
                     .asType(.int32)
                     .reshaped(1, bs)
 
-                let verifyOut = langModel.forwardWithIntermediates(
-                    inputs: verifyInput, cache: cacheArr
-                )
-                eval(verifyOut.logits, verifyOut.preNormHiddenStates)
+                let verifyOut: LanguageForwardOutput
+                if seqVerify {
+                    // Sequential verify: bs forwards de L=1 chacun. Plus lent mais
+                    // numeriquement bit-exact equivalent au sequential decode.
+                    var allLogits: [MLXArray] = []
+                    var allPreNormHidden: [MLXArray] = []
+                    for i in 0 ..< bs {
+                        let single = verifyInput[0..., i..<(i+1)]
+                        let stepOut = langModel.forwardWithIntermediates(
+                            inputs: single, cache: cacheArr
+                        )
+                        eval(stepOut.logits, stepOut.preNormHiddenStates)
+                        allLogits.append(stepOut.logits)
+                        allPreNormHidden.append(stepOut.preNormHiddenStates)
+                    }
+                    let logits = concatenated(allLogits, axis: 1)
+                    let preNorm = concatenated(allPreNormHidden, axis: 1)
+                    verifyOut = LanguageForwardOutput(
+                        logits: logits,
+                        hiddenStates: preNorm,  // unused
+                        preNormHiddenStates: preNorm,
+                        intermediates: []  // unused
+                    )
+                } else {
+                    verifyOut = langModel.forwardWithIntermediates(
+                        inputs: verifyInput, cache: cacheArr
+                    )
+                    eval(verifyOut.logits, verifyOut.preNormHiddenStates)
+                }
 
                 // Sample target sur chaque position [B, bs, vocab] -> [B, bs]
                 let targetTokensArr = argMax(verifyOut.logits, axis: -1).reshaped(-1)
