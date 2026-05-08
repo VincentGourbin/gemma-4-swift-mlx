@@ -44,9 +44,38 @@ public actor Gemma4MTPPipeline {
                 do {
                     try await self.runLoop(
                         prompt: prompt,
+                        preTokenizedIds: nil,
                         blockSize: blockSize,
                         maxTokens: maxTokens,
                         useChatTemplate: useChatTemplate,
+                        sequentialVerify: sequentialVerify,
+                        continuation: continuation
+                    )
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Variante qui prend des tokens deja pre-tokenises (utile pour multi-turn chat
+    /// ou le caller doit appliquer le chat template sur l'historique complet).
+    public func mtpStreamFromTokens(
+        tokenIds: [Int],
+        blockSize: Int = 4,
+        maxTokens: Int = 256,
+        sequentialVerify: Bool = false
+    ) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    try await self.runLoop(
+                        prompt: "",
+                        preTokenizedIds: tokenIds,
+                        blockSize: blockSize,
+                        maxTokens: maxTokens,
+                        useChatTemplate: false,
                         sequentialVerify: sequentialVerify,
                         continuation: continuation
                     )
@@ -74,6 +103,7 @@ public actor Gemma4MTPPipeline {
 
     private func runLoop(
         prompt: String,
+        preTokenizedIds: [Int]?,
         blockSize: Int,
         maxTokens: Int,
         useChatTemplate: Bool,
@@ -88,6 +118,7 @@ public actor Gemma4MTPPipeline {
         let useTpl = useChatTemplate
         let userPrompt = prompt
         let seqVerify = sequentialVerify
+        let preTokens = preTokenizedIds
 
         let stats = try await target.perform { context -> Stats in
             // Adapter: supporte Gemma4LLMModel (text-only) ET Gemma4MultimodalLLMModel
@@ -113,9 +144,11 @@ public actor Gemma4MTPPipeline {
 
             var s = Stats()
 
-            // 1) Tokenize
+            // 1) Tokenize (sauf si deja pre-tokenise par le caller, e.g. chat multi-turn)
             let promptIds: [Int]
-            if useTpl {
+            if let pre = preTokens {
+                promptIds = pre
+            } else if useTpl {
                 let messages: [[String: String]] = [["role": "user", "content": userPrompt]]
                 promptIds = try context.tokenizer.applyChatTemplate(messages: messages)
             } else {

@@ -181,12 +181,16 @@ public enum Gemma4DrafterTraining {
         var losses: [Float] = []
         var iterStart = Date.timeIntervalSinceReferenceDate
 
+        let batchSize = max(config.batchSize, 1)
         for iter in 0 ..< config.iterations {
-            // Sample un chunk au hasard
-            let chunk = chunks.randomElement()!
-
-            // batch [1, seqLen]
-            let batchTokens = MLXArray(chunk.map { Int32($0) }).reshaped(1, seqLen)
+            // Sample batchSize chunks au hasard (tous de longueur fixe seqLen → pas de padding)
+            var flatTokens: [Int32] = []
+            flatTokens.reserveCapacity(batchSize * seqLen)
+            for _ in 0 ..< batchSize {
+                let chunk = chunks.randomElement()!
+                flatTokens.append(contentsOf: chunk.map { Int32($0) })
+            }
+            let batchTokens = MLXArray(flatTokens).reshaped(batchSize, seqLen)
 
             // Forward + backward
             let (results, grads) = lossValueGrad(drafter, [batchTokens])

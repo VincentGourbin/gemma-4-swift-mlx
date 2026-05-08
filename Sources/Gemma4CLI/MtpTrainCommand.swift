@@ -43,6 +43,9 @@ struct MtpTrain: AsyncParsableCommand {
     @Option(name: .long, help: "Sequence length par chunk")
     var seqLen: Int = 256
 
+    @Option(name: .long, help: "Batch size (chunks per step)")
+    var batchSize: Int = 1
+
     @Option(name: .long, help: "Learning rate")
     var lr: Float = 1e-4
 
@@ -92,6 +95,7 @@ struct MtpTrain: AsyncParsableCommand {
         print("[4/4] Training...")
         let it = iterations
         let sl = seqLen
+        let bs = batchSize
         let lrate = lr
         let spr = stepsPerReport
         let sve = saveEvery
@@ -139,7 +143,7 @@ struct MtpTrain: AsyncParsableCommand {
             var config = Gemma4DrafterTraining.TrainConfig()
             config.iterations = it
             config.seqLen = sl
-            config.batchSize = 1
+            config.batchSize = bs
             config.stepsPerReport = spr
             config.saveEvery = sve
             config.weightsURL = wURL
