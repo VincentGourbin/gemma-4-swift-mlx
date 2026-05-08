@@ -121,17 +121,41 @@ struct MtpTrain: AsyncParsableCommand {
             // Bind drafter au target (pour input_embed dans le path d'inference)
             drafterRef.bind(target: langModel)
 
-            // Tokeniser chaque ligne (avec chat template? non, brut pour training general)
+            // Tokeniser chaque ligne. Supporte 2 formats JSONL:
+            //  - {"text": "..."} : texte brut (concatene les chunks de seqLen)
+            //  - {"messages": [{"role": ..., "content": ...}, ...]} : chat,
+            //    rendu via applyChatTemplate, regroupe pour atteindre seqLen
             print("  tokenizing \(textLines.count) lines...")
+            var allTokens: [Int] = []
             var tokenizedSamples: [[Int]] = []
-            for line in textLines {
-                let parsed = try parseJsonlLine(line)
-                let tokens = try context.tokenizer.encode(text: parsed)
+            var failedLines = 0
+            for (lineIdx, line) in textLines.enumerated() {
+                let tokens: [Int]
+                do {
+                    tokens = try parseAndTokenizeJsonlLine(line, tokenizer: context.tokenizer)
+                } catch {
+                    failedLines += 1
+                    if failedLines <= 3 {
+                        print("  line \(lineIdx + 1) failed: \(error.localizedDescription)")
+                        print("  preview: \(line.prefix(120))")
+                    }
+                    continue
+                }
+                if tokens.isEmpty { continue }
+
+                // Si la ligne fait deja >= seqLen, en faire un sample.
                 if tokens.count >= sl {
                     tokenizedSamples.append(tokens)
+                } else {
+                    // Sinon accumuler dans un buffer global, decouper en chunks de seqLen
+                    allTokens.append(contentsOf: tokens)
+                    while allTokens.count >= sl {
+                        tokenizedSamples.append(Array(allTokens.prefix(sl)))
+                        allTokens.removeFirst(sl)
+                    }
                 }
             }
-            print("  \(tokenizedSamples.count) samples avec >= \(sl) tokens")
+            print("  \(tokenizedSamples.count) samples (chunks de \(sl)), \(failedLines) lignes echouees")
 
             guard !tokenizedSamples.isEmpty else {
                 fatalError("Aucun sample n'a au moins \(sl) tokens")
@@ -162,17 +186,33 @@ struct MtpTrain: AsyncParsableCommand {
         print("\n[mtp-train] DONE — drafter sauve dans \(weightsURL.path)")
     }
 
-    /// Parse une ligne JSONL avec un champ "text"
-    private func parseJsonlLine(_ line: String) throws -> String {
+    /// Parse une ligne JSONL et la tokenize. Supporte:
+    ///  - {"text": "..."} : tokenise via encode()
+    ///  - {"messages": [...]} : tokenise via applyChatTemplate
+    private func parseAndTokenizeJsonlLine(_ line: String, tokenizer: any Tokenizer) throws -> [Int] {
         guard let data = line.data(using: .utf8) else {
             throw NSError(domain: "MtpTrain", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid line"])
         }
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let text = json["text"] as? String else {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NSError(domain: "MtpTrain", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: "Line missing 'text' field: \(line.prefix(80))"
+                NSLocalizedDescriptionKey: "Not valid JSON: \(line.prefix(80))"
             ])
         }
-        return text
+
+        if let text = json["text"] as? String {
+            return try tokenizer.encode(text: text)
+        }
+        if let messages = json["messages"] as? [[String: Any]] {
+            // Convertir au format [String: String] requis par applyChatTemplate
+            let strMessages: [[String: String]] = messages.compactMap { m in
+                guard let role = m["role"] as? String,
+                      let content = m["content"] as? String else { return nil }
+                return ["role": role, "content": content]
+            }
+            return try tokenizer.applyChatTemplate(messages: strMessages)
+        }
+        throw NSError(domain: "MtpTrain", code: 3, userInfo: [
+            NSLocalizedDescriptionKey: "Line missing 'text' or 'messages': \(line.prefix(80))"
+        ])
     }
 }

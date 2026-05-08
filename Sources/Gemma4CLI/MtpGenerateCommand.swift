@@ -50,6 +50,9 @@ struct MtpGenerate: AsyncParsableCommand {
     @Flag(name: .long, help: "Bypass le MaskedEmbedder a l'inference et utiliser le full lm head (necessaire si drafter est fine-tune sans toucher les centroides)")
     var fullLmHead: Bool = false
 
+    @Option(name: .long, help: "Chemin vers un adapter LoRA a appliquer au target (e.g. pour benchmark MTP avec target fine-tune)")
+    var adapterPath: String?
+
     @Option(name: .long, help: "Token HuggingFace")
     var hfToken: String?
 
@@ -81,6 +84,13 @@ struct MtpGenerate: AsyncParsableCommand {
         print("[2/3] Load target + drafter...")
         await Gemma4Registration.register(multimodal: false)
         let container = try await loadModelContainer(from: targetDir, using: Gemma4TokenizerLoader())
+
+        // Apply LoRA adapter if requested
+        if let adapter = adapterPath {
+            let adapterURL = URL(fileURLWithPath: adapter)
+            try await Gemma4LoRAInference.loadAdapter(into: container, from: adapterURL)
+            print("  LoRA adapter loaded: \(adapter)")
+        }
 
         let drafterCfgData = try Data(contentsOf: drafterDir.appendingPathComponent("config.json"))
         let drafterCfg = try JSONDecoder().decode(Gemma4AssistantConfig.self, from: drafterCfgData)
