@@ -188,6 +188,7 @@ public enum Gemma4DrafterTraining {
 
         var losses: [Float] = []
         var iterStart = Date.timeIntervalSinceReferenceDate
+        var bestValidLoss: Float = .infinity
 
         let batchSize = max(config.batchSize, 1)
         for iter in 0 ..< config.iterations {
@@ -248,8 +249,19 @@ public enum Gemma4DrafterTraining {
                 }
                 drafter.train()
                 let avgValLoss = valLosses.reduce(0, +) / Float(max(valLosses.count, 1))
-                print(String(format: "[drafter-train] iter %d/%d  valid_loss=%.4f  (n=%d batches)",
-                             iter + 1, config.iterations, avgValLoss, valLosses.count))
+                let isBest = avgValLoss < bestValidLoss
+                let marker = isBest ? "  [BEST]" : ""
+                print(String(format: "[drafter-train] iter %d/%d  valid_loss=%.4f  (n=%d batches)%@",
+                             iter + 1, config.iterations, avgValLoss, valLosses.count, marker))
+                if isBest {
+                    bestValidLoss = avgValLoss
+                    if let url = config.weightsURL {
+                        let bestURL = url.deletingPathExtension()
+                            .appendingPathExtension("best.safetensors")
+                        let params = Dictionary(uniqueKeysWithValues: drafter.parameters().flattened())
+                        try save(arrays: params, url: bestURL)
+                    }
+                }
                 iterStart = Date.timeIntervalSinceReferenceDate
             }
 
@@ -266,6 +278,11 @@ public enum Gemma4DrafterTraining {
             let params = Dictionary(uniqueKeysWithValues: drafter.parameters().flattened())
             try save(arrays: params, url: url)
             print("[drafter-train] final weights saved to \(url.path)")
+            if bestValidLoss.isFinite {
+                let bestURL = url.deletingPathExtension().appendingPathExtension("best.safetensors")
+                print(String(format: "[drafter-train] best valid_loss=%.4f saved to %@",
+                             bestValidLoss, bestURL.path))
+            }
         }
     }
 }
