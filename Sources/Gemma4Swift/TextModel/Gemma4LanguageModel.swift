@@ -6,12 +6,20 @@ import MLXFast
 import MLXNN
 import MLXLMCommon
 
+/// Sortie complete d'un forward du Gemma4LanguageModel.
+/// Utilise par le path MTP pour exposer logits + hidden state + K/V intermediaires.
+public struct LanguageForwardOutput {
+    public let logits: MLXArray
+    public let hiddenStates: MLXArray
+    public let intermediates: [LayerIntermediate?]
+}
+
 /// Modele de langage Gemma 4 complet (text model + logit head + softcapping)
 public class Gemma4LanguageModel: Module {
-    let config: Gemma4TextConfig
+    public let config: Gemma4TextConfig
     let finalLogitSoftcapping: Float?
 
-    @ModuleInfo var model: Gemma4TextModel
+    @ModuleInfo public var model: Gemma4TextModel
 
     public init(_ config: Gemma4TextConfig) {
         self.config = config
@@ -43,6 +51,34 @@ public class Gemma4LanguageModel: Module {
         }
 
         return out
+    }
+
+    /// Forward qui retourne logits + hidden states + K/V intermediaires par couche.
+    /// Utilise par le path MTP : le drafter consomme `hiddenStates` et `intermediates`.
+    /// Le `callAsFunction` standard reste inchange.
+    public func forwardWithIntermediates(
+        inputs: MLXArray? = nil,
+        inputsEmbeds: MLXArray? = nil,
+        cache: [KVCache?]? = nil,
+        perLayerInputs: MLXArray? = nil
+    ) -> LanguageForwardOutput {
+        let textOut = model.forwardCollectingIntermediates(
+            inputs: inputs,
+            inputsEmbeds: inputsEmbeds,
+            cache: cache,
+            perLayerInputs: perLayerInputs
+        )
+
+        var logits = model.embedTokens.asLinear(textOut.hidden)
+        if let softcap = finalLogitSoftcapping {
+            logits = tanh(logits / softcap) * softcap
+        }
+
+        return LanguageForwardOutput(
+            logits: logits,
+            hiddenStates: textOut.hidden,
+            intermediates: textOut.intermediates
+        )
     }
 
     /// Estime si TurboQuant est benefique pour cette architecture.

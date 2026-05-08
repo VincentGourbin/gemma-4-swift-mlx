@@ -37,14 +37,14 @@ public class Gemma4DecoderLayer: Module {
     // Layer scalar
     @ModuleInfo(key: "layer_scalar") var layerScalar: MLXArray
 
-    public init(_ config: Gemma4TextConfig, layerIdx: Int) {
+    public init(_ config: Gemma4TextConfig, layerIdx: Int, kvSharedOnly: Bool = false) {
         self.config = config
         self.layerIdx = layerIdx
         self.layerType = config.resolvedLayerTypes[layerIdx]
         self.hiddenSizePerLayerInput = config.hiddenSizePerLayerInput
         self.enableMoe = config.enableMoeBlock
 
-        self._selfAttn.wrappedValue = Gemma4Attention(config, layerIdx: layerIdx)
+        self._selfAttn.wrappedValue = Gemma4Attention(config, layerIdx: layerIdx, kvSharedOnly: kvSharedOnly)
         self._mlp.wrappedValue = Gemma4MLP(config, layerIdx: layerIdx)
 
         self._inputLayernorm.wrappedValue = RMSNorm(dimensions: config.hiddenSize, eps: config.rmsNormEps)

@@ -6,6 +6,20 @@ import MLXFast
 import MLXNN
 import MLXLMCommon
 
+/// Sortie d'un forward du TextModel avec les intermediaires (K/V par couche concrete).
+/// Utilise par le path MTP speculative decoding pour exposer les K/V partages
+/// du target au drafter.
+public struct LayerIntermediate {
+    public let keys: MLXArray
+    public let values: MLXArray
+    public let offset: Int
+}
+
+public struct TextForwardOutput {
+    public let hidden: MLXArray
+    public let intermediates: [LayerIntermediate?]
+}
+
 /// Linear avec scaling integre (pour per_layer_model_projection)
 class ScaledLinear: Module {
     @ModuleInfo var weight: MLXArray
@@ -149,6 +163,23 @@ public class Gemma4TextModel: Module {
         cache: [KVCache?]? = nil,
         perLayerInputs: MLXArray? = nil
     ) -> MLXArray {
+        forwardCollectingIntermediates(
+            inputs: inputs,
+            inputsEmbeds: inputsEmbeds,
+            cache: cache,
+            perLayerInputs: perLayerInputs
+        ).hidden
+    }
+
+    /// Variante de `callAsFunction` qui retourne aussi les K/V intermediaires
+    /// par couche. Utilise par le path MTP pour exposer les K/V partages au drafter.
+    /// Le `callAsFunction` standard reste inchange (delegate vers cette methode).
+    public func forwardCollectingIntermediates(
+        inputs: MLXArray? = nil,
+        inputsEmbeds: MLXArray? = nil,
+        cache: [KVCache?]? = nil,
+        perLayerInputs: MLXArray? = nil
+    ) -> TextForwardOutput {
         var h: MLXArray
         if let inputsEmbeds = inputsEmbeds {
             h = inputsEmbeds
@@ -229,6 +260,11 @@ public class Gemma4TextModel: Module {
             intermediates[i] = (kv: kv, offset: offset)
         }
 
-        return norm(h)
+        let publicIntermediates: [LayerIntermediate?] = intermediates.map { entry in
+            guard let entry = entry else { return nil }
+            return LayerIntermediate(keys: entry.kv.keys, values: entry.kv.values, offset: entry.offset)
+        }
+
+        return TextForwardOutput(hidden: norm(h), intermediates: publicIntermediates)
     }
 }

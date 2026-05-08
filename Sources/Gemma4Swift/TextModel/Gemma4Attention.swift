@@ -22,21 +22,25 @@ public class Gemma4Attention: Module {
     let numKVHeads: Int
     let useKEqV: Bool
     let isKvSharedLayer: Bool
+    /// Si true, la couche n'a JAMAIS ses propres K/V (drafter Assistant) — on skip
+    /// k_proj/v_proj/k_norm/v_norm a l'init et on force le path sharedKV au forward.
+    let kvSharedOnly: Bool
     let scale: Float
 
     @ModuleInfo(key: "q_proj") var qProj: Linear
-    @ModuleInfo(key: "k_proj") var kProj: Linear
+    @ModuleInfo(key: "k_proj") var kProj: Linear?
     @ModuleInfo(key: "v_proj") var vProj: Linear?
     @ModuleInfo(key: "o_proj") var oProj: Linear
     @ModuleInfo(key: "q_norm") var qNorm: RMSNorm
-    @ModuleInfo(key: "k_norm") var kNorm: RMSNorm
-    @ModuleInfo(key: "v_norm") var vNorm: RMSNormNoScale
+    @ModuleInfo(key: "k_norm") var kNorm: RMSNorm?
+    @ModuleInfo(key: "v_norm") var vNorm: RMSNormNoScale?
 
     let rope: RoPEWrapper
 
-    public init(_ config: Gemma4TextConfig, layerIdx: Int) {
+    public init(_ config: Gemma4TextConfig, layerIdx: Int, kvSharedOnly: Bool = false) {
         self.config = config
         self.layerIdx = layerIdx
+        self.kvSharedOnly = kvSharedOnly
 
         let layerTypes = config.resolvedLayerTypes
         self.layerType = layerTypes[layerIdx]
@@ -63,17 +67,25 @@ public class Gemma4Attention: Module {
         self.scale = 1.0
 
         self._qProj.wrappedValue = Linear(dim, numHeads * headDim, bias: false)
-        self._kProj.wrappedValue = Linear(dim, numKVHeads * headDim, bias: false)
-        if !useKEqV {
-            self._vProj.wrappedValue = Linear(dim, numKVHeads * headDim, bias: false)
-        } else {
-            self._vProj.wrappedValue = nil
-        }
         self._oProj.wrappedValue = Linear(numHeads * headDim, dim, bias: false)
-
         self._qNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
-        self._kNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
-        self._vNorm.wrappedValue = RMSNormNoScale(eps: config.rmsNormEps)
+
+        if kvSharedOnly {
+            // Drafter Assistant: pas de K/V propres, jamais. Skip les modules associes.
+            self._kProj.wrappedValue = nil
+            self._vProj.wrappedValue = nil
+            self._kNorm.wrappedValue = nil
+            self._vNorm.wrappedValue = nil
+        } else {
+            self._kProj.wrappedValue = Linear(dim, numKVHeads * headDim, bias: false)
+            if !useKEqV {
+                self._vProj.wrappedValue = Linear(dim, numKVHeads * headDim, bias: false)
+            } else {
+                self._vProj.wrappedValue = nil
+            }
+            self._kNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
+            self._vNorm.wrappedValue = RMSNormNoScale(eps: config.rmsNormEps)
+        }
 
         // KV sharing
         let firstKvSharedLayerIdx = config.firstKvSharedLayerIdx
@@ -140,8 +152,13 @@ public class Gemma4Attention: Module {
             return (oProj(output), (keys, values), effectiveOffset)
 
         } else if isKvSharedLayer, let cache = cache {
-            // KV sharing avec cache (inference): reutiliser le cache existant
-            effectiveOffset = cache.offset
+            // KV sharing avec cache (inference): reutiliser le cache existant.
+            // IMPORTANT: cache.offset a deja ete incremente de L par la couche concrete
+            // source (qui s'execute avant nous dans le meme forward). Nos queries
+            // correspondent aux positions globales [cache.offset - L, ..., cache.offset - 1],
+            // donc RoPE doit etre applique a (cache.offset - L), pas cache.offset.
+            // (Equivaut a `offset` parameter passe par la textModel cote Python.)
+            effectiveOffset = cache.offset - L
             queries = rope(queries, offset: effectiveOffset)
 
             // TurboQuant shared
@@ -223,6 +240,9 @@ public class Gemma4Attention: Module {
     private func computeKV(
         x: MLXArray, B: Int, L: Int
     ) -> (keys: MLXArray, values: MLXArray) {
+        guard let kProj = kProj, let kNorm = kNorm, let vNorm = vNorm else {
+            fatalError("computeKV appele sur une couche kvSharedOnly — sharedKV doit etre fourni externe")
+        }
         var keys = kProj(x).reshaped(B, L, numKVHeads, headDim)
 
         // K=V: values sont le raw k_proj output (avant k_norm)
