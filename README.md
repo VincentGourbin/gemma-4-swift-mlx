@@ -13,6 +13,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
 | LoRA/DoRA fine-tuning | ✅ **Working** | LoRA, DoRA, full SFT. Response masking, chat template. 97% accuracy on classifier benchmark |
 | Multimodal LoRA | ✅ **Working** | Audio + vision fine-tuning. 50% accuracy on 20-species bird call classification, LaTeX OCR verified |
+| Speculative decoding (MTP) | ✅ **Working** | Gemma 4 Assistant drafter with greedy bit-exact equivalence. Fine-tuneable: ×2.5 acceptance on domain-specific dataset |
 | KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
@@ -426,6 +427,71 @@ try await pipeline.fuseAdapter(from: adapterDirectoryURL)
 | Audio | ✅ | ✅ | Conformer encoder, 5-30s clips |
 | Vision | ✅ | ✅ | SigLIP encoder, any image size |
 | Video | - | ✅ | Inference only (training not yet implemented) |
+
+## Speculative Decoding (MTP)
+
+Accelerate text generation with Google's `gemma-4-{E2B,E4B}-it-assistant` drafter models via Multi-Token Prediction. The drafter proposes K-1 tokens per round; the target verifies all in one parallel forward and accepts only those matching its own argmax. **Output is bit-exact identical to standard greedy generation**.
+
+### Quick start
+
+```bash
+# Inference with pretrained drafter (~35% acceptance on generic prompts)
+gemma4-cli generate \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --draft-model google/gemma-4-E2B-it-assistant \
+  --temperature 0 \
+  "Your prompt"
+
+# Chat mode (multi-turn)
+gemma4-cli chat \
+  --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --draft-model google/gemma-4-E2B-it-assistant
+```
+
+### Fine-tuning the drafter for your domain
+
+The pretrained drafter is generic — to actually win throughput, fine-tune it on the kind of text your target produces. Self-distillation against `argmax(target_logits)`:
+
+```bash
+# Train (11 min for 2000 iter on 4.3k samples, batch=4)
+gemma4-cli mtp-train \
+  --target ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
+  --drafter google/gemma-4-E2B-it-assistant \
+  --data my_corpus/train.jsonl \
+  --valid-data my_corpus/valid.jsonl \
+  --output ./my-drafter \
+  --iterations 2000 --batch-size 4 \
+  --steps-per-valid 200
+
+# Inference with fine-tuned drafter + optional LoRA on target
+gemma4-cli mtp-generate \
+  --target mlx-community/gemma-4-e2b-it-bf16 \
+  --drafter google/gemma-4-E2B-it-assistant \
+  --drafter-path ./my-drafter/drafter.best.safetensors \
+  --full-lm-head \
+  --adapter-path ./my-target-lora \
+  --prompt "Your domain-specific query"
+```
+
+Dataset format: same JSONL conventions as LoRA training (`{"text": "..."}` or `{"messages": [{"role": ..., "content": ...}]}`).
+
+### Validation production (toolsforge French→SQL dataset)
+
+| Metric | Pretrained drafter | Fine-tuned drafter | Δ |
+|---|---|---|---|
+| Acceptance moyenne | 8.8% | 22.4% | **×2.5** |
+| Temps de génération | baseline | -12% | **-12%** |
+
+Greedy equivalence preserved (output bit-exact identical). See PR #25 for full bench.
+
+### Validation tools
+
+```bash
+gemma4-cli mtp-smoke <repo>              # validate drafter weights load cleanly
+gemma4-cli mtp-forward                   # 1-round drafter parity test
+gemma4-cli mtp-generate --compare        # bit-exact equivalence vs standard
+gemma4-cli mtp-diag-verify               # sequential vs parallel hidden diff (advanced)
+```
 
 ## Library Integration
 

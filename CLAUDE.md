@@ -53,6 +53,23 @@ The decoder has two layer types with different configurations:
 - Skips rotary_emb and unused clipping params
 - Splits MoE `gate_up_proj` into separate gate/up projections
 
+### Speculative Decoding (MTP)
+
+Supports `gemma-4-{E2B,E4B}-it-assistant` drafter models for multi-token prediction. The drafter is a 4-layer mini-transformer (hidden 256) where **all layers are kv-shared-only** — they consume the target's K/V cache via `bind(target:)` + `setSharedKV(...)` instead of computing their own.
+
+Key files:
+- `Speculative/Gemma4AssistantDraftModel.swift` — drafter with `draftBlock` (autoregressive K-step) and `trainForward` (parallel multi-position, used during fine-tuning)
+- `Speculative/MaskedEmbedder.swift` — sparse softmax LM head: scores 2048 token clusters, picks top-K=32, computes dense logits only on the ~4096 tokens of those clusters
+- `Speculative/SpeculativeWalk.swift` — pure-logic greedy walk (accept until first divergence)
+- `Speculative/Gemma4DrafterTraining.swift` — self-distillation training (target frozen, drafter trainable, CE loss against `argmax(target_logits)`)
+- `Pipeline/Gemma4MTPPipeline.swift` — actor with `mtpStream(...)` end-to-end (prefill → draft → verify → walk → rollback)
+
+Quirks:
+- The drafter checkpoint OMITS `k_proj`, `v_proj`, `k_norm` weights — they're optional in `Gemma4Attention` gated by `kvSharedOnly: Bool` (default `false`, back-compat).
+- `Gemma4TextModel.forwardCollectingIntermediates` exposes the LAST decoder layer's output **BEFORE** the final RMSNorm via `preNormHidden` — the drafter's `pre_projection` was trained against pre-norm.
+- For kv-shared inference path with cache, queries get RoPE at `cache.offset - L` (pre-write offset), not `cache.offset` (post-write).
+- During training, `MaskedEmbedder` is bypassed via `useFullLMHead = true` because `putAlong` (scatter) has no VJP in MLX.
+
 ## Key Conventions
 
 - All neural network types subclass `Module` from MLXNN with `@ModuleInfo` property wrappers for parameter tracking
