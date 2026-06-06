@@ -36,13 +36,15 @@ public class Gemma4LanguageModel: Module {
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> MLXArray {
         var out = model(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
             cache: cache,
-            perLayerInputs: perLayerInputs
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
         )
 
         // Tied word embeddings: utiliser embed_tokens comme linear

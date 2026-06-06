@@ -46,8 +46,11 @@ public struct Gemma4Config: Codable {
             textConfig = try Gemma4TextConfig(from: decoder)
         }
 
-        visionConfig = try container.decodeIfPresent(Gemma4VisionConfig.self, forKey: .visionConfig)
-        audioConfig = try container.decodeIfPresent(Gemma4AudioConfig.self, forKey: .audioConfig)
+        // Tolerant decoding: variantes (e.g. gemma4_unified) exposent un schema
+        // vision/audio reduit. On accepte de loader sans encodeurs multimodaux
+        // plutot que d'echouer le chargement entier (path text-only reste OK).
+        visionConfig = (try? container.decodeIfPresent(Gemma4VisionConfig.self, forKey: .visionConfig)) ?? nil
+        audioConfig = (try? container.decodeIfPresent(Gemma4AudioConfig.self, forKey: .audioConfig)) ?? nil
         imageTokenId = try container.decodeIfPresent(Int.self, forKey: .imageTokenId) ?? 258880
         audioTokenId = try container.decodeIfPresent(Int.self, forKey: .audioTokenId) ?? 258881
         videoTokenId = try container.decodeIfPresent(Int.self, forKey: .videoTokenId) ?? 258884

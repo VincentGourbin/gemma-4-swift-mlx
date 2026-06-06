@@ -170,24 +170,32 @@ public class Gemma4TextModel: Module {
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> MLXArray {
         forwardCollectingIntermediates(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
             cache: cache,
-            perLayerInputs: perLayerInputs
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
         ).hidden
     }
 
     /// Variante de `callAsFunction` qui retourne aussi les K/V intermediaires
     /// par couche. Utilise par le path MTP pour exposer les K/V partages au drafter.
     /// Le `callAsFunction` standard reste inchange (delegate vers cette methode).
+    ///
+    /// - Parameter visionTokenMask : `[B, T]` bool, true ou le token est vision (image/video).
+    ///   Si fourni ET prefill (T > 1), active l'overlay bidirectionnel sur les blocs vision
+    ///   (port du Python `_apply_blockwise_bidirectional_overlay`). Utilise par
+    ///   [[Gemma4UnifiedMultimodalLLMModel]] quand `use_bidirectional_attention=vision`.
     public func forwardCollectingIntermediates(
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> TextForwardOutput {
         var h: MLXArray
         if let inputsEmbeds = inputsEmbeds {
@@ -217,15 +225,32 @@ public class Gemma4TextModel: Module {
         // Masques d'attention — utilise createAttentionMask() de MLXLMCommon
         // Pour les single tokens (T=1) : retourne .none (pas de masque materialise)
         // Pour les multi-tokens (prefill) : retourne .causal ou .array selon le cas
-        let globalMask = MLXLMCommon.createAttentionMask(
+        var globalMask = MLXLMCommon.createAttentionMask(
             h: h,
             cache: firstFullCacheIdx < cacheArray.count ? cacheArray[firstFullCacheIdx] : nil
         )
-        let slidingWindowMask = MLXLMCommon.createAttentionMask(
+        var slidingWindowMask = MLXLMCommon.createAttentionMask(
             h: h,
             cache: firstSlidingCacheIdx < cacheArray.count ? cacheArray[firstSlidingCacheIdx] : nil,
             windowSize: windowSize
         )
+
+        // Overlay bidirectionnel pour les blocs vision (gemma4_unified) :
+        // materialise les masques causaux + OR avec same_block.
+        let T = h.dim(1)
+        if let visionMask = visionTokenMask, T > 1 {
+            let blockIds = Gemma4BidirectionalMask.blockSequenceIds(visionMask: visionMask)
+            let overlay = Gemma4BidirectionalMask.overlay(blockSequenceIds: blockIds)
+
+            let causalGlobal = MLXLMCommon.createCausalMask(n: T, offset: 0)
+            let causalSliding = MLXLMCommon.createCausalMask(n: T, offset: 0, windowSize: windowSize)
+
+            let mergedGlobal = Gemma4BidirectionalMask.compose(causal: causalGlobal, overlay: overlay)
+            let mergedSliding = Gemma4BidirectionalMask.compose(causal: causalSliding, overlay: overlay)
+
+            globalMask = .array(mergedGlobal)
+            slidingWindowMask = .array(mergedSliding)
+        }
 
         // Forward a travers les layers — avec suivi des intermediaires pour le KV sharing
         // Ref: Python mlx-lm gemma4_text.py utilise intermediates[] + previous_kvs

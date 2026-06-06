@@ -41,9 +41,17 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         case a4b6bit = "mlx-community/gemma-4-26b-a4b-it-6bit"
         case a4bBf16 = "mlx-community/gemma-4-26b-a4b-it-bf16"
 
+        // 12B Unified — 12B dense, MQA full attention (num_global_kv_heads=1),
+        // pas de KV-sharing ni per-layer-input. Multimodal vision/audio schema
+        // different (todo). Pour l'instant : text-only.
+        case b12b4bit = "mlx-community/gemma-4-12B-it-4bit"
+        case b12b6bit = "mlx-community/gemma-4-12B-it-6bit"
+        case b12b8bit = "mlx-community/gemma-4-12B-it-8bit"
+        case b12bBf16 = "mlx-community/gemma-4-12B-it-bf16"
+
         /// Famille du modele
         public enum Family: String, Sendable {
-            case e2b, e4b, b31b, a4b
+            case e2b, e4b, b31b, a4b, b12b
         }
 
         public var family: Family {
@@ -52,22 +60,24 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             case .e4b4bit, .e4b8bit, .e4b6bit, .e4bBf16: return .e4b
             case .b31b4bit, .b31b8bit, .b31b6bit, .b31bBf16: return .b31b
             case .a4b4bit, .a4b8bit, .a4b6bit, .a4bBf16: return .a4b
+            case .b12b4bit, .b12b8bit, .b12b6bit, .b12bBf16: return .b12b
             }
         }
 
         public var displayName: String {
             let quant: String
             switch self {
-            case .e2b4bit, .e4b4bit, .b31b4bit, .a4b4bit: quant = "4-bit"
-            case .e2b8bit, .e4b8bit, .b31b8bit, .a4b8bit: quant = "8-bit"
-            case .e2b6bit, .e4b6bit, .b31b6bit, .a4b6bit: quant = "6-bit"
-            case .e2bBf16, .e4bBf16, .b31bBf16, .a4bBf16: quant = "BF16"
+            case .e2b4bit, .e4b4bit, .b31b4bit, .a4b4bit, .b12b4bit: quant = "4-bit"
+            case .e2b8bit, .e4b8bit, .b31b8bit, .a4b8bit, .b12b8bit: quant = "8-bit"
+            case .e2b6bit, .e4b6bit, .b31b6bit, .a4b6bit, .b12b6bit: quant = "6-bit"
+            case .e2bBf16, .e4bBf16, .b31bBf16, .a4bBf16, .b12bBf16: quant = "BF16"
             }
             switch family {
             case .e2b: return "Gemma 4 E2B (\(quant))"
             case .e4b: return "Gemma 4 E4B (\(quant))"
             case .b31b: return "Gemma 4 31B (\(quant))"
             case .a4b: return "Gemma 4 26B-A4B (\(quant))"
+            case .b12b: return "Gemma 4 12B Unified (\(quant))"
             }
         }
 
@@ -89,6 +99,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             case .a4b6bit: return 21.0
             case .a4b8bit: return 27.0
             case .a4bBf16: return 52.0
+            case .b12b4bit: return 6.8
+            case .b12b6bit: return 9.5
+            case .b12b8bit: return 12.7
+            case .b12bBf16: return 24.0
             }
         }
 
@@ -99,6 +113,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             case .e4b: return "9.6B"
             case .b31b: return "31.3B"
             case .a4b: return "25.8B"
+            case .b12b: return "12.0B"
             }
         }
 
@@ -109,6 +124,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             case .e4b: return "4.5B"
             case .b31b: return "31.3B"
             case .a4b: return "3.8B"
+            case .b12b: return "12.0B"
             }
         }
 
@@ -117,10 +133,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         public var quantization: String {
             switch self {
-            case .e2b4bit, .e4b4bit, .b31b4bit, .a4b4bit: return "4-bit"
-            case .e2b8bit, .e4b8bit, .b31b8bit, .a4b8bit: return "8-bit"
-            case .e2b6bit, .e4b6bit, .b31b6bit, .a4b6bit: return "6-bit"
-            case .e2bBf16, .e4bBf16, .b31bBf16, .a4bBf16: return "bf16"
+            case .e2b4bit, .e4b4bit, .b31b4bit, .a4b4bit, .b12b4bit: return "4-bit"
+            case .e2b8bit, .e4b8bit, .b31b8bit, .a4b8bit, .b12b8bit: return "8-bit"
+            case .e2b6bit, .e4b6bit, .b31b6bit, .a4b6bit, .b12b6bit: return "6-bit"
+            case .e2bBf16, .e4bBf16, .b31bBf16, .a4bBf16, .b12bBf16: return "bf16"
             }
         }
 
@@ -150,6 +166,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             // 26B-A4B et 31B : text + image + video (pas d'audio)
             case .a4b, .b31b:
                 return .imageTextToText
+            // 12B Unified : text + image + video + audio (encoder-free design).
+            case .b12b:
+                return .anyToAny
             }
         }
 

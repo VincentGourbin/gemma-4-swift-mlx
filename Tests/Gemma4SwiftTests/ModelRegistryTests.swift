@@ -89,9 +89,10 @@ struct ModelRegistryTests {
         #expect(Gemma4Pipeline.Model.e4b4bit.estimatedSizeGB < Gemma4Pipeline.Model.a4b4bit.estimatedSizeGB)
     }
 
-    @Test("16 modeles au total (4 familles x 4 quantisations)")
+    @Test("20 modeles au total (5 familles x 4 quantisations)")
     func testModelCount() {
-        #expect(Gemma4Pipeline.Model.allCases.count == 16)
+        // 5 familles : E2B, E4B, 31B, 26B-A4B, 12B Unified ; 4 quants chacune.
+        #expect(Gemma4Pipeline.Model.allCases.count == 20)
     }
 
     @Test("Raw values sont des IDs HuggingFace valides")
