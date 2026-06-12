@@ -351,10 +351,13 @@ struct EvalMmlu: AsyncParsableCommand {
             let logits = context.model(inputIds, cache: cache)
             // Logits du dernier token = distribution du prochain token (= " A"/" B"/...)
             let lastLogits = logits[0, logits.dim(1) - 1, 0...]
+            // Gather des candidats en un seul tenseur + UN seul sync via asArray
+            // (evite N appels .item() qui forcent N sync GPU->CPU).
+            let candidateIdx = MLXArray(letterTokens.map { Int32($0) })
+            let candidateLogits = lastLogits.take(candidateIdx, axis: 0).asArray(Float.self)
             var bestIdx = 0
             var bestLogit = Float(-Float.infinity)
-            for (i, tok) in letterTokens.enumerated() {
-                let l = lastLogits[tok].item(Float.self)
+            for (i, l) in candidateLogits.enumerated() {
                 if l > bestLogit { bestLogit = l; bestIdx = i }
             }
             return bestIdx

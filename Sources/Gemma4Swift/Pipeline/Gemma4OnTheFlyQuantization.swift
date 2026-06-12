@@ -73,12 +73,16 @@ public enum Gemma4OnTheFlyQuantization {
             return 0
         }
 
-        // mxfp4/mxfp8 imposent group_size=32 cote MLX. On corrige silencieusement.
+        // mxfp4/mxfp8 imposent group_size=32 cote MLX. On corrige avec warning
+        // visible en stderr (les pipelines de bench grep parfois sur stdout
+        // uniquement et rateraient un print silencieux).
         var effectiveGroupSize = groupSize
         switch mode {
         case .mxfp4, .mxfp8:
             if effectiveGroupSize != 32 {
-                print("[OnTheFlyQuantization] \(mode.rawValue) requiert group_size=32, override")
+                let msg = "[OnTheFlyQuantization] WARNING: \(mode.rawValue) requires group_size=32, " +
+                    "overriding user value \(effectiveGroupSize) → 32\n"
+                FileHandle.standardError.write(Data(msg.utf8))
                 effectiveGroupSize = 32
             }
         case .affine:

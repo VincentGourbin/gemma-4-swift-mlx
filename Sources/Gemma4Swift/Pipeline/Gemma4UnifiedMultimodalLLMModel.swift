@@ -213,9 +213,12 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
             projected = stopGradient(projected)
             projected = projected.asType(inputsEmbeds.dtype)
 
-            // Compacter via mask (true = valide).
+            // Compacter via mask (true = valide). Clamping defensif au cas ou
+            // le mask aurait plus de samples valides que la projection (shape
+            // mismatch silencieux).
             if let mask = pendingAudioMask {
-                let validCount = mask.asType(.int32).sum().item(Int.self)
+                let rawCount = mask.asType(.int32).sum().item(Int.self)
+                let validCount = min(rawCount, projected.dim(1))
                 if validCount < projected.dim(1) {
                     projected = projected[0..., 0 ..< validCount]
                 }
