@@ -194,13 +194,27 @@ struct PanelView: View {
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 Spacer()
-                if state.isRunning {
-                    ProgressView().controlSize(.small).tint(accent)
-                }
+                Text(state.phase.labelShort)
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(accent.opacity(0.18))
+                            .overlay(Capsule().strokeBorder(accent.opacity(0.5), lineWidth: 1))
+                    )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(Color.black.opacity(0.3))
+
+            // Progress bar : indéterminée si loading, déterminée si generating
+            progressBar
+                .frame(height: 24)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.15))
 
             // Texte (scrollable)
             ScrollView {
@@ -247,6 +261,62 @@ struct PanelView: View {
             Text(value)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.85))
+        }
+    }
+
+    @ViewBuilder
+    private var progressBar: some View {
+        switch state.phase {
+        case .idle:
+            HStack(spacing: 6) {
+                Image(systemName: "circle").font(.system(size: 10)).foregroundStyle(.white.opacity(0.3))
+                Text("Pret a generer").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.5))
+                Spacer()
+            }
+        case .loading(let detail):
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small).tint(accent)
+                Text(detail).font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.8))
+                Spacer()
+            }
+        case .generating(let progress, let detail):
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(detail).font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.8))
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(accent)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.white.opacity(0.08))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(LinearGradient(
+                                colors: [accent.opacity(0.6), accent],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                            .frame(width: max(2, geo.size.width * progress))
+                            .shadow(color: accent.opacity(0.6), radius: 4)
+                            .animation(.easeOut(duration: 0.2), value: progress)
+                    }
+                }
+                .frame(height: 6)
+            }
+        case .done:
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill").font(.system(size: 11)).foregroundStyle(accent)
+                Text("Termine").font(.system(size: 10, design: .monospaced)).foregroundStyle(.white.opacity(0.7))
+                Spacer()
+            }
+        case .error(let msg):
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 11)).foregroundStyle(.red)
+                Text(msg).font(.system(size: 10, design: .monospaced)).foregroundStyle(.red.opacity(0.8)).lineLimit(1)
+                Spacer()
+            }
         }
     }
 }

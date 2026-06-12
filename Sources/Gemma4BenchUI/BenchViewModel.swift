@@ -45,6 +45,24 @@ final class BenchViewModel: ObservableObject {
 
     // MARK: - État panneaux
 
+    enum PanelPhase: Equatable {
+        case idle
+        case loading(detail: String)
+        case generating(progress: Double, detail: String)  // 0...1
+        case done
+        case error(String)
+
+        var labelShort: String {
+            switch self {
+            case .idle: return "Inactif"
+            case .loading: return "Chargement"
+            case .generating: return "Generation"
+            case .done: return "Termine"
+            case .error: return "Erreur"
+            }
+        }
+    }
+
     struct PanelState {
         var text: String = ""
         var tokensGenerated: Int = 0
@@ -54,6 +72,7 @@ final class BenchViewModel: ObservableObject {
         var isRunning: Bool = false
         var currentStep: Int? = nil
         var totalSteps: Int = 0
+        var phase: PanelPhase = .idle
     }
 
     @Published var loadState: LoadState = .idle
@@ -120,20 +139,28 @@ final class BenchViewModel: ObservableObject {
     func loadAR() async {
         await unloadAll()
         loadState = .loadingAR("\(arModelID)…")
+        arPanel.phase = .loading(detail: "Chargement \(arModelID) (~48 Go bf16)…")
+        arPanel.status = "Chargement…"
         do {
             await Gemma4Registration.register(multimodal: false)
             let pipeline = Gemma4Pipeline()
             try await pipeline.load(from: arPath, multimodal: false)
             arPipeline = pipeline
             loadState = .arReady
+            arPanel.phase = .idle
+            arPanel.status = "Modele charge, pret"
         } catch {
             loadState = .error("AR : \(error.localizedDescription)")
+            arPanel.phase = .error(error.localizedDescription)
+            arPanel.status = "Erreur chargement"
         }
     }
 
     func loadDiffusion() async {
         await unloadAll()
         loadState = .loadingDiffusion("\(diffusionModelID)…")
+        diffusionPanel.phase = .loading(detail: "Chargement \(diffusionModelID) (~48 Go bf16)…")
+        diffusionPanel.status = "Chargement…"
         do {
             let (model, config) = try DiffusionGemmaLoader.load(
                 from: diffusionPath, includeVision: false
@@ -153,8 +180,12 @@ final class BenchViewModel: ObservableObject {
 
             diffusionTokenizer = try await AutoTokenizer.from(modelFolder: diffusionPath)
             loadState = .diffusionReady
+            diffusionPanel.phase = .idle
+            diffusionPanel.status = "Modele charge, pret"
         } catch {
             loadState = .error("Diffusion : \(error.localizedDescription)")
+            diffusionPanel.phase = .error(error.localizedDescription)
+            diffusionPanel.status = "Erreur chargement"
         }
     }
 
@@ -162,11 +193,17 @@ final class BenchViewModel: ObservableObject {
 
     func runAR() async {
         guard let pipeline = arPipeline else { return }
-        arPanel = PanelState()
+        // Garde le label "chargement OK" un instant puis bascule generation
+        arPanel.text = ""
+        arPanel.tokensGenerated = 0
+        arPanel.elapsed = 0
+        arPanel.currentStep = nil
         arPanel.isRunning = true
+        arPanel.phase = .generating(progress: 0, detail: "Token 0 / \(maxTokens)")
         arPanel.status = "Generation AR (token-par-token)…"
 
         let start = Date()
+        let targetTokens = maxTokens
         do {
             let stream = try pipeline.chatStream(
                 prompt: prompt,
@@ -178,10 +215,17 @@ final class BenchViewModel: ObservableObject {
                 arPanel.text.append(piece)
                 arPanel.tokensGenerated += 1
                 arPanel.elapsed = Date().timeIntervalSince(start)
+                let p = min(1.0, Double(arPanel.tokensGenerated) / Double(targetTokens))
+                arPanel.phase = .generating(
+                    progress: p,
+                    detail: "Token \(arPanel.tokensGenerated) / \(targetTokens)"
+                )
             }
             arPanel.status = "Fini"
+            arPanel.phase = .done
         } catch {
             arPanel.status = "Erreur : \(error.localizedDescription)"
+            arPanel.phase = .error(error.localizedDescription)
         }
         arPanel.isRunning = false
         arPanel.elapsed = Date().timeIntervalSince(start)
@@ -207,10 +251,14 @@ final class BenchViewModel: ObservableObject {
               let tokenizer = diffusionTokenizer
         else { return }
 
-        diffusionPanel = PanelState()
+        diffusionPanel.text = ""
+        diffusionPanel.tokensGenerated = 0
+        diffusionPanel.elapsed = 0
+        diffusionPanel.currentStep = nil
         diffusionPanel.isRunning = true
-        diffusionPanel.status = "Generation Diffusion (denoising)…"
         diffusionPanel.totalSteps = genConfig.maxDenoisingSteps
+        diffusionPanel.phase = .generating(progress: 0, detail: "Denoising step \(genConfig.maxDenoisingSteps) / \(genConfig.maxDenoisingSteps)")
+        diffusionPanel.status = "Generation Diffusion (denoising)…"
 
         let canvasLength = config.textConfig.canvasLength
         let maxBlocks = max(1, Int(ceil(Double(maxTokens) / Double(canvasLength))))
@@ -286,6 +334,13 @@ final class BenchViewModel: ObservableObject {
                 diffusionPanel.text = event.text
                 diffusionPanel.currentStep = event.step
                 diffusionPanel.elapsed = event.elapsed
+                // Steps décroissent de totalSteps à 1 → progress = (totalSteps - step + 1) / totalSteps
+                let stepsDone = totalSteps - event.step + 1
+                let p = min(1.0, Double(stepsDone) / Double(totalSteps))
+                diffusionPanel.phase = .generating(
+                    progress: p,
+                    detail: "Canvas \(event.canvasIdx + 1), denoising step \(event.step) / \(totalSteps)"
+                )
                 diffusionPanel.status = "Canvas \(event.canvasIdx), step \(event.step) / \(totalSteps)"
             case .canvas:
                 diffusionPanel.status = "Canvas \(event.canvasIdx) commit"
@@ -295,6 +350,7 @@ final class BenchViewModel: ObservableObject {
                 diffusionPanel.status = "Fini (\(steps) forwards, \(canvases) canvas)"
                 diffusionPanel.isRunning = false
                 diffusionPanel.currentStep = nil
+                diffusionPanel.phase = .done
             }
         }
     }
