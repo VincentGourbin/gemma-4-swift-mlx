@@ -231,12 +231,16 @@ PYTHONPATH=~/Library/Python/3.12/lib/python/site-packages \
 
 **Notes** :
 - E2B et E4B Python crash : bug `mlx-vlm 0.6.2` sur le KV-sharing (parameters not in model). Notre Swift port gère via `WeightSanitizer` qui strip les K/V projections des couches partagées.
-- **26B-A4B (MoE) Swift -6 pts vs Python** : divergence dans notre Router. Tentative de port verbatim de la version Python actuelle (softmax-sur-top-k, fused rms_norm) a **dégradé** l'accuracy de -3 pts au lieu d'améliorer. La cause exacte reste à investiguer — probable interaction entre :
-  - Quantization 4-bit des SwitchGLU experts (calibrée sur une distribution spécifique d'activations)
-  - Ordering numérique bf16 du router
-  - Path softmax-sur-tout-puis-renormalize vs softmax-sur-top-k (mathématiquement équivalent mais distributions différentes en bf16)
-  - SwitchGLU expert dispatching différent entre Swift MLX-LM et Python MLX-LM
-  Le code Swift actuel utilise empiriquement la meilleure variante mesurée (-6 pts), mais reste sous-optimal vs Python.
+- **26B-A4B (MoE) Swift -6 pts vs Python en 4-bit MAIS +2 pts en bf16** : la divergence est **isolée au path quantisé du SwitchGLU MLX-swift-lm**, pas dans notre Router ni dans notre archi MoE.
+
+### Sweep isolation quant vs Router/MoE Swift (26B-A4B)
+
+| Config | Swift plain | Python plain | Δ Swift-Py | Swift Pro | Python Pro | Δ Swift-Py |
+|---|---|---|---|---|---|---|
+| 26B-A4B-4bit | 57.0% | **63.0%** | **-6** ⚠ | 44.8% | 47.6% | -2.8 |
+| **26B-A4B-bf16** | **59.0%** | 57.0% | **+2** ✓ | **51.4%** | 48.6% | **+2.8** ✓ |
+
+**Verdict isolation** : sur bf16 non-quantisé, Swift donne un résultat équivalent ou meilleur que Python (+2 à +2.8 pts). Le bug -6 pts en 4-bit vient donc du dispatch quantisé de `SwitchGLU` dans `mlx-swift-lm` (probablement `quantizedSwitchLinear` ou `gather_mm` quantisé moins précis qu'en Python). À reporter en upstream.
 
 Observation : sur 12B Unified, la quantification 4-bit (n'importe quel mode)
 **dégrade significativement** la qualité MMLU (-20 à -25 pts). Le 8-bit
