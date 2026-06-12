@@ -45,7 +45,7 @@ struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
         abstract: "Inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self],
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self],
         defaultSubcommand: Generate.self
     )
 }
@@ -150,6 +150,11 @@ struct Download: AsyncParsableCommand {
         "a4b-6bit": "mlx-community/gemma-4-26b-a4b-it-6bit",
         "a4b-8bit": "mlx-community/gemma-4-26b-a4b-it-8bit",
         "a4b-bf16": "mlx-community/gemma-4-26b-a4b-it-bf16",
+        // 12B Unified
+        "12b-4bit": "mlx-community/gemma-4-12B-it-4bit",
+        "12b-6bit": "mlx-community/gemma-4-12B-it-6bit",
+        "12b-8bit": "mlx-community/gemma-4-12B-it-8bit",
+        "12b-bf16": "mlx-community/gemma-4-12B-it-bf16",
     ]
 
     func run() async throws {
@@ -269,6 +274,18 @@ struct Generate: AsyncParsableCommand {
     @Option(name: .long, help: "Block size MTP (drafter genere blockSize-1 tokens par round)")
     var blockSize: Int = 4
 
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (bits : 4, 6, 8). Applique apres le load, AVANT la generation.")
+    var quantizeBits: Int?
+
+    @Option(name: .customLong("quantize-group-size"), help: "Group size de quantification (defaut 64)")
+    var quantizeGroupSize: Int = 64
+
+    @Option(name: .customLong("quantize-mode"), help: "Mode quantification : affine | mxfp4 | mxfp8")
+    var quantizeMode: String = "affine"
+
+    @Flag(name: .customLong("quantize-text-only"), help: "Si actif: ne quantize QUE le decoder texte (pour multimodal: vision/audio restent en bf16).")
+    var quantizeTextOnly: Bool = false
+
     @Argument(help: "Le prompt utilisateur")
     var prompt: String
 
@@ -293,6 +310,30 @@ struct Generate: AsyncParsableCommand {
 
         let loadTime = Date().timeIntervalSince(startLoad)
         print("Modele charge en \(String(format: "%.1f", loadTime))s")
+
+        // 3b. Quantification a la volee (optionnelle)
+        if let bits = quantizeBits {
+            guard let mode = Gemma4OnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
+                print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
+                throw ExitCode.failure
+            }
+            let excluded = quantizeTextOnly
+                ? Gemma4OnTheFlyQuantization.multimodalEncoderPrefixes
+                : Gemma4OnTheFlyQuantization.defaultExcludedPathPrefixes
+            let quantStart = Date()
+            let count = await container.perform { context in
+                Gemma4OnTheFlyQuantization.apply(
+                    to: context.model,
+                    bits: bits,
+                    groupSize: self.quantizeGroupSize,
+                    mode: mode,
+                    excludedPathPrefixes: excluded
+                )
+            }
+            let quantTime = Date().timeIntervalSince(quantStart)
+            let scope = quantizeTextOnly ? "text-only" : "all"
+            print("Quantification a la volee (\(scope)): \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue)) en \(String(format: "%.1f", quantTime))s")
+        }
 
         // 4. Stats GPU
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
@@ -553,6 +594,18 @@ struct Describe: AsyncParsableCommand {
     @Option(name: .long, help: "Temperature")
     var temperature: Float = 0.3
 
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Par defaut quantifie aussi les encoders multimodaux (comme mlx-community pre-quant).")
+    var quantizeBits: Int?
+
+    @Option(name: .customLong("quantize-group-size"), help: "Group size (defaut 64)")
+    var quantizeGroupSize: Int = 64
+
+    @Option(name: .customLong("quantize-mode"), help: "Mode : affine | mxfp4 | mxfp8")
+    var quantizeMode: String = "affine"
+
+    @Flag(name: .customLong("quantize-text-only"), help: "Si actif: ne quantize QUE le decoder texte (vision/audio encoders restent en bf16).")
+    var quantizeTextOnly: Bool = false
+
     func run() async throws {
         guard !image.isEmpty || audio != nil || video != nil else {
             print("Erreur: specifiez --image, --audio ou --video")
@@ -572,6 +625,39 @@ struct Describe: AsyncParsableCommand {
         print("Chargement du modele: \(path)")
         let container = try await loadLocalMultimodalModel(path: path)
         print("Modele charge.")
+
+        // 2b. Quantification a la volee (optionnelle).
+        //     Par defaut : quantize tout (Linear + Embedding), comme le pre-quant mlx-community.
+        //     Avec --quantize-text-only : preserve les encoders multimodaux en bf16.
+        if let bits = quantizeBits {
+            guard let mode = Gemma4OnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
+                print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
+                throw ExitCode.failure
+            }
+            let excluded = quantizeTextOnly
+                ? Gemma4OnTheFlyQuantization.multimodalEncoderPrefixes
+                : Gemma4OnTheFlyQuantization.defaultExcludedPathPrefixes
+            let count = await container.perform { context in
+                Gemma4OnTheFlyQuantization.apply(
+                    to: context.model,
+                    bits: bits,
+                    groupSize: self.quantizeGroupSize,
+                    mode: mode,
+                    excludedPathPrefixes: excluded
+                )
+            }
+            let scope = quantizeTextOnly ? "text-only" : "all"
+            print("On-the-fly quant (\(scope)): \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue))")
+        }
+
+        // 2b. Detecter si modele unified (gemma4_unified, ex: 12B) -> path dedie.
+        let isUnified: Bool = await container.perform { context in
+            context.model is Gemma4UnifiedMultimodalLLMModel
+        }
+        if isUnified {
+            try await runUnified(container: container)
+            return
+        }
 
         // 3. Preparer les inputs multimodaux
         let numImages = image.count
@@ -810,6 +896,244 @@ struct Describe: AsyncParsableCommand {
         } else {
             print("Tokens: \(tokenCount)")
         }
+        print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
+        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+    }
+
+    // MARK: - gemma4_unified (12B) path
+
+    /// Pipeline multimodal pour gemma4_unified (12B) : patches 48x48 + chunks PCM 640.
+    /// Reutilise le meme tokenizer + chat template + boucle generation que le path
+    /// E2B/E4B, mais (1) preprocesse images via patches/positionIds et
+    /// (2) expanse les image_token par le nombre VARIABLE de patches valides.
+    fileprivate func runUnified(container: ModelContainer) async throws {
+        // Recuperer la config vision/audio depuis le modele.
+        let (visionConfig, audioConfig, videoSoftTokensPerFrame): (Gemma4UnifiedVisionConfig?, Gemma4UnifiedAudioConfig?, Int) =
+            await container.perform { context in
+                guard let m = context.model as? Gemma4UnifiedMultimodalLLMModel else {
+                    return (nil, nil, 70)
+                }
+                return (m.config.visionConfig, m.config.audioConfig, m.config.visionSoftTokensPerVideoFrame)
+            }
+
+        // --- 1. Preprocess images ---
+        var imagePatchesList: [MLXArray] = []
+        var imagePositionsList: [MLXArray] = []
+        var validPatchesPerImage: [Int] = []
+
+        if !image.isEmpty {
+            guard let vcfg = visionConfig else {
+                print("Erreur: modele sans vision_config.")
+                throw ExitCode.failure
+            }
+            for imagePath in image {
+                print("Traitement de l'image: \(imagePath)")
+                let imageURL = URL(fileURLWithPath: imagePath)
+                let processed = try Gemma4UnifiedImageProcessor.processImage(url: imageURL, config: vcfg)
+                imagePatchesList.append(processed.patches)
+                imagePositionsList.append(processed.positionIds)
+                validPatchesPerImage.append(processed.validPatches)
+                print("  -> \(processed.validPatches) patches valides (sur \(processed.patches.dim(0)) padded)")
+            }
+        }
+        let hasImage = !imagePatchesList.isEmpty
+
+        // --- 1b. Preprocess video ---
+        var videoFramePatchesList: [MLXArray] = []
+        var videoFramePositionsList: [MLXArray] = []
+        var videoValidPatchesPerFrame: [Int] = []
+        var videoTimestamps: [Double] = []
+
+        if let videoPath = video {
+            guard let vcfg = visionConfig else {
+                print("Erreur: modele sans vision_config.")
+                throw ExitCode.failure
+            }
+            print("Traitement de la video: \(videoPath)")
+            let videoURL = URL(fileURLWithPath: videoPath)
+            let processed = try await Gemma4UnifiedVideoProcessor.processVideo(
+                url: videoURL, config: vcfg, softTokensPerFrame: videoSoftTokensPerFrame
+            )
+            for f in processed.frames {
+                videoFramePatchesList.append(f.patches)
+                videoFramePositionsList.append(f.positionIds)
+                videoValidPatchesPerFrame.append(f.validPatches)
+            }
+            videoTimestamps = processed.timestamps
+            print("  -> \(processed.frames.count) frames, \(videoSoftTokensPerFrame) tokens/frame max, fps source=\(String(format: "%.1f", processed.sourceFPS))")
+        }
+        let hasVideo = !videoFramePatchesList.isEmpty
+        let numVideoFrames = videoFramePatchesList.count
+
+        // --- 2. Preprocess audio ---
+        var audioFeatures: Gemma4UnifiedAudioProcessor.ProcessedAudio?
+        if let audioPath = audio {
+            guard let acfg = audioConfig else {
+                print("Erreur: modele sans audio_config.")
+                throw ExitCode.failure
+            }
+            print("Traitement de l'audio: \(audioPath)")
+            let audioURL = URL(fileURLWithPath: audioPath)
+            audioFeatures = try await Gemma4UnifiedAudioProcessor.processAudio(url: audioURL, config: acfg)
+            print("  -> \(audioFeatures!.numTokens) tokens (\(String(format: "%.2f", audioFeatures!.durationSeconds))s)")
+        }
+        let hasAudio = audioFeatures != nil
+        let numAudioTokens = audioFeatures?.numTokens ?? 0
+
+        // --- 3. Construire le contenu avec placeholders ---
+        var contentParts: [String] = []
+        if hasImage {
+            for _ in 0 ..< imagePatchesList.count {
+                contentParts.append("<|image|>")
+            }
+        }
+        if hasVideo {
+            for i in 0 ..< numVideoFrames {
+                let ts = Gemma4VideoProcessor.formatTimestamp(videoTimestamps[i])
+                contentParts.append("\(ts)\n<|video|>")
+            }
+        }
+        if hasAudio && numAudioTokens > 0 {
+            contentParts.append("<|audio|>")
+        }
+        contentParts.append(prompt)
+        let content = contentParts.joined(separator: "\n")
+
+        let messages: [[String: String]] = [["role": "user", "content": content]]
+        var tokenIds: [Int] = try await container.perform { context in
+            try context.tokenizer.applyChatTemplate(messages: messages)
+        }
+
+        // --- 4. Expanser les placeholders en respectant validPatches[i] par image/frame ---
+        let imageTokenId = Int(Gemma4Processor.imageTokenId)
+        let videoTokenId = Int(Gemma4Processor.videoTokenId)
+        let audioTokenId = Int(Gemma4Processor.audioTokenId)
+        let boiTokenId = Int(Gemma4Processor.boiTokenId)
+        let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+        let boaTokenId = Int(Gemma4Processor.boaTokenId)
+        let eoaTokenId = Int(Gemma4Processor.eoaTokenId)
+
+        var expandedTokenIds: [Int] = []
+        var imageIdx = 0
+        var videoIdx = 0
+        for tid in tokenIds {
+            if tid == imageTokenId {
+                expandedTokenIds.append(boiTokenId)
+                let n = imageIdx < validPatchesPerImage.count ? validPatchesPerImage[imageIdx] : 0
+                for _ in 0 ..< n { expandedTokenIds.append(imageTokenId) }
+                expandedTokenIds.append(eoiTokenId)
+                imageIdx += 1
+            } else if tid == videoTokenId {
+                expandedTokenIds.append(boiTokenId)
+                let n = videoIdx < videoValidPatchesPerFrame.count ? videoValidPatchesPerFrame[videoIdx] : 0
+                for _ in 0 ..< n { expandedTokenIds.append(videoTokenId) }
+                expandedTokenIds.append(eoiTokenId)
+                videoIdx += 1
+            } else if tid == audioTokenId {
+                expandedTokenIds.append(boaTokenId)
+                for _ in 0 ..< numAudioTokens { expandedTokenIds.append(audioTokenId) }
+                expandedTokenIds.append(eoaTokenId)
+            } else {
+                expandedTokenIds.append(tid)
+            }
+        }
+        tokenIds = expandedTokenIds
+        let inputIds = MLXArray(tokenIds.map { Int32($0) })
+
+        let imgCount = tokenIds.filter { $0 == imageTokenId }.count
+        let vidCount = tokenIds.filter { $0 == videoTokenId }.count
+        let audCount = tokenIds.filter { $0 == audioTokenId }.count
+        print("  image_token: \(imgCount), video_token: \(vidCount), audio_token: \(audCount), total: \(inputIds.shape[0])")
+
+        // --- 5. Stack patches/positions + injection ---
+        let stackedPatches: MLXArray? = imagePatchesList.isEmpty ? nil : stacked(imagePatchesList, axis: 0)
+        let stackedPositions: MLXArray? = imagePositionsList.isEmpty ? nil : stacked(imagePositionsList, axis: 0)
+        let stackedVideoPatches: MLXArray? = videoFramePatchesList.isEmpty ? nil : stacked(videoFramePatchesList, axis: 0)
+        let stackedVideoPositions: MLXArray? = videoFramePositionsList.isEmpty ? nil : stacked(videoFramePositionsList, axis: 0)
+
+        nonisolated(unsafe) let finalPatches = stackedPatches
+        nonisolated(unsafe) let finalPositions = stackedPositions
+        nonisolated(unsafe) let finalValid = validPatchesPerImage
+        nonisolated(unsafe) let finalVideoPatches = stackedVideoPatches
+        nonisolated(unsafe) let finalVideoPositions = stackedVideoPositions
+        nonisolated(unsafe) let finalVideoValid = videoValidPatchesPerFrame
+        nonisolated(unsafe) let finalAudio = audioFeatures
+
+        await container.perform { context in
+            guard let model = context.model as? Gemma4UnifiedMultimodalLLMModel else { return }
+            if finalPatches != nil {
+                model.pendingPixelPatches = finalPatches
+                model.pendingImagePositionIds = finalPositions
+                model.pendingValidPatches = finalValid
+            }
+            if finalVideoPatches != nil {
+                model.pendingVideoFramePatches = finalVideoPatches
+                model.pendingVideoFramePositionIds = finalVideoPositions
+                model.pendingVideoValidPatches = finalVideoValid
+            }
+            if let af = finalAudio {
+                model.pendingAudioFeatures = af.features
+                model.pendingAudioMask = af.mask
+            }
+        }
+
+        print("\n--- Generation multimodale (gemma4_unified) ---")
+        if hasImage { print("  Mode: vision (\(imagePatchesList.count) image(s))") }
+        if hasVideo { print("  Mode: video (\(numVideoFrames) frames)") }
+        if hasAudio { print("  Mode: audio") }
+        print("  Prompt: \(prompt)")
+        print("---")
+
+        // --- 6. Generation (meme boucle que path E2B/E4B) ---
+        let startTime = Date()
+        var tokenCount = 0
+        nonisolated(unsafe) let capturedInputIds = inputIds
+        let tokenFilter = Gemma4TokenFilter(mode: .disabled)
+
+        let result = try await container.perform { context in
+            var generatedTokens: [Int] = []
+            let params = GenerateParameters(
+                maxTokens: self.maxTokens,
+                temperature: self.temperature,
+                topP: 0.95
+            )
+            let cache = context.model.newCache(parameters: params)
+
+            let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
+            var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+
+            let maxTotalTokens = self.maxTokens * 3
+            var visibleTokens = 0
+
+            for _ in 0 ..< maxTotalTokens {
+                generatedTokens.append(Int(nextToken))
+                let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
+                let filtered = tokenFilter.process(tokenId: nextToken, text: text)
+                if !filtered.isEmpty {
+                    print(filtered, terminator: "")
+                    fflush(stdout)
+                    visibleTokens += 1
+                }
+                if tokenFilter.isEOS(nextToken) { break }
+                if visibleTokens >= self.maxTokens { break }
+
+                let nextInput = MLXArray([nextToken]).reshaped(1, 1)
+                let output = context.model(nextInput, cache: cache)
+                if self.temperature <= 0.01 {
+                    nextToken = argMax(output[0..., 0, 0...], axis: -1).item(Int32.self)
+                } else {
+                    let logits = output[0..., 0, 0...] / self.temperature
+                    let probs = softmax(logits, axis: -1)
+                    nextToken = MLXRandom.categorical(log(probs)).item(Int32.self)
+                }
+            }
+            return generatedTokens
+        }
+
+        tokenCount = result.count
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("\n\n--- Stats ---")
+        print("Tokens: \(tokenCount)")
         print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
         print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
     }

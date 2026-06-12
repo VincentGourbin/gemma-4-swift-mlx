@@ -40,10 +40,12 @@ public enum WeightSanitizer {
             if key.contains(".rope.") && key.hasSuffix(".freqs") { continue }
 
             // Skip audio si pas d'audio tower
-            if !hasAudio && (key.contains("audio_tower") || key.contains("embed_audio")) { continue }
+            if !hasAudio && (key.contains("audio_tower") || key.contains("embed_audio") || key.contains("audio_embedder")) { continue }
 
             // Skip vision si pas de vision tower
-            if !hasVision && (key.contains("vision_tower") || key.contains("embed_vision")) { continue }
+            // gemma4_unified ajoute un prefixe "vision_embedder.*" (patch embedder
+            // direct, sans SigLIP) en plus de "vision_tower" / "embed_vision".
+            if !hasVision && (key.contains("vision_tower") || key.contains("embed_vision") || key.contains("vision_embedder")) { continue }
 
             var newKey = key
             var newValue = value

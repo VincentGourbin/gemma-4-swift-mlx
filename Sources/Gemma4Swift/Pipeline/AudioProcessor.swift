@@ -88,8 +88,9 @@ public enum Gemma4AudioProcessor {
         return min(t, maxAudioTokens)
     }
 
-    /// Charge l'audio en PCM float32 mono 16kHz
-    static func loadAudioPCM(url: URL) async throws -> [Float] {
+    /// Charge l'audio en PCM float32 mono 16kHz.
+    /// Public car reutilise par [[Gemma4UnifiedAudioProcessor]].
+    public static func loadAudioPCM(url: URL) async throws -> [Float] {
         let file = try AVAudioFile(forReading: url)
         let origFormat = file.processingFormat
         let frameCount = AVAudioFrameCount(file.length)

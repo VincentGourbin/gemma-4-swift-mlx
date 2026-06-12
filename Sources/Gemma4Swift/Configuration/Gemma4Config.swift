@@ -46,8 +46,30 @@ public struct Gemma4Config: Codable {
             textConfig = try Gemma4TextConfig(from: decoder)
         }
 
-        visionConfig = try container.decodeIfPresent(Gemma4VisionConfig.self, forKey: .visionConfig)
-        audioConfig = try container.decodeIfPresent(Gemma4AudioConfig.self, forKey: .audioConfig)
+        // Tolerant decoding pour les variantes (e.g. gemma4_unified) qui exposent
+        // un schema vision/audio reduit. On loggue les erreurs de decoding pour
+        // ne pas masquer les vrais bugs (typos, types incorrects) tout en
+        // permettant le fallback text-only.
+        if container.contains(.visionConfig) {
+            do {
+                visionConfig = try container.decode(Gemma4VisionConfig.self, forKey: .visionConfig)
+            } catch {
+                FileHandle.standardError.write(Data("[Gemma4Config] vision_config present but decode failed (\(error)); fallback to text-only\n".utf8))
+                visionConfig = nil
+            }
+        } else {
+            visionConfig = nil
+        }
+        if container.contains(.audioConfig) {
+            do {
+                audioConfig = try container.decode(Gemma4AudioConfig.self, forKey: .audioConfig)
+            } catch {
+                FileHandle.standardError.write(Data("[Gemma4Config] audio_config present but decode failed (\(error)); fallback to text-only\n".utf8))
+                audioConfig = nil
+            }
+        } else {
+            audioConfig = nil
+        }
         imageTokenId = try container.decodeIfPresent(Int.self, forKey: .imageTokenId) ?? 258880
         audioTokenId = try container.decodeIfPresent(Int.self, forKey: .audioTokenId) ?? 258881
         videoTokenId = try container.decodeIfPresent(Int.self, forKey: .videoTokenId) ?? 258884

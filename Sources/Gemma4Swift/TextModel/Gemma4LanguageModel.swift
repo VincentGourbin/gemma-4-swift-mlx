@@ -36,13 +36,15 @@ public class Gemma4LanguageModel: Module {
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> MLXArray {
         var out = model(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
             cache: cache,
-            perLayerInputs: perLayerInputs
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
         )
 
         // Tied word embeddings: utiliser embed_tokens comme linear
@@ -63,13 +65,15 @@ public class Gemma4LanguageModel: Module {
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> LanguageForwardOutput {
         let textOut = model.forwardCollectingIntermediates(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
             cache: cache,
-            perLayerInputs: perLayerInputs
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
         )
 
         var logits = model.embedTokens.asLinear(textOut.hidden)
@@ -91,10 +95,31 @@ public class Gemma4LanguageModel: Module {
     /// nombre de couches full attention et la taille des KV heads sont
     /// suffisants pour que le gain de compression depasse l'overhead.
     public func turboQuantViable(bits: Float) -> (viable: Bool, fullAttnLayers: Int, kvHeadDim: Int, reason: String) {
+        Self.turboQuantViability(config: config, bits: bits)
+    }
+
+    /// Heuristique pure-fonction (testable sans MLX). Estime le gain RAM TurboQuant
+    /// a un contexte de reference (16K) et compare a l'overhead fixe estime.
+    ///
+    /// IMPORTANT — biais corrige : sur les modeles MQA full attention (ex: 12B
+    /// Unified avec `attention_k_eq_v=true` + `num_global_key_value_heads=1`),
+    /// les couches full_attention n'ont que 1 KV head et non `num_key_value_heads`.
+    /// Le gain TurboQuant est proportionnel au nombre de KV heads SUR full_attention,
+    /// donc utiliser `num_key_value_heads` (8 sur 12B) surestime massivement le
+    /// gain et active TQ alors qu'il est couteux en perf.
+    public static func turboQuantViability(
+        config: Gemma4TextConfig, bits: Float
+    ) -> (viable: Bool, fullAttnLayers: Int, kvHeadDim: Int, reason: String) {
         let layerTypes = config.resolvedLayerTypes
         let concreteLayers = Array(layerTypes[..<config.firstKvSharedLayerIdx])
         let fullAttnCount = concreteLayers.filter { $0 == "full_attention" }.count
-        let kvHeads = config.numKeyValueHeads
+
+        let fullAttnKvHeads: Int
+        if config.attentionKEqV, let globalKvH = config.numGlobalKeyValueHeads {
+            fullAttnKvHeads = globalKvH
+        } else {
+            fullAttnKvHeads = config.numKeyValueHeads
+        }
         let headDim = config.globalHeadDim > 0 ? config.globalHeadDim : config.headDim
 
         // Overhead fixe ~500 Mo process (graph MLX, codecs, rotation matrices)
@@ -104,8 +129,8 @@ public class Gemma4LanguageModel: Module {
         //   Rotation: D * D * 4 * 2 (key+value codecs)
         let T = 16000 // reference context
         let packedWidth = (headDim * Int(bits) + 31) / 32
-        let bf16PerLayer = T * headDim * kvHeads * 2 * 2
-        let tqPerLayer = T * (2 + packedWidth * 4) * kvHeads * 2
+        let bf16PerLayer = T * headDim * fullAttnKvHeads * 2 * 2
+        let tqPerLayer = T * (2 + packedWidth * 4) * fullAttnKvHeads * 2
         let rotPerLayer = headDim * headDim * 4 * 2
         let savingPerLayer = bf16PerLayer - tqPerLayer - rotPerLayer
         let totalSaving = savingPerLayer * fullAttnCount
@@ -115,9 +140,9 @@ public class Gemma4LanguageModel: Module {
             return (false, fullAttnCount, headDim, "trop peu de couches full attention (\(fullAttnCount))")
         }
         if totalSaving < overheadEstimate / 2 {
-            return (false, fullAttnCount, headDim, "gain estime \(totalSaving / 1024 / 1024) Mo < overhead ~500 Mo a 16K tokens")
+            return (false, fullAttnCount, headDim, "gain estime \(totalSaving / 1024 / 1024) Mo < overhead ~500 Mo a 16K tokens (full_attn kv_heads=\(fullAttnKvHeads))")
         }
-        return (true, fullAttnCount, headDim, "gain estime \(totalSaving / 1024 / 1024) Mo a 16K tokens sur \(fullAttnCount) couches")
+        return (true, fullAttnCount, headDim, "gain estime \(totalSaving / 1024 / 1024) Mo a 16K tokens sur \(fullAttnCount) couches (kv_heads=\(fullAttnKvHeads))")
     }
 
     /// Cree les caches KV pour chaque couche concrete (non-partagee)

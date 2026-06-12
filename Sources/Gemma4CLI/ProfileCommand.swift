@@ -56,6 +56,18 @@ struct ProfileRun: AsyncParsableCommand {
     @Option(name: .long, help: "Bits de quantisation KV cache TurboQuant (3, 4)")
     var kvBits: Int?
 
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee des poids (4, 6, 8). Mesure perf apres quantization.")
+    var quantizeBits: Int?
+
+    @Option(name: .customLong("quantize-group-size"), help: "Group size de quantization (defaut 64)")
+    var quantizeGroupSize: Int = 64
+
+    @Option(name: .customLong("quantize-mode"), help: "Mode quantization : affine | mxfp4 | mxfp8")
+    var quantizeMode: String = "affine"
+
+    @Flag(name: .customLong("quantize-text-only"), help: "Si actif: ne quantize QUE le decoder texte.")
+    var quantizeTextOnly: Bool = false
+
     @Option(name: .long, help: "Repertoire de sortie pour les traces")
     var output: String?
 
@@ -86,6 +98,29 @@ struct ProfileRun: AsyncParsableCommand {
             throw ExitCode.failure
         }
         let container = try await loadLocalModel(path: path)
+
+        // Quantification a la volee : ajoute le compte dans la phase load.
+        if let bits = quantizeBits {
+            guard let mode = Gemma4OnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
+                print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
+                throw ExitCode.failure
+            }
+            let excluded = quantizeTextOnly
+                ? Gemma4OnTheFlyQuantization.multimodalEncoderPrefixes
+                : Gemma4OnTheFlyQuantization.defaultExcludedPathPrefixes
+            let count = await container.perform { context in
+                Gemma4OnTheFlyQuantization.apply(
+                    to: context.model,
+                    bits: bits,
+                    groupSize: self.quantizeGroupSize,
+                    mode: mode,
+                    excludedPathPrefixes: excluded
+                )
+            }
+            let scope = quantizeTextOnly ? "text-only" : "all"
+            session.metadata["onTheFlyQuantization"] = "\(bits)-bit g=\(quantizeGroupSize) \(mode.rawValue) scope=\(scope)"
+            print("On-the-fly quantization (\(scope)): \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue))")
+        }
 
         session.endPhase("1. Model Loading", category: .modelLoad)
 
