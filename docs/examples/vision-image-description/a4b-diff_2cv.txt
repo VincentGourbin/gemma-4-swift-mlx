@@ -1,0 +1,159 @@
+# DiffusionGemma 26B-A4B-it (bf16) — 2CV (Citroën) Vehicle Identification
+
+## Setup
+Model : google/diffusiongemma-26B-A4B-it (block-AR diffusion, canvas 256)
+Image : input_sample.jpg (1920×1280)
+Prompt : "Describe this image in detail. What type of vehicle is this? What color? What is the setting?"
+
+3 runs avec parametres de diversite differents.
+
+================================================================================
+=== RUN_1_default (--max-blocks 1) ===
+
+--- DiffusionGemma loader (Phase 4 experimental) ---
+Repertoire : /Users/vincent/Library/Caches/models/google/diffusiongemma-26B-A4B-it
+Modele charge en 10.5s
+Config: hidden=2816, layers=30, canvas=256, vocab=262144
+GPU: 49255 Mo actifs, 49255 Mo pic
+Image preprocessee : [1, 3, 624, 960]
+Prompt tokens : 318
+Premiers tokens : [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880]
+
+--- Generation ---
+max_blocks=1, canvas_length=256, max_denoising_steps=48
+temperature schedule : 0.4 -> 0.8, seed=0
+---
+[canvas 0] This image shows a profile view of a classic Citroën 2CV, commonly known as a "Dechville."
+
+**Vehicle:**
+The vehicle is a vintage automobile characterized by its iconic rounded, aerodynamic shape, prominent fenders, and distinct curved windows. It is painted a vibrant red. The car features chrome accents on the bumpers, hubcaps, and side mirrors. There are a few small stickers visible on the rear side window.
+
+**Setting:**
+The car is parked on a flat surface made of grey gravel and dirt. The background consists of a dense wall of lush green foliage, including various trees and bushes, creating a natural backdrop that contrasts with the bright red color of the vehicle. The lighting appears to be even, suggesting an overcast day.<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Output complete ---
+This image shows a profile view of a classic Citroën 2CV, commonly known as a "Dechville."
+
+**Vehicle:**
+The vehicle is a vintage automobile characterized by its iconic rounded, aerodynamic shape, prominent fenders, and distinct curved windows. It is painted a vibrant red. The car features chrome accents on the bumpers, hubcaps, and side mirrors. There are a few small stickers visible on the rear side window.
+
+**Setting:**
+The car is parked on a flat surface made of grey gravel and dirt. The background consists of a dense wall of lush green foliage, including various trees and bushes, creating a natural backdrop that contrasts with the bright red color of the vehicle. The lighting appears to be even, suggesting an overcast day.<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Stats ---
+Tokens generes : 256
+Canvases : 1
+Decoder forwards : 9
+Temps : 11.18s
+Vitesse : 22.9 tok/s (1.24s/step)
+GPU pic : 50789 Mo
+
+================================================================================
+=== RUN_2_seed1234 (--max-blocks 1 --seed 1234) ===
+
+--- DiffusionGemma loader (Phase 4 experimental) ---
+Repertoire : /Users/vincent/Library/Caches/models/google/diffusiongemma-26B-A4B-it
+Modele charge en 8.9s
+Config: hidden=2816, layers=30, canvas=256, vocab=262144
+GPU: 49255 Mo actifs, 49255 Mo pic
+Image preprocessee : [1, 3, 624, 960]
+Prompt tokens : 318
+Premiers tokens : [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880]
+
+--- Generation ---
+max_blocks=1, canvas_length=256, max_denoising_steps=48
+temperature schedule : 0.4 -> 0.8, seed=1234
+---
+[canvas 0] This image shows a side-profile view of a classic car.
+
+**Vehicle Type:**
+The vehicle is a **Citroën 2CV**, an iconic French economy car produced for several decades. It is easily recognizable by its rounded, aerodynamic shape, distinct curved fenders, and vintage-style design.
+
+**Color:**
+The car is a vibrant **red**. It features silver chrome accents on the bumpers, hubcaps, and side mirror. 
+
+**Setting:**
+The car is parked on a grey gravel and dirt surface. The background consists of a lush, dense wall of green foliage, including trees and leafy bushes, creating a secluded or wooded atmosphere. The lighting appears to be natural daylight, suggesting an overcast day as which minimizes harsh shadows on the vehicle's body.<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Output complete ---
+This image shows a side-profile view of a classic car.
+
+**Vehicle Type:**
+The vehicle is a **Citroën 2CV**, an iconic French economy car produced for several decades. It is easily recognizable by its rounded, aerodynamic shape, distinct curved fenders, and vintage-style design.
+
+**Color:**
+The car is a vibrant **red**. It features silver chrome accents on the bumpers, hubcaps, and side mirror. 
+
+**Setting:**
+The car is parked on a grey gravel and dirt surface. The background consists of a lush, dense wall of green foliage, including trees and leafy bushes, creating a secluded or wooded atmosphere. The lighting appears to be natural daylight, suggesting an overcast day as which minimizes harsh shadows on the vehicle's body.<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Stats ---
+Tokens generes : 256
+Canvases : 1
+Decoder forwards : 15
+Temps : 14.22s
+Vitesse : 18.0 tok/s (0.95s/step)
+GPU pic : 50789 Mo
+
+================================================================================
+=== RUN_3_hot (--max-blocks 1 --seed 42 --t-min 1.0 --t-max 1.8) ===
+
+--- DiffusionGemma loader (Phase 4 experimental) ---
+Repertoire : /Users/vincent/Library/Caches/models/google/diffusiongemma-26B-A4B-it
+Modele charge en 8.6s
+Config: hidden=2816, layers=30, canvas=256, vocab=262144
+GPU: 49255 Mo actifs, 49255 Mo pic
+Image preprocessee : [1, 3, 624, 960]
+Prompt tokens : 318
+Premiers tokens : [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880]
+
+--- Generation ---
+max_blocks=1, canvas_length=256, max_denoising_steps=48
+temperature schedule : 1.0 -> 1.8, seed=42
+---
+[canvas 0] This image shows a side-profile view of a vintage automobile.
+
+**Vehicle Type:**
+The vehicle is a **Citroën 2CV**, an iconic French economy car. It is easily recognizable by its delevively rounded, aerodynamic shape, distinct rounded fenders, and sloping roofline.
+
+**Color:**
+The car is a vibrant, solid **red**.
+
+**Setting:**
+The car is parked on a flat area of light grey gravel and dirt. The background consists of a dense, lush wall of green leafy foliage and trees, suggesting a wooded or garden setting. The lighting appears to be natural daylight, creating soft shadows.
+
+**Detailed Features:**
+* **Body:** The car has a two-door hatchback design with curved lines. The wheel arches are prominent and semi-circular.
+* **Wheels:** It features classic silver steel wheels with polished chrome hubcaps.
+* **Windows:** The side windows are large, and the rear window is angled. There are some small stickers visible on the rear quarter window.
+* **Details:** Chrome accents are visible on the front bumper, the side mirror, and the door handles. A black running board runs along the bottom edge of the body between the wheels.
+* **Condition:** The
+
+--- Output complete ---
+This image shows a side-profile view of a vintage automobile.
+
+**Vehicle Type:**
+The vehicle is a **Citroën 2CV**, an iconic French economy car. It is easily recognizable by its delevively rounded, aerodynamic shape, distinct rounded fenders, and sloping roofline.
+
+**Color:**
+The car is a vibrant, solid **red**.
+
+**Setting:**
+The car is parked on a flat area of light grey gravel and dirt. The background consists of a dense, lush wall of green leafy foliage and trees, suggesting a wooded or garden setting. The lighting appears to be natural daylight, creating soft shadows.
+
+**Detailed Features:**
+* **Body:** The car has a two-door hatchback design with curved lines. The wheel arches are prominent and semi-circular.
+* **Wheels:** It features classic silver steel wheels with polished chrome hubcaps.
+* **Windows:** The side windows are large, and the rear window is angled. There are some small stickers visible on the rear quarter window.
+* **Details:** Chrome accents are visible on the front bumper, the side mirror, and the door handles. A black running board runs along the bottom edge of the body between the wheels.
+* **Condition:** The
+
+--- Stats ---
+Tokens generes : 256
+Canvases : 1
+Decoder forwards : 48
+Temps : 33.94s
+Vitesse : 7.5 tok/s (0.71s/step)
+GPU pic : 50789 Mo
+
+================================================================================
