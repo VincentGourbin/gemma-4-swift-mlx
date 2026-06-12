@@ -243,8 +243,11 @@ final class BenchViewModel: ObservableObject {
         diffusionPanel.phase = .loading(detail: "Chargement \(diffusionModelID) (~48 Go bf16)…")
         diffusionPanel.status = "Chargement…"
         do {
+            // includeVision: true car le checkpoint a vision_config != nil,
+            // donc DiffusionGemmaEncoderModel instancie quand meme vision_tower
+            // qui attend ses poids (~600 MB additionnels).
             let (model, config) = try DiffusionGemmaLoader.load(
-                from: diffusionPath, includeVision: false
+                from: diffusionPath, includeVision: true
             )
             diffusionModel = model
             diffusionConfig = config
