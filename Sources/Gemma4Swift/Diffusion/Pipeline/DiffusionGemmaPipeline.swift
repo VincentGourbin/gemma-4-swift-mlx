@@ -76,16 +76,22 @@ public actor DiffusionGemmaPipeline {
     ///   - promptIds : `[B, T_prompt]` int. Tokens du prompt initial.
     ///   - maxBlocks : nombre max de canvases (chacun de `canvas_length` tokens).
     ///   - seed : seed pour le PRNG (sampler + initialize_canvas).
-    ///   - onCanvas : callback optionnel apres chaque canvas (utile pour streaming).
+    ///   - onCanvas : callback optionnel apres chaque canvas commit. Equivalent
+    ///     du `streamer.put(canvas)` cote Python.
+    ///   - onStep : callback optionnel apres CHAQUE step de denoising. Recoit
+    ///     `(canvasIdx, step, argmaxCanvas)` — le draft courant decode avec
+    ///     argmax. Equivalent du `streamer.put_draft(argmax_canvas)` cote
+    ///     Python (= passer par le VAE a chaque step en diffusion image).
+    ///     Permet d'observer la convergence du denoising en live.
     /// - Returns: tokens generes + stats.
     public func generate(
         promptIds: MLXArray,
         maxBlocks: Int = 4,
         seed: UInt64 = 0,
-        onCanvas: ((Int, MLXArray) -> Void)? = nil
+        onCanvas: ((Int, MLXArray) -> Void)? = nil,
+        onStep: ((_ canvasIdx: Int, _ step: Int, _ argmaxCanvas: MLXArray) -> Void)? = nil
     ) -> DiffusionGenerationResult {
         var key = MLXRandom.key(seed)
-        let canvasLength = model.config.textConfig.canvasLength
         let batchSize = promptIds.dim(0)
         let eosSet = Set(genConfig.eosTokenIds.map { Int32($0) })
 
@@ -124,6 +130,10 @@ public actor DiffusionGemmaPipeline {
                 let (kS, kN) = splitKey(key: &rngKey)
                 let denoiserCanvas = MLXRandom.categorical(scaled, axis: -1, key: kS).asType(.int32)
                 rngKey = kN
+
+                // Streaming step-by-step : observer la convergence du denoising.
+                // Equivalent du `streamer.put_draft(argmax_canvas)` Python.
+                onStep?(canvasIdx, step, argmaxCanvas)
 
                 // d) accept / stopping / renoise
                 canvas = sampler.accept(

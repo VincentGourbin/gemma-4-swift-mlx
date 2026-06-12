@@ -50,6 +50,12 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Mode dry-run keys : instancie le modele sans poids, compare avec le safetensors index si present. N'instancie PAS de tensor lourd.")
     var validateKeys: Bool = false
 
+    @Flag(name: .long, help: "Streaming step-by-step : affiche le canvas decode (argmax) apres CHAQUE step de denoising. Equivalent du `streamer.put_draft` Python = voir le texte se debruiter en live.")
+    var streamSteps: Bool = false
+
+    @Option(name: .long, help: "Avec --stream-steps : effacer l'ecran entre steps (ANSI clear). Defaut: print en-place sans effacer.")
+    var streamMode: String = "inplace"
+
     @Argument(help: "Prompt utilisateur")
     var prompt: String = "Hello"
 
@@ -141,17 +147,52 @@ struct DiffusionCommand: AsyncParsableCommand {
         print("max_blocks=\(maxBlocks), canvas_length=\(config.textConfig.canvasLength), max_denoising_steps=\(genConfig.maxDenoisingSteps)")
         print("---")
 
+        // Captures pour les closures (Sendable Tokenizer copy)
+        let captureTokenizer = tokenizer
+        let captureStreamMode = streamMode
+
         let genStart = Date()
-        let result = await pipeline.generate(
-            promptIds: promptIds,
-            maxBlocks: maxBlocks,
-            seed: seed
-        ) { canvasIdx, canvas in
-            // Decode each canvas as it lands
-            canvas.eval()
-            let tokens = canvas.asArray(Int32.self).map { Int($0) }
-            let text = tokenizer.decode(tokens: tokens)
-            print("[canvas \(canvasIdx)] \(text)")
+        let result: DiffusionGenerationResult
+        if streamSteps {
+            // Stream chaque step : decode l'argmax_canvas et l'affiche en place
+            result = await pipeline.generate(
+                promptIds: promptIds,
+                maxBlocks: maxBlocks,
+                seed: seed,
+                onCanvas: { canvasIdx, canvas in
+                    canvas.eval()
+                    let tokens = canvas.asArray(Int32.self).map { Int($0) }
+                    let text = captureTokenizer.decode(tokens: tokens)
+                    print("\n[canvas \(canvasIdx) COMMITTED] \(text)\n")
+                },
+                onStep: { canvasIdx, step, argmaxCanvas in
+                    argmaxCanvas.eval()
+                    let tokens = argmaxCanvas.asArray(Int32.self).map { Int($0) }
+                    let text = captureTokenizer.decode(tokens: tokens)
+                    if captureStreamMode == "clear" {
+                        // Efface l'ecran + curseur en haut a gauche
+                        print("\u{001B}[2J\u{001B}[H", terminator: "")
+                    }
+                    print("[c\(canvasIdx) step \(String(format: "%2d", step))] \(text)")
+                    if captureStreamMode == "inplace" {
+                        // Separateur leger
+                        print(String(repeating: "-", count: 80))
+                    }
+                    fflush(stdout)
+                }
+            )
+        } else {
+            result = await pipeline.generate(
+                promptIds: promptIds,
+                maxBlocks: maxBlocks,
+                seed: seed,
+                onCanvas: { canvasIdx, canvas in
+                    canvas.eval()
+                    let tokens = canvas.asArray(Int32.self).map { Int($0) }
+                    let text = captureTokenizer.decode(tokens: tokens)
+                    print("[canvas \(canvasIdx)] \(text)")
+                }
+            )
         }
         let genTime = Date().timeIntervalSince(genStart)
 
