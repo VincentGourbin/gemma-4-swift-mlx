@@ -49,10 +49,13 @@ public class DiffusionGemmaForBlockDiffusion: Module {
     }
 
     /// Calcule les logits depuis les hidden states du decoder.
-    /// tie_word_embeddings = true : on reutilise decoder.embed_tokens.weight.
+    /// tie_word_embeddings = true : on reutilise decoder.embed_tokens via asLinear
+    /// (override par QuantizedEmbedding pour gerer la dequantization au vol).
     public func computeLogits(_ hiddenStates: MLXArray) -> MLXArray {
-        let weight = decoder.embedTokens.weight  // [vocab, hidden]
-        let logits = matmul(hiddenStates, weight.T)
+        // asLinear fait x @ weight.T en interne, et fonctionne aussi bien
+        // pour Embedding standard que pour QuantizedEmbedding (qui dequantize
+        // automatiquement le pack 4-bit/8-bit lors du matmul).
+        let logits = decoder.embedTokens.asLinear(hiddenStates)
         return applyLogitSoftcapping(logits.asType(.float32))
     }
 
