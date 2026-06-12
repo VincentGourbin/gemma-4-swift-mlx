@@ -158,6 +158,15 @@ public actor DiffusionGemmaPipeline {
                 rngKey = kNext
 
                 prevLogits = scaled
+
+                // Note : on a teste asyncEval(canvas, prevLogits, argmaxCanvas) ici
+                // pour casser le graph entre steps. Resultat : gain ~0 sur le
+                // temps et 0 sur la memoire. Le shouldStop.all().item(...) ligne
+                // 152 force deja un eval qui materialise le graph du step en
+                // cours. Les ~260 MB qui croissent par canvas ne sont pas une
+                // fuite : c'est le KV cache encoder qui grossit avec la longueur
+                // du prompt cumule (commit canvas precedents). O(N) attendu.
+                // Vraie optim possible : encoder KV cache incremental + quantization.
             }
 
             totalSteps += stepsExecuted
