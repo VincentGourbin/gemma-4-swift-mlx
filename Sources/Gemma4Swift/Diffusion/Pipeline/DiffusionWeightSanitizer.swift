@@ -57,7 +57,7 @@ public enum DiffusionWeightSanitizer {
             // Skip rotary_emb pre-computed frequencies
             if key.contains("rotary_emb") { continue }
 
-            // Skip vision (Phase 4+)
+            // Skip vision si non demande (Phase 4 default)
             if !includeVision {
                 if key.contains("vision_tower") || key.contains("embed_vision") {
                     continue
@@ -70,49 +70,48 @@ public enum DiffusionWeightSanitizer {
                 stripped = String(stripped.dropFirst("model.".count))
             }
 
-            // Cas 1 : encoder.language_model.* -> encoder.*
-            //   Seuls layer_scalar / embed_tokens / norm doivent etre maintenus
-            //   pour encoder. layer_scalar est SPECIFIC encoder. Les autres
-            //   (embed_tokens, norm) sont tied avec le decoder mais on les
-            //   charge cote encoder aussi pour avoir une hierarchie complete.
+            // Cas 1 : encoder.language_model.* (typically: layer_scalar specific)
+            //   -> encoder.language_model.* (on garde le chemin tel quel)
             if stripped.hasPrefix("encoder.language_model.") {
-                let rest = String(stripped.dropFirst("encoder.language_model.".count))
-                let target = "encoder." + rest
-                insert(into: &result, key: target, value: value)
+                insert(into: &result, key: stripped, value: value)
                 continue
             }
 
-            // Cas 2 : decoder.* -> decoder.* + duplique vers encoder.* sauf layer_scalar
+            // Cas 2 : encoder.vision_tower.* / encoder.embed_vision.* -> idem
+            if stripped.hasPrefix("encoder.vision_tower.")
+                || stripped.hasPrefix("encoder.embed_vision.") {
+                insert(into: &result, key: stripped, value: value)
+                continue
+            }
+
+            // Cas 3 : decoder.* -> decoder.* + duplique vers encoder.language_model.*
+            //   sauf layer_scalar et self_conditioning qui restent decoder-only.
             if stripped.hasPrefix("decoder.") {
                 let rest = String(stripped.dropFirst("decoder.".count))
                 let decoderTarget = "decoder." + rest
 
-                // self_conditioning : decoder-only, pas de duplication
+                // self_conditioning : decoder-only
                 if rest.hasPrefix("self_conditioning.") {
                     insert(into: &result, key: decoderTarget, value: value)
                     continue
                 }
 
-                // layer_scalar : decoder-only, pas de duplication
+                // layer_scalar : decoder-only (le scalar encoder vient de
+                // encoder.language_model.layers.N.layer_scalar)
                 if rest.hasSuffix(".layer_scalar") {
                     insert(into: &result, key: decoderTarget, value: value)
                     continue
                 }
 
                 // Tous les autres poids (embed_tokens, norm, layers.N.{X != layer_scalar})
-                // sont tied avec encoder. On insere les deux.
+                // sont tied : on les insere dans decoder ET dans encoder.language_model.
                 insert(into: &result, key: decoderTarget, value: value)
-
-                // Duplique vers encoder uniquement pour ce qui existe cote encoder :
-                //  - embed_tokens.weight
-                //  - norm.weight
-                //  - layers.N.X
-                let encoderTarget = "encoder." + rest
+                let encoderTarget = "encoder.language_model." + rest
                 insert(into: &result, key: encoderTarget, value: value)
                 continue
             }
 
-            // Cas 3 : tout le reste, on laisse passer apres strip "model."
+            // Cas 4 : tout le reste, on laisse passer
             insert(into: &result, key: stripped, value: value)
         }
 

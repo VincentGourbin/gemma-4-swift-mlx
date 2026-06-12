@@ -34,14 +34,14 @@ public struct DiffusionEncoderOutput: @unchecked Sendable {
 
 /// Encoder text model DiffusionGemma.
 public class DiffusionGemmaEncoderTextModel: Module {
-    let config: Gemma4TextConfig
-    let useBidirectionalAttention: String
+    public let config: Gemma4TextConfig
+    public let useBidirectionalAttention: String
 
-    @ModuleInfo(key: "embed_tokens") var embedTokens: Embedding
-    @ModuleInfo var layers: [DiffusionGemmaEncoderTextLayer]
-    @ModuleInfo var norm: RMSNorm
+    @ModuleInfo(key: "embed_tokens") public var embedTokens: Embedding
+    @ModuleInfo public var layers: [DiffusionGemmaEncoderTextLayer]
+    @ModuleInfo public var norm: RMSNorm
 
-    let embedScale: Float
+    public let embedScale: Float
 
     public init(_ textConfig: DiffusionGemmaTextConfig) {
         self.config = textConfig.base

@@ -7,10 +7,14 @@
 import Foundation
 
 /// Top-level config DiffusionGemma (model_type = "diffusion_gemma").
+///
+/// `visionConfig` est un `Gemma4VisionConfig` (SigLIP-like, ~27 layers,
+/// hidden 1152, head_dim 72) — PAS `Gemma4UnifiedVisionConfig` qui decrit
+/// le patch-projector du 12B.
 public struct DiffusionGemmaConfig: Decodable, @unchecked Sendable {
     public let modelType: String
     public let textConfig: DiffusionGemmaTextConfig
-    public let visionConfig: Gemma4UnifiedVisionConfig?
+    public let visionConfig: Gemma4VisionConfig?
 
     // Tokens speciaux (identiques a gemma4_unified)
     public let imageTokenId: Int
@@ -34,7 +38,7 @@ public struct DiffusionGemmaConfig: Decodable, @unchecked Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         modelType = try c.decodeIfPresent(String.self, forKey: .modelType) ?? "diffusion_gemma"
         textConfig = try c.decode(DiffusionGemmaTextConfig.self, forKey: .textConfig)
-        visionConfig = try c.decodeIfPresent(Gemma4UnifiedVisionConfig.self, forKey: .visionConfig)
+        visionConfig = try c.decodeIfPresent(Gemma4VisionConfig.self, forKey: .visionConfig)
         imageTokenId = try c.decodeIfPresent(Int.self, forKey: .imageTokenId) ?? 258880
         boiTokenId = try c.decodeIfPresent(Int.self, forKey: .boiTokenId) ?? 255999
         eoiTokenId = try c.decodeIfPresent(Int.self, forKey: .eoiTokenId) ?? 258882

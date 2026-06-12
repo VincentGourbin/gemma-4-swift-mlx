@@ -86,6 +86,7 @@ public actor DiffusionGemmaPipeline {
     /// - Returns: tokens generes + stats.
     public func generate(
         promptIds: MLXArray,
+        pixelValues: MLXArray? = nil,
         maxBlocks: Int = 4,
         seed: UInt64 = 0,
         onCanvas: ((Int, MLXArray) -> Void)? = nil,
@@ -100,8 +101,12 @@ public actor DiffusionGemmaPipeline {
         var canvasesUsed = 0
 
         for canvasIdx in 0 ..< maxBlocks {
-            // 1) Encoder forward sur l'entierete du prompt + canvases deja commits
-            let encOut = model.encodePrompt(promptIds: fullIds)
+            // 1) Encoder forward sur l'entierete du prompt + canvases deja commits.
+            //    Note : on passe pixel_values a TOUS les canvases car le prompt
+            //    contient toujours les image_token_id qui doivent etre remplaces
+            //    par les soft-tokens vision. KV cache encoder incremental
+            //    (Phase 6) eliminera ce recalcul.
+            let encOut = model.encodePrompt(promptIds: fullIds, pixelValues: pixelValues)
 
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)

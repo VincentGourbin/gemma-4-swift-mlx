@@ -30,13 +30,13 @@ public class DiffusionGemmaForBlockDiffusion: Module {
     public let config: DiffusionGemmaConfig
     public let finalLogitSoftcapping: Float
 
-    @ModuleInfo(key: "encoder") var encoder: DiffusionGemmaEncoderTextModel
+    @ModuleInfo(key: "encoder") var encoder: DiffusionGemmaEncoderModel
     @ModuleInfo(key: "decoder") var decoder: DiffusionGemmaDecoderTextModel
 
     public init(_ config: DiffusionGemmaConfig) {
         self.config = config
         self.finalLogitSoftcapping = config.textConfig.base.finalLogitSoftcapping
-        self._encoder.wrappedValue = DiffusionGemmaEncoderTextModel(config.textConfig)
+        self._encoder.wrappedValue = DiffusionGemmaEncoderModel(config)
         self._decoder.wrappedValue = DiffusionGemmaDecoderTextModel(config.textConfig)
         super.init()
     }
@@ -57,8 +57,14 @@ public class DiffusionGemmaForBlockDiffusion: Module {
     }
 
     /// Encode un prompt et retourne le cache encoder + le last hidden state.
-    public func encodePrompt(promptIds: MLXArray) -> DiffusionEncoderOutput {
-        encoder(inputs: promptIds)
+    /// - Parameter pixelValues : si non nil, les images sont encodees par
+    ///   `vision_tower` puis splices dans inputs_embeds via masked_scatter
+    ///   aux positions `image_token_id`.
+    public func encodePrompt(
+        promptIds: MLXArray,
+        pixelValues: MLXArray? = nil
+    ) -> DiffusionEncoderOutput {
+        encoder(inputIds: promptIds, pixelValues: pixelValues)
     }
 
     /// Forward d'un step de denoising : canvas -> logits.

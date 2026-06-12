@@ -50,6 +50,9 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Mode dry-run keys : instancie le modele sans poids, compare avec le safetensors index si present. N'instancie PAS de tensor lourd.")
     var validateKeys: Bool = false
 
+    @Option(name: .long, help: "Chemin vers une image à passer au modèle (active le vision_tower). Requires --include-vision pour charger les poids vision.")
+    var image: String?
+
     @Flag(name: .long, help: "Streaming step-by-step : affiche le canvas decode (argmax) apres CHAQUE step de denoising. Equivalent du `streamer.put_draft` Python = voir le texte se debruiter en live.")
     var streamSteps: Bool = false
 
@@ -124,17 +127,60 @@ struct DiffusionCommand: AsyncParsableCommand {
         // 2) Tokenizer
         let tokenizer = try await AutoTokenizer.from(modelFolder: directory)
 
-        // 3) Tokeniser le prompt
+        // 2b) Image optionnelle
+        let pixelValues: MLXArray?
+        let numImageSoftTokens = config.visionSoftTokensPerImage  // 280
+        if let imagePath = image {
+            guard includeVision else {
+                print("Erreur : --image necessite --include-vision pour charger le vision_tower")
+                throw ExitCode.failure
+            }
+            let imageURL = URL(fileURLWithPath: imagePath)
+            let pixels = try Gemma4ImageProcessor.processImage(url: imageURL)
+            print("Image preprocessee : \(pixels.shape)")
+            pixelValues = pixels
+        } else {
+            pixelValues = nil
+        }
+
+        // 3) Tokeniser le prompt (avec <|image|> au debut si image fournie)
+        let content: String
+        if pixelValues != nil {
+            content = "<|image|>\n\(prompt)"
+        } else {
+            content = prompt
+        }
         let messages: [[String: String]]
         if system.isEmpty {
-            messages = [["role": "user", "content": prompt]]
+            messages = [["role": "user", "content": content]]
         } else {
             messages = [
                 ["role": "system", "content": system],
-                ["role": "user", "content": prompt],
+                ["role": "user", "content": content],
             ]
         }
-        let tokenIds = try tokenizer.applyChatTemplate(messages: messages)
+        var tokenIds = try tokenizer.applyChatTemplate(messages: messages)
+
+        // 3b) Expanser <|image|> en boi + image_token x N + eoi
+        if pixelValues != nil {
+            let imageTokenId = config.imageTokenId
+            let boiTokenId = config.boiTokenId
+            let eoiTokenId = config.eoiTokenId
+            var expanded: [Int] = []
+            for tid in tokenIds {
+                if tid == imageTokenId {
+                    expanded.append(boiTokenId)
+                    for _ in 0 ..< numImageSoftTokens {
+                        expanded.append(imageTokenId)
+                    }
+                    expanded.append(eoiTokenId)
+                } else {
+                    expanded.append(tid)
+                }
+            }
+            tokenIds = expanded
+        }
+
         let promptIds = MLXArray(tokenIds.map { Int32($0) }).reshaped(1, -1)
         print("Prompt tokens : \(tokenIds.count)")
         print("Premiers tokens : \(Array(tokenIds.prefix(10)))")
@@ -157,6 +203,7 @@ struct DiffusionCommand: AsyncParsableCommand {
             // Stream chaque step : decode l'argmax_canvas et l'affiche en place
             result = await pipeline.generate(
                 promptIds: promptIds,
+                pixelValues: pixelValues,
                 maxBlocks: maxBlocks,
                 seed: seed,
                 onCanvas: { canvasIdx, canvas in
@@ -184,6 +231,7 @@ struct DiffusionCommand: AsyncParsableCommand {
         } else {
             result = await pipeline.generate(
                 promptIds: promptIds,
+                pixelValues: pixelValues,
                 maxBlocks: maxBlocks,
                 seed: seed,
                 onCanvas: { canvasIdx, canvas in
