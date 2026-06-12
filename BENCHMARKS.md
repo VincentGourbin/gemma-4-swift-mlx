@@ -231,7 +231,12 @@ PYTHONPATH=~/Library/Python/3.12/lib/python/site-packages \
 
 **Notes** :
 - E2B et E4B Python crash : bug `mlx-vlm 0.6.2` sur le KV-sharing (parameters not in model). Notre Swift port gère via `WeightSanitizer` qui strip les K/V projections des couches partagées.
-- 26B-A4B (MoE) Swift -6 pts vs Python → possible divergence dans notre port MoE (SwitchGLU/Experts). À investiguer.
+- **26B-A4B (MoE) Swift -6 pts vs Python** : divergence dans notre Router. Tentative de port verbatim de la version Python actuelle (softmax-sur-top-k, fused rms_norm) a **dégradé** l'accuracy de -3 pts au lieu d'améliorer. La cause exacte reste à investiguer — probable interaction entre :
+  - Quantization 4-bit des SwitchGLU experts (calibrée sur une distribution spécifique d'activations)
+  - Ordering numérique bf16 du router
+  - Path softmax-sur-tout-puis-renormalize vs softmax-sur-top-k (mathématiquement équivalent mais distributions différentes en bf16)
+  - SwitchGLU expert dispatching différent entre Swift MLX-LM et Python MLX-LM
+  Le code Swift actuel utilise empiriquement la meilleure variante mesurée (-6 pts), mais reste sous-optimal vs Python.
 
 Observation : sur 12B Unified, la quantification 4-bit (n'importe quel mode)
 **dégrade significativement** la qualité MMLU (-20 à -25 pts). Le 8-bit

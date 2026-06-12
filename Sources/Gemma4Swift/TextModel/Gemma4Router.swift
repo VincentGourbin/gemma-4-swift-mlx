@@ -5,6 +5,13 @@ import MLX
 import MLXNN
 
 /// Router MoE Gemma 4 : norm → scale → project → softmax → top-k → renormalize → per_expert_scale
+///
+/// NB : tentative de port verbatim de la version Python "softmax-sur-top-k" (au
+/// lieu de "softmax-sur-tout + renormalize sur top-k") a DEGRADE l'accuracy
+/// MMLU sur 26B-A4B (-3 pts). Garde la version "softmax-sur-tout + renormalize"
+/// qui empiriquement preserve mieux la qualite sur ce checkpoint. La cause exacte
+/// de la divergence vs Python reste a investiguer (probable interaction MoE +
+/// 4-bit quant + ordering numerique en bf16).
 public class Gemma4Router: Module {
     let numExperts: Int
     let topK: Int
