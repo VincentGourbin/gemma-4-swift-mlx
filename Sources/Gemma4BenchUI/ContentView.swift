@@ -93,7 +93,7 @@ struct ContentView: View {
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .buttonStyle(GlowButtonStyle(color: .green))
-                .disabled(vm.loadState.isBusy || vm.arPanel.isRunning || vm.diffusionPanel.isRunning)
+                .disabled(vm.isPipelineActive)
 
                 Button {
                     Task { await vm.runDiffusionFull() }
@@ -102,7 +102,7 @@ struct ContentView: View {
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .buttonStyle(GlowButtonStyle(color: .purple))
-                .disabled(vm.loadState.isBusy || vm.arPanel.isRunning || vm.diffusionPanel.isRunning)
+                .disabled(vm.isPipelineActive)
             }
         }
         .padding(.horizontal, 20)

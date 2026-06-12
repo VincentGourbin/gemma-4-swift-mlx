@@ -79,6 +79,11 @@ final class BenchViewModel: ObservableObject {
     @Published var arPanel = PanelState()
     @Published var diffusionPanel = PanelState()
 
+    /// True du moment où on clique un bouton jusqu'à la fin de la
+    /// generation correspondante (incluant load + unload + run).
+    /// Sert à bloquer l'AUTRE bouton de bout en bout.
+    @Published var isPipelineActive: Bool = false
+
     @Published var prompt: String = "Why is the sky blue? Answer in 3 short paragraphs."
     @Published var maxTokens: Int = 256
     @Published var temperature: Float = 0.3
@@ -290,7 +295,7 @@ final class BenchViewModel: ObservableObject {
                     onCanvas: { @Sendable canvasIdx, canvas in
                         canvas.eval()
                         let tokens = canvas.asArray(Int32.self).map { Int($0) }
-                        let text = nonisolatedTokenizer.decode(tokens: tokens)
+                        let text = nonisolatedTokenizer.decode(tokens: tokens, skipSpecialTokens: true)
                         continuation.yield(DiffusionEvent(
                             kind: .canvas,
                             canvasIdx: canvasIdx,
@@ -302,7 +307,7 @@ final class BenchViewModel: ObservableObject {
                     onStep: { @Sendable canvasIdx, step, argmax in
                         argmax.eval()
                         let tokens = argmax.asArray(Int32.self).map { Int($0) }
-                        let text = nonisolatedTokenizer.decode(tokens: tokens)
+                        let text = nonisolatedTokenizer.decode(tokens: tokens, skipSpecialTokens: true)
                         continuation.yield(DiffusionEvent(
                             kind: .step,
                             canvasIdx: canvasIdx,
@@ -359,6 +364,9 @@ final class BenchViewModel: ObservableObject {
 
     /// Bouton "Lancer AR" : décharge la Diffusion si présente, charge l'AR si besoin, génère.
     func runARFull() async {
+        guard !isPipelineActive else { return }
+        isPipelineActive = true
+        defer { isPipelineActive = false }
         if !loadState.hasARLoaded {
             await loadAR()
             guard loadState == .arReady else { return }
@@ -368,6 +376,9 @@ final class BenchViewModel: ObservableObject {
 
     /// Bouton "Lancer Diffusion" : décharge l'AR si présent, charge la Diffusion si besoin, génère.
     func runDiffusionFull() async {
+        guard !isPipelineActive else { return }
+        isPipelineActive = true
+        defer { isPipelineActive = false }
         if !loadState.hasDiffusionLoaded {
             await loadDiffusion()
             guard loadState == .diffusionReady else { return }
