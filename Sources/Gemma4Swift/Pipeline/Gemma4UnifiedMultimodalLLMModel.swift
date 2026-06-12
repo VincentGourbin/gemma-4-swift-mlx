@@ -102,6 +102,30 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
+    /// Variante de `callAsFunction` qui retourne logits + hidden states (pre-norm) +
+    /// intermediates K/V — utilise par le path MTP speculative decoding.
+    /// Symetrique a Gemma4MultimodalLLMModel.forwardWithIntermediates pour les
+    /// futurs drafters publiables sur 12B Unified.
+    public func forwardWithIntermediates(
+        _ inputs: MLXArray,
+        cache: [KVCache]?
+    ) -> LanguageForwardOutput {
+        let cacheArray: [KVCache?]? = cache?.map { $0 as KVCache? }
+        let visionMask: MLXArray? = computeVisionTokenMask(inputs)
+        if let inputsEmbeds = prepareMultimodalEmbeds(inputs) {
+            return languageModel.forwardWithIntermediates(
+                inputsEmbeds: inputsEmbeds,
+                cache: cacheArray,
+                visionTokenMask: visionMask
+            )
+        }
+        return languageModel.forwardWithIntermediates(
+            inputs: inputs,
+            cache: cacheArray,
+            visionTokenMask: visionMask
+        )
+    }
+
     /// Calcule un mask [B, T] bool : true ou le token est image OU video.
     /// Retourne nil si T==1 (decodage), ou si AUCUN token vision ni AUCUN audio
     /// (path text pur, pas de masking custom necessaire).

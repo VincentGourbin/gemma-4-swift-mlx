@@ -177,107 +177,19 @@ public class Gemma4TextModel: Module {
         // collecte d'intermediates qui retient ~150 MB de K/V refs par forward
         // et augmente la pression memoire pendant le prefill.
         // Pour E2B/E4B (avec KV-sharing), on garde le path complet.
-        if firstKvSharedLayerIdx >= numHiddenLayers {
-            return forwardWithoutIntermediates(
-                inputs: inputs,
-                inputsEmbeds: inputsEmbeds,
-                cache: cache,
-                perLayerInputs: perLayerInputs,
-                visionTokenMask: visionTokenMask
-            )
+        let collect = firstKvSharedLayerIdx < numHiddenLayers
+        if collect {
+            return runForward(
+                inputs: inputs, inputsEmbeds: inputsEmbeds, cache: cache,
+                perLayerInputs: perLayerInputs, visionTokenMask: visionTokenMask,
+                collectIntermediates: true
+            ).hidden
         }
-        return forwardCollectingIntermediates(
-            inputs: inputs,
-            inputsEmbeds: inputsEmbeds,
-            cache: cache,
-            perLayerInputs: perLayerInputs,
-            visionTokenMask: visionTokenMask
+        return runForward(
+            inputs: inputs, inputsEmbeds: inputsEmbeds, cache: cache,
+            perLayerInputs: perLayerInputs, visionTokenMask: visionTokenMask,
+            collectIntermediates: false
         ).hidden
-    }
-
-    /// Forward optimise pour les modeles SANS KV-sharing.
-    /// Identique a forwardCollectingIntermediates() mais ne stocke pas les
-    /// K/V intermediaires (pas d'array `intermediates[]`, pas de
-    /// `publicIntermediates`, pas de struct TextForwardOutput a wrapper).
-    ///
-    /// Ne pas utiliser sur E2B/E4B (KV-sharing necessite les intermediates).
-    private func forwardWithoutIntermediates(
-        inputs: MLXArray? = nil,
-        inputsEmbeds: MLXArray? = nil,
-        cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil,
-        visionTokenMask: MLXArray? = nil
-    ) -> MLXArray {
-        var h: MLXArray
-        if let inputsEmbeds = inputsEmbeds {
-            h = inputsEmbeds
-        } else if let inputs = inputs {
-            h = embedTokens(inputs)
-            h = h * MLXArray(embedScale, dtype: h.dtype)
-        } else {
-            fatalError("inputs ou inputsEmbeds requis")
-        }
-
-        var finalPerLayerInputs: MLXArray? = nil
-        if hiddenSizePerLayerInput > 0 {
-            var pli = perLayerInputs
-            if inputs != nil && pli == nil {
-                pli = getPerLayerInputs(inputs!)
-            }
-            if pli != nil || inputs != nil {
-                finalPerLayerInputs = projectPerLayerInputs(h, perLayerInputs: pli)
-            }
-        }
-
-        let cacheArray = cache ?? Array(repeating: nil as KVCache?, count: firstKvSharedLayerIdx)
-
-        var globalMask = MLXLMCommon.createAttentionMask(
-            h: h,
-            cache: firstFullCacheIdx < cacheArray.count ? cacheArray[firstFullCacheIdx] : nil
-        )
-        var slidingWindowMask = MLXLMCommon.createAttentionMask(
-            h: h,
-            cache: firstSlidingCacheIdx < cacheArray.count ? cacheArray[firstSlidingCacheIdx] : nil,
-            windowSize: windowSize
-        )
-
-        let T = h.dim(1)
-        if let visionMask = visionTokenMask, T > 1 {
-            let blockIds = Gemma4BidirectionalMask.blockSequenceIds(visionMask: visionMask)
-            let overlay = Gemma4BidirectionalMask.overlay(blockSequenceIds: blockIds)
-            let causalGlobal = MLXLMCommon.createCausalMask(n: T, offset: 0)
-            let causalSliding = MLXLMCommon.createCausalMask(n: T, offset: 0, windowSize: windowSize)
-            let mergedGlobal = Gemma4BidirectionalMask.compose(causal: causalGlobal, overlay: overlay)
-            let mergedSliding = Gemma4BidirectionalMask.compose(causal: causalSliding, overlay: overlay)
-            globalMask = .array(mergedGlobal)
-            slidingWindowMask = .array(mergedSliding)
-        }
-
-        let layerTypes = config.resolvedLayerTypes
-
-        for (i, layer) in layers.enumerated() {
-            let cacheIdx = layerIdxToCacheIdx[i]
-            let c = cacheIdx < cacheArray.count ? cacheArray[cacheIdx] : nil
-            let isGlobal = layerTypes[i] == "full_attention"
-            let localMask = isGlobal ? globalMask : slidingWindowMask
-
-            let perLayerInput: MLXArray?
-            if let fpli = finalPerLayerInputs {
-                perLayerInput = fpli[0..., 0..., i, 0...]
-            } else {
-                perLayerInput = nil
-            }
-
-            // Pas de KV-sharing : on jette les K/V retournes par la couche
-            // (le cache les a deja stockes pour ses propres besoins).
-            let (output, _, _) = layer(
-                h, mask: localMask, cache: c, perLayerInput: perLayerInput,
-                sharedKV: nil, sharedOffset: nil
-            )
-            h = output
-        }
-
-        return norm(h)
     }
 
     /// Variante de `callAsFunction` qui retourne aussi les K/V intermediaires
@@ -294,6 +206,25 @@ public class Gemma4TextModel: Module {
         cache: [KVCache?]? = nil,
         perLayerInputs: MLXArray? = nil,
         visionTokenMask: MLXArray? = nil
+    ) -> TextForwardOutput {
+        runForward(
+            inputs: inputs, inputsEmbeds: inputsEmbeds, cache: cache,
+            perLayerInputs: perLayerInputs, visionTokenMask: visionTokenMask,
+            collectIntermediates: true
+        )
+    }
+
+    /// Path partage entre `callAsFunction` (fast-path sans intermediates) et
+    /// `forwardCollectingIntermediates` (avec intermediates pour KV-sharing /
+    /// MTP). La logique embedding, masks, layer loop et norm est identique ;
+    /// seul l'enregistrement des K/V dans un array `intermediates[]` differe.
+    private func runForward(
+        inputs: MLXArray?,
+        inputsEmbeds: MLXArray?,
+        cache: [KVCache?]?,
+        perLayerInputs: MLXArray?,
+        visionTokenMask: MLXArray?,
+        collectIntermediates: Bool
     ) -> TextForwardOutput {
         var h: MLXArray
         if let inputsEmbeds = inputsEmbeds {
@@ -350,12 +281,15 @@ public class Gemma4TextModel: Module {
             slidingWindowMask = .array(mergedSliding)
         }
 
-        // Forward a travers les layers — avec suivi des intermediaires pour le KV sharing
-        // Ref: Python mlx-lm gemma4_text.py utilise intermediates[] + previous_kvs
-        // pour passer les K/V des couches non-partagees aux couches partagees.
+        // Forward a travers les layers — avec ou sans suivi des intermediaires.
+        // Le suivi est necessaire pour le KV sharing (E2B/E4B) et pour MTP.
+        // Sans suivi : on jette les K/V retournes (~150 MB economises par
+        // forward sur prefill long, gain x2.3 mesure sur MMLU Pro CoT 12B).
         let layerTypes = config.resolvedLayerTypes
         var intermediates: [(kv: (keys: MLXArray, values: MLXArray), offset: Int)?] =
-            Array(repeating: nil, count: numHiddenLayers)
+            collectIntermediates
+                ? Array(repeating: nil, count: numHiddenLayers)
+                : []
 
         for (i, layer) in layers.enumerated() {
             let cacheIdx = layerIdxToCacheIdx[i]
@@ -372,10 +306,12 @@ public class Gemma4TextModel: Module {
             }
 
             // KV sharing: passer les K/V de la couche source aux couches partagees
-            // (seulement quand pas de cache — le cache gere deja le sharing a l'inference)
+            // (seulement quand pas de cache — le cache gere deja le sharing a l'inference).
+            // Quand collectIntermediates est false, on n'a pas de KV-sharing par definition.
             let sharedKV: (keys: MLXArray, values: MLXArray)?
             let sharedOffset: Int?
-            if i >= firstKvSharedLayerIdx && firstKvSharedLayerIdx > 0 && cache == nil,
+            if collectIntermediates,
+               i >= firstKvSharedLayerIdx && firstKvSharedLayerIdx > 0 && cache == nil,
                let prev = intermediates[cacheIdx] {
                 sharedKV = prev.kv
                 sharedOffset = prev.offset
@@ -384,22 +320,39 @@ public class Gemma4TextModel: Module {
                 sharedOffset = nil
             }
 
-            let (output, kv, offset) = layer(
-                h, mask: localMask, cache: c, perLayerInput: perLayerInput,
-                sharedKV: sharedKV, sharedOffset: sharedOffset
-            )
-            h = output
-            intermediates[i] = (kv: kv, offset: offset)
-        }
-
-        let publicIntermediates: [LayerIntermediate?] = intermediates.map { entry in
-            guard let entry = entry else { return nil }
-            return LayerIntermediate(keys: entry.kv.keys, values: entry.kv.values, offset: entry.offset)
+            if collectIntermediates {
+                let (output, kv, offset) = layer(
+                    h, mask: localMask, cache: c, perLayerInput: perLayerInput,
+                    sharedKV: sharedKV, sharedOffset: sharedOffset
+                )
+                h = output
+                intermediates[i] = (kv: kv, offset: offset)
+            } else {
+                // Fast path : on jette les K/V (le cache les a deja captures
+                // pour ses propres besoins).
+                let (output, _, _) = layer(
+                    h, mask: localMask, cache: c, perLayerInput: perLayerInput,
+                    sharedKV: nil, sharedOffset: nil
+                )
+                h = output
+            }
         }
 
         // Capture h pre-norm pour le drafter MTP, puis applique norm pour les logits standard.
         let preNormHidden = h
         let normedHidden = norm(h)
+
+        let publicIntermediates: [LayerIntermediate?]
+        if collectIntermediates {
+            publicIntermediates = intermediates.map { entry in
+                guard let entry = entry else { return nil }
+                return LayerIntermediate(
+                    keys: entry.kv.keys, values: entry.kv.values, offset: entry.offset
+                )
+            }
+        } else {
+            publicIntermediates = []
+        }
 
         return TextForwardOutput(
             hidden: normedHidden,

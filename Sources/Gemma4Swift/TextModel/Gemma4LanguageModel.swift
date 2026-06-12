@@ -65,13 +65,15 @@ public class Gemma4LanguageModel: Module {
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
-        perLayerInputs: MLXArray? = nil
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> LanguageForwardOutput {
         let textOut = model.forwardCollectingIntermediates(
             inputs: inputs,
             inputsEmbeds: inputsEmbeds,
             cache: cache,
-            perLayerInputs: perLayerInputs
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
         )
 
         var logits = model.embedTokens.asLinear(textOut.hidden)

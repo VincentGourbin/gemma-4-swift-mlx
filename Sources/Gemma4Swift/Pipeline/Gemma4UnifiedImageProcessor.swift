@@ -38,19 +38,7 @@ public enum Gemma4UnifiedImageProcessor {
         url: URL,
         config: Gemma4UnifiedVisionConfig
     ) throws -> ProcessedImage {
-        #if canImport(AppKit)
-        guard let nsImage = NSImage(contentsOf: url),
-              let cgImage = nsImage.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw ImageProcessingError.cannotLoadImage(url.path)
-        }
-        #elseif canImport(UIKit)
-        guard let data = try? Data(contentsOf: url),
-              let uiImage = UIImage(data: data),
-              let cgImage = uiImage.cgImage else {
-            throw ImageProcessingError.cannotLoadImage(url.path)
-        }
-        #endif
-
+        let cgImage = try Gemma4CGImageLoader.load(from: url)
         return try processImage(cgImage, config: config)
     }
 
@@ -107,70 +95,51 @@ public enum Gemma4UnifiedImageProcessor {
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(x: 0, y: 0, width: bestW, height: bestH))
 
-        // 3) Normaliser en float32 [-1, 1] (mean=0.5, std=0.5).
-        // Layout du buffer : (H, W, 4=BGRA). On veut (3, H, W) channel-first.
-        let totalPixels = bestH * bestW
-        var rChannel = [Float](repeating: 0, count: totalPixels)
-        var gChannel = [Float](repeating: 0, count: totalPixels)
-        var bChannel = [Float](repeating: 0, count: totalPixels)
-        for i in 0 ..< totalPixels {
-            // CGContext avec noneSkipLast est en BGR ordering sur certaines plateformes ;
-            // mais avec CGColorSpaceCreateDeviceRGB + alphaInfo = noneSkipLast = RGBX.
-            rChannel[i] = (Float(pixelData[i * 4    ]) / 255.0 - imageMean[0]) / imageStd[0]
-            gChannel[i] = (Float(pixelData[i * 4 + 1]) / 255.0 - imageMean[1]) / imageStd[1]
-            bChannel[i] = (Float(pixelData[i * 4 + 2]) / 255.0 - imageMean[2]) / imageStd[2]
-        }
-
-        // 4) Decouper en patches (modelPatch x modelPatch x 3) flattenes.
+        // 3-4) Tout le pipeline RGBA -> normaliser -> patches en operations MLX
+        // vectorisees. Pour une image 2K (~4M pixels), on passe de ~16M
+        // operations scalaires Swift a quelques kernels MLX (gain ~10-50x).
         let pH = bestH / modelPatch
         let pW = bestW / modelPatch
         let patchDim = config.patchDim
         let numPatches = pH * pW
 
-        var patchesArr = [Float](repeating: 0, count: numPatches * patchDim)
-        var positionsArr = [Int32](repeating: 0, count: numPatches * 2)
+        // (a) buffer brut UInt8 [H*W*4] -> [H, W, 4] -> [H, W, 3] (drop alpha)
+        let raw = MLXArray(pixelData).reshaped(bestH, bestW, 4)
+        let rgb = raw[0..., 0..., 0..<3].asType(.float32) / MLXArray(Float(255.0))
 
-        for py in 0 ..< pH {
-            for px in 0 ..< pW {
-                let patchIdx = py * pW + px
-                positionsArr[patchIdx * 2    ] = Int32(px) // x
-                positionsArr[patchIdx * 2 + 1] = Int32(py) // y
+        // (b) normalisation par canal : (x - mean) / std (broadcast sur [3])
+        let mean = MLXArray(Self.imageMean)
+        let std = MLXArray(Self.imageStd)
+        let normalized = (rgb - mean) / std
 
-                // Copier le patch (modelPatch lignes x modelPatch cols x 3 canaux).
-                // Layout cible : (patchH, patchW, C) ligne-par-ligne.
-                let baseY = py * modelPatch
-                let baseX = px * modelPatch
-                let patchOffset = patchIdx * patchDim
-                for ly in 0 ..< modelPatch {
-                    let srcY = baseY + ly
-                    let rowSrcBase = srcY * bestW
-                    let rowDstBase = patchOffset + ly * modelPatch * 3
-                    for lx in 0 ..< modelPatch {
-                        let srcIdx = rowSrcBase + baseX + lx
-                        let dstIdx = rowDstBase + lx * 3
-                        patchesArr[dstIdx    ] = rChannel[srcIdx]
-                        patchesArr[dstIdx + 1] = gChannel[srcIdx]
-                        patchesArr[dstIdx + 2] = bChannel[srcIdx]
-                    }
-                }
-            }
-        }
+        // (c) decoupage en patches : [pH, mp, pW, mp, 3] -> [pH, pW, mp, mp, 3]
+        //     -> [numPatches, patchDim]
+        let patchesValid = normalized
+            .reshaped(pH, modelPatch, pW, modelPatch, 3)
+            .transposed(0, 2, 1, 3, 4)
+            .reshaped(numPatches, patchDim)
 
         // 5) Pad jusqu'a maxPatches (positions -1 pour les paddings).
         let validCount = numPatches
         let padTarget = maxPatches
-        var finalPatches = patchesArr
-        var finalPositions = positionsArr
+        let patchesMLX: MLXArray
         if validCount < padTarget {
-            finalPatches.append(contentsOf: [Float](repeating: 0, count: (padTarget - validCount) * patchDim))
-            for _ in validCount ..< padTarget {
-                finalPositions.append(-1)
-                finalPositions.append(-1)
-            }
+            let padding = MLXArray.zeros([padTarget - validCount, patchDim], type: Float.self)
+            patchesMLX = concatenated([patchesValid, padding], axis: 0)
+        } else {
+            patchesMLX = patchesValid
         }
 
-        let patchesMLX = MLXArray(finalPatches).reshaped(padTarget, patchDim)
-        let positionsMLX = MLXArray(finalPositions).reshaped(padTarget, 2)
+        // Positions (x, y) : petit tableau, on garde en Swift (numPatches <= 2520).
+        var positionsArr = [Int32](repeating: -1, count: padTarget * 2)
+        for py in 0 ..< pH {
+            for px in 0 ..< pW {
+                let patchIdx = py * pW + px
+                positionsArr[patchIdx * 2    ] = Int32(px)
+                positionsArr[patchIdx * 2 + 1] = Int32(py)
+            }
+        }
+        let positionsMLX = MLXArray(positionsArr).reshaped(padTarget, 2)
 
         return ProcessedImage(patches: patchesMLX, positionIds: positionsMLX, validPatches: validCount)
     }
