@@ -240,7 +240,9 @@ PYTHONPATH=~/Library/Python/3.12/lib/python/site-packages \
 | 26B-A4B-4bit | 57.0% | **63.0%** | **-6** ⚠ | 44.8% | 47.6% | -2.8 |
 | **26B-A4B-bf16** | **59.0%** | 57.0% | **+2** ✓ | **51.4%** | 48.6% | **+2.8** ✓ |
 
-**Verdict isolation** : sur bf16 non-quantisé, Swift donne un résultat équivalent ou meilleur que Python (+2 à +2.8 pts). Le bug -6 pts en 4-bit vient donc du dispatch quantisé de `SwitchGLU` dans `mlx-swift-lm` (probablement `quantizedSwitchLinear` ou `gather_mm` quantisé moins précis qu'en Python). À reporter en upstream.
+**Verdict isolation** : sur bf16 non-quantisé, Swift donne un résultat équivalent ou meilleur que Python (+2 à +2.8 pts). Le bug -6 pts en 4-bit vient donc du dispatch quantisé de `SwitchGLU` dans `mlx-swift-lm` (probablement `quantizedSwitchLinear` ou `gather_mm` quantisé moins précis qu'en Python).
+
+**Suivi** : voir [issue #27](https://github.com/VincentGourbin/gemma-4-swift-mlx/issues/27) pour le plan d'investigation détaillé et les hypothèses.
 
 Observation : sur 12B Unified, la quantification 4-bit (n'importe quel mode)
 **dégrade significativement** la qualité MMLU (-20 à -25 pts). Le 8-bit
