@@ -16,16 +16,29 @@ final class BenchViewModel: ObservableObject {
         case idle
         case loadingAR(String)
         case loadingDiffusion(String)
-        case ready
+        case unloading(String)
+        case arReady
+        case diffusionReady
         case error(String)
 
         var label: String {
             switch self {
-            case .idle: return "Pas de modele charge"
+            case .idle: return "Aucun modele charge"
             case .loadingAR(let msg): return "Chargement AR : \(msg)"
             case .loadingDiffusion(let msg): return "Chargement Diffusion : \(msg)"
-            case .ready: return "Modeles prets"
+            case .unloading(let msg): return "Dechargement : \(msg)"
+            case .arReady: return "AR pret (Diffusion non charge)"
+            case .diffusionReady: return "Diffusion pret (AR non charge)"
             case .error(let e): return "Erreur : \(e)"
+            }
+        }
+
+        var hasARLoaded: Bool { self == .arReady }
+        var hasDiffusionLoaded: Bool { self == .diffusionReady }
+        var isBusy: Bool {
+            switch self {
+            case .loadingAR, .loadingDiffusion, .unloading: return true
+            default: return false
             }
         }
     }
@@ -80,22 +93,46 @@ final class BenchViewModel: ObservableObject {
         return p
     }
 
-    // MARK: - Chargement séquentiel
+    // MARK: - Déchargement
 
-    func loadModels() async {
-        // 1) AR
+    /// Décharge tout, libère la RAM / GPU cache.
+    private func unloadAll() async {
+        if arPipeline != nil {
+            loadState = .unloading("AR…")
+            arPipeline?.unload()
+            arPipeline = nil
+        }
+        if diffusionModel != nil {
+            loadState = .unloading("Diffusion…")
+            diffusionModel = nil
+            diffusionConfig = nil
+            diffusionGenConfig = nil
+            diffusionTokenizer = nil
+            MLX.GPU.clearCache()
+        }
+        // Petit délai pour laisser ARC + GPU free les ressources
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        loadState = .idle
+    }
+
+    // MARK: - Chargement individuel (un modèle à la fois)
+
+    func loadAR() async {
+        await unloadAll()
         loadState = .loadingAR("\(arModelID)…")
         do {
             await Gemma4Registration.register(multimodal: false)
             let pipeline = Gemma4Pipeline()
             try await pipeline.load(from: arPath, multimodal: false)
             arPipeline = pipeline
+            loadState = .arReady
         } catch {
             loadState = .error("AR : \(error.localizedDescription)")
-            return
         }
+    }
 
-        // 2) Diffusion
+    func loadDiffusion() async {
+        await unloadAll()
         loadState = .loadingDiffusion("\(diffusionModelID)…")
         do {
             let (model, config) = try DiffusionGemmaLoader.load(
@@ -104,7 +141,6 @@ final class BenchViewModel: ObservableObject {
             diffusionModel = model
             diffusionConfig = config
 
-            // generation_config.json optionnel
             let genConfigURL = diffusionPath.appendingPathComponent("generation_config.json")
             if FileManager.default.fileExists(atPath: genConfigURL.path),
                let data = try? Data(contentsOf: genConfigURL),
@@ -115,14 +151,11 @@ final class BenchViewModel: ObservableObject {
                 diffusionGenConfig = DiffusionGenerationConfig()
             }
 
-            // Tokenizer Diffusion (l'AR a le sien dans le ModelContainer)
             diffusionTokenizer = try await AutoTokenizer.from(modelFolder: diffusionPath)
+            loadState = .diffusionReady
         } catch {
             loadState = .error("Diffusion : \(error.localizedDescription)")
-            return
         }
-
-        loadState = .ready
     }
 
     // MARK: - Génération AR
@@ -266,12 +299,23 @@ final class BenchViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Race (les 2 en séquence)
+    // MARK: - One-shot : charge le bon modèle (décharge l'autre) puis génère.
 
-    func runRace() async {
+    /// Bouton "Lancer AR" : décharge la Diffusion si présente, charge l'AR si besoin, génère.
+    func runARFull() async {
+        if !loadState.hasARLoaded {
+            await loadAR()
+            guard loadState == .arReady else { return }
+        }
         await runAR()
-        // Pause pour laisser l'oeil respirer
-        try? await Task.sleep(nanoseconds: 1_500_000_000)
+    }
+
+    /// Bouton "Lancer Diffusion" : décharge l'AR si présent, charge la Diffusion si besoin, génère.
+    func runDiffusionFull() async {
+        if !loadState.hasDiffusionLoaded {
+            await loadDiffusion()
+            guard loadState == .diffusionReady else { return }
+        }
         await runDiffusion()
     }
 }

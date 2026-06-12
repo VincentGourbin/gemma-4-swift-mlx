@@ -37,58 +37,17 @@ struct ContentView: View {
                 Text("Gemma 4 — AR vs Diffusion")
                     .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
-                Text("Block-AR diffusion vs autoregressive streaming, même prompt, mêmes 26B params")
+                Text("26B params bf16, un modèle à la fois (l'autre est déchargé automatiquement)")
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.5))
             }
             Spacer()
-            loadButton
+            if vm.loadState.isBusy {
+                ProgressView().controlSize(.small).tint(.white)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
-    }
-
-    private var loadButton: some View {
-        HStack(spacing: 12) {
-            if case .loadingAR = vm.loadState {
-                ProgressView().controlSize(.small).tint(.white)
-            } else if case .loadingDiffusion = vm.loadState {
-                ProgressView().controlSize(.small).tint(.white)
-            }
-            Button {
-                Task { await vm.loadModels() }
-            } label: {
-                Label(loadButtonTitle, systemImage: loadButtonIcon)
-                    .font(.system(size: 13, weight: .semibold))
-            }
-            .buttonStyle(GlowButtonStyle(color: .cyan))
-            .disabled(isLoading || vm.loadState == .ready)
-        }
-    }
-
-    private var loadButtonTitle: String {
-        switch vm.loadState {
-        case .idle: return "Charger les 2 modèles"
-        case .loadingAR: return "Chargement AR…"
-        case .loadingDiffusion: return "Chargement Diffusion…"
-        case .ready: return "Modèles prêts"
-        case .error: return "Réessayer"
-        }
-    }
-
-    private var loadButtonIcon: String {
-        switch vm.loadState {
-        case .idle: return "arrow.down.circle"
-        case .loadingAR, .loadingDiffusion: return "hourglass"
-        case .ready: return "checkmark.circle.fill"
-        case .error: return "exclamationmark.triangle.fill"
-        }
-    }
-
-    private var isLoading: Bool {
-        if case .loadingAR = vm.loadState { return true }
-        if case .loadingDiffusion = vm.loadState { return true }
-        return false
     }
 
     private var controlBar: some View {
@@ -128,31 +87,22 @@ struct ContentView: View {
                 Spacer()
 
                 Button {
-                    Task { await vm.runRace() }
+                    Task { await vm.runARFull() }
                 } label: {
-                    Label("Lancer le bench", systemImage: "play.fill")
+                    Label("Lancer AR", systemImage: "arrow.right.circle.fill")
                         .font(.system(size: 13, weight: .semibold))
                 }
-                .buttonStyle(GlowButtonStyle(color: .pink))
-                .disabled(vm.loadState != .ready || vm.arPanel.isRunning || vm.diffusionPanel.isRunning)
-
-                Button {
-                    Task { await vm.runAR() }
-                } label: {
-                    Label("AR seul", systemImage: "arrow.right.circle")
-                        .font(.system(size: 12))
-                }
                 .buttonStyle(GlowButtonStyle(color: .green))
-                .disabled(vm.loadState != .ready || vm.arPanel.isRunning)
+                .disabled(vm.loadState.isBusy || vm.arPanel.isRunning || vm.diffusionPanel.isRunning)
 
                 Button {
-                    Task { await vm.runDiffusion() }
+                    Task { await vm.runDiffusionFull() }
                 } label: {
-                    Label("Diffusion seul", systemImage: "waveform")
-                        .font(.system(size: 12))
+                    Label("Lancer Diffusion", systemImage: "waveform")
+                        .font(.system(size: 13, weight: .semibold))
                 }
                 .buttonStyle(GlowButtonStyle(color: .purple))
-                .disabled(vm.loadState != .ready || vm.diffusionPanel.isRunning)
+                .disabled(vm.loadState.isBusy || vm.arPanel.isRunning || vm.diffusionPanel.isRunning)
             }
         }
         .padding(.horizontal, 20)
@@ -201,8 +151,8 @@ struct ContentView: View {
     private var statusIcon: String {
         switch vm.loadState {
         case .idle: return "circle"
-        case .loadingAR, .loadingDiffusion: return "arrow.triangle.2.circlepath"
-        case .ready: return "checkmark.circle.fill"
+        case .loadingAR, .loadingDiffusion, .unloading: return "arrow.triangle.2.circlepath"
+        case .arReady, .diffusionReady: return "checkmark.circle.fill"
         case .error: return "exclamationmark.triangle.fill"
         }
     }
@@ -210,8 +160,9 @@ struct ContentView: View {
     private var statusColor: Color {
         switch vm.loadState {
         case .idle: return .gray
-        case .loadingAR, .loadingDiffusion: return .cyan
-        case .ready: return .green
+        case .loadingAR, .loadingDiffusion, .unloading: return .cyan
+        case .arReady: return .green
+        case .diffusionReady: return .purple
         case .error: return .red
         }
     }
