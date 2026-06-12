@@ -1,26 +1,44 @@
-// Stub Phase 2 — pipeline de generation block-AR
+// Pipeline de generation DiffusionGemma block-AR.
 //
-// L'algorithme complet :
-//   while not all_blocks_done:
-//       encode_prompt_to_kv_cache()          // 1 forward encoder
-//       canvas = sampler.initialize_canvas() // random
-//       prev_logits = None                    // self-conditioning
-//       for step in 0..<max_denoising_steps:
-//           logits = decoder(canvas, encoder_kv, self_cond=prev_logits)
-//           logits = apply_logit_softcapping(logits)
-//           logits = temperature_schedule.apply(logits, step)
-//           denoiser_canvas = argmax_or_sample(logits)
-//           canvas = sampler.accept(current=canvas, denoiser=denoiser_canvas, logits=logits)
-//           if stopping.should_stop(argmax(canvas), logits).all(): break
-//           canvas = sampler.renoise(canvas)
+// Algorithme :
+//   for canvas in 0..<max_new_canvases:
+//       encoder_cache = encoder(input_ids)
+//       canvas = sampler.initialize_canvas(B)
+//       prev_logits = nil
+//       stopping.reset()
+//       for step in max_denoising_steps...1:
+//           logits = model.denoiseStep(canvas, encoder_cache, prev_logits)
+//           logits = temperature.apply(logits, step)
+//           argmax_canvas = argmax(logits)
+//           denoiser_canvas = sample(logits)
+//           canvas = sampler.accept(canvas, denoiser_canvas, logits)
+//           if stopping.shouldStop(argmax_canvas, logits).all() : break
+//           canvas = sampler.renoise(canvas, B)
 //           prev_logits = logits
-//       commit_canvas_to_prompt()
-//       check_eos_or_max_length()
+//       input_ids = cat(input_ids, argmax_canvas)
+//       if EOS in argmax_canvas : break
+//
+// Simplification Phase 4 : on re-encode TOUT le prompt a chaque canvas.
+// Phase 5+ : KV cache incremental cote encoder (faster).
 
 import Foundation
 import MLX
+import MLXNN
+import MLXRandom
 
-/// Pipeline de generation DiffusionGemma block-AR. STUB Phase 2.
+/// Sortie d'une generation block-AR.
+public struct DiffusionGenerationResult: @unchecked Sendable {
+    /// Tokens generes (apres le prompt initial).
+    public let generatedIds: MLXArray
+    /// Concatenation prompt + tokens generes.
+    public let fullIds: MLXArray
+    /// Nombre de forwards decoder reellement executes.
+    public let totalDecoderSteps: Int
+    /// Nombre de canvases utilises.
+    public let canvases: Int
+}
+
+/// Pipeline de generation DiffusionGemma block-AR.
 public actor DiffusionGemmaPipeline {
     public let model: DiffusionGemmaForBlockDiffusion
     public let genConfig: DiffusionGenerationConfig
@@ -52,5 +70,128 @@ public actor DiffusionGemmaPipeline {
         )
     }
 
-    // TODO Phase 4-5: implementer generate(promptIds:maxBlocks:)
+    /// Genere des canvases successifs jusqu'a EOS ou maxBlocks atteint.
+    ///
+    /// - Parameters:
+    ///   - promptIds : `[B, T_prompt]` int. Tokens du prompt initial.
+    ///   - maxBlocks : nombre max de canvases (chacun de `canvas_length` tokens).
+    ///   - seed : seed pour le PRNG (sampler + initialize_canvas).
+    ///   - onCanvas : callback optionnel apres chaque canvas (utile pour streaming).
+    /// - Returns: tokens generes + stats.
+    public func generate(
+        promptIds: MLXArray,
+        maxBlocks: Int = 4,
+        seed: UInt64 = 0,
+        onCanvas: ((Int, MLXArray) -> Void)? = nil
+    ) -> DiffusionGenerationResult {
+        var key = MLXRandom.key(seed)
+        let canvasLength = model.config.textConfig.canvasLength
+        let batchSize = promptIds.dim(0)
+        let eosSet = Set(genConfig.eosTokenIds.map { Int32($0) })
+
+        var fullIds = promptIds
+        var totalSteps = 0
+        var canvasesUsed = 0
+
+        for canvasIdx in 0 ..< maxBlocks {
+            // 1) Encoder forward sur l'entierete du prompt + canvases deja commits
+            let encOut = model.encodePrompt(promptIds: fullIds)
+
+            // 2) Init canvas + stopping
+            let (k1, k2) = splitKey(key: &key)
+            var canvas = sampler.initializeCanvas(batchSize: batchSize, key: k1)
+            var argmaxCanvas = canvas
+            var prevLogits: MLXArray? = nil
+            stopping.reset()
+            var rngKey = k2
+
+            // 3) Inner denoising loop : steps decroissants
+            var stepsExecuted = 0
+            for step in (1 ... genConfig.maxDenoisingSteps).reversed() {
+                // a) decoder forward
+                let logits = model.denoiseStep(
+                    canvasIds: canvas,
+                    encoderCache: encOut.kvCache,
+                    selfConditioningLogits: prevLogits,
+                    decoderAttentionMask: nil
+                )
+
+                // b) temperature
+                let scaled = temperatureSchedule.apply(logits, curStep: step)
+
+                // c) argmax + sample
+                argmaxCanvas = MLX.argMax(scaled, axis: -1).asType(.int32)
+                let (kS, kN) = splitKey(key: &rngKey)
+                let denoiserCanvas = MLXRandom.categorical(scaled, axis: -1, key: kS).asType(.int32)
+                rngKey = kN
+
+                // d) accept / stopping / renoise
+                canvas = sampler.accept(
+                    currentCanvas: canvas,
+                    denoiserCanvas: denoiserCanvas,
+                    logits: scaled
+                )
+
+                stepsExecuted += 1
+                let shouldStop = stopping.shouldStop(argmaxCanvas: argmaxCanvas, logits: scaled)
+                if shouldStop.all().item(Bool.self) {
+                    break
+                }
+
+                let (kR, kNext) = splitKey(key: &rngKey)
+                canvas = sampler.renoise(acceptedCanvas: canvas, batchSize: batchSize, key: kR)
+                rngKey = kNext
+
+                prevLogits = scaled
+            }
+
+            totalSteps += stepsExecuted
+            canvasesUsed += 1
+
+            // 4) Commit canvas
+            fullIds = concatenated([fullIds, argmaxCanvas], axis: -1)
+            onCanvas?(canvasIdx, argmaxCanvas)
+
+            // 5) Check EOS
+            if containsEOS(canvas: argmaxCanvas, eosSet: eosSet) {
+                break
+            }
+        }
+
+        let promptLen = promptIds.dim(1)
+        let totalLen = fullIds.dim(1)
+        let generatedIds = fullIds[0..., promptLen ..< totalLen]
+
+        return DiffusionGenerationResult(
+            generatedIds: generatedIds,
+            fullIds: fullIds,
+            totalDecoderSteps: totalSteps,
+            canvases: canvasesUsed
+        )
+    }
+
+    // MARK: - Helpers
+
+    /// Split d'une cle PRNG en (k_use, k_next). Met a jour la cle courante.
+    private func splitKey(key: inout MLXArray) -> (MLXArray, MLXArray) {
+        let split = MLXRandom.split(key: key, into: 2)
+        let useKey = split[0]
+        let nextKey = split[1]
+        key = nextKey
+        return (useKey, nextKey)
+    }
+
+    /// Verifie si un token EOS est present dans le canvas. Sortie : Bool unique.
+    private func containsEOS(canvas: MLXArray, eosSet: Set<Int32>) -> Bool {
+        // Approche simple : eval + iteration cote CPU sur le canvas.
+        // OK car canvas_length = 256, donc < 1 ms.
+        canvas.eval()
+        let array = canvas.asArray(Int32.self)
+        for tok in array {
+            if eosSet.contains(tok) {
+                return true
+            }
+        }
+        return false
+    }
 }

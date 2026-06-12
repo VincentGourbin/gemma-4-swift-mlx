@@ -45,7 +45,7 @@ struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
         abstract: "Inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self],
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self, DiffusionCommand.self],
         defaultSubcommand: Generate.self
     )
 }
@@ -155,6 +155,9 @@ struct Download: AsyncParsableCommand {
         "12b-6bit": "mlx-community/gemma-4-12B-it-6bit",
         "12b-8bit": "mlx-community/gemma-4-12B-it-8bit",
         "12b-bf16": "mlx-community/gemma-4-12B-it-bf16",
+        // DiffusionGemma 26B-A4B (block-AR diffusion, experimental)
+        "a4b-diff-bf16": "google/diffusiongemma-26B-A4B-it",
+        "diff-bf16": "google/diffusiongemma-26B-A4B-it",
     ]
 
     func run() async throws {
