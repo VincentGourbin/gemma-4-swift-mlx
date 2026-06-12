@@ -38,8 +38,17 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Nombre maximum de canvases a generer")
     var maxBlocks: Int = 4
 
-    @Option(name: .long, help: "Seed PRNG pour le sampler")
+    @Option(name: .long, help: "Seed PRNG pour le sampler (varier pour observer la diversite)")
     var seed: UInt64 = 0
+
+    @Option(name: .long, help: "Override t_min du schedule de temperature (defaut: generation_config.json, typiquement 0.4)")
+    var tMin: Float?
+
+    @Option(name: .long, help: "Override t_max du schedule de temperature (defaut: generation_config.json, typiquement 0.8)")
+    var tMax: Float?
+
+    @Option(name: .long, help: "Override max_denoising_steps (defaut: 48). Plus = plus de variation mais plus lent.")
+    var maxSteps: Int?
 
     @Flag(name: .long, help: "Charger les poids vision (Phase 5+, ignore pour l'instant).")
     var includeVision: Bool = false
@@ -185,12 +194,25 @@ struct DiffusionCommand: AsyncParsableCommand {
         print("Prompt tokens : \(tokenIds.count)")
         print("Premiers tokens : \(Array(tokenIds.prefix(10)))")
 
-        // 4) Generation
-        let genConfig = try loadGenerationConfig(directory: directory)
+        // 4) Generation : permettre overrides de temperature / steps
+        var genConfig = try loadGenerationConfig(directory: directory)
+        if tMin != nil || tMax != nil || maxSteps != nil {
+            genConfig = DiffusionGenerationConfig(
+                tMin: tMin ?? genConfig.tMin,
+                tMax: tMax ?? genConfig.tMax,
+                maxDenoisingSteps: maxSteps ?? genConfig.maxDenoisingSteps,
+                entropyBound: genConfig.entropyBound,
+                stabilityThreshold: genConfig.stabilityThreshold,
+                confidenceThreshold: genConfig.confidenceThreshold,
+                eosTokenIds: genConfig.eosTokenIds,
+                padTokenId: genConfig.padTokenId
+            )
+        }
         let pipeline = DiffusionGemmaPipeline(model: model, genConfig: genConfig)
 
         print("\n--- Generation ---")
         print("max_blocks=\(maxBlocks), canvas_length=\(config.textConfig.canvasLength), max_denoising_steps=\(genConfig.maxDenoisingSteps)")
+        print("temperature schedule : \(genConfig.tMin) -> \(genConfig.tMax), seed=\(seed)")
         print("---")
 
         // Captures pour les closures (Sendable Tokenizer copy)
