@@ -62,6 +62,18 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Chemin vers une image à passer au modèle (active le vision_tower). Requires --include-vision pour charger les poids vision.")
     var image: String?
 
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Applique apres le load, AVANT la generation. 48 Go -> ~14 Go en 4-bit, 3-4x speedup forwards.")
+    var quantizeBits: Int?
+
+    @Option(name: .customLong("quantize-group-size"), help: "Group size de quantization (defaut 64 pour affine, 32 pour mxfp).")
+    var quantizeGroupSize: Int = 64
+
+    @Option(name: .customLong("quantize-mode"), help: "Mode quantization : affine | mxfp4 | mxfp8.")
+    var quantizeMode: String = "affine"
+
+    @Flag(name: .customLong("quantize-text-only"), help: "Preserve vision_tower / embed_vision en bf16, quantize seulement encoder.language_model + decoder + self_conditioning.")
+    var quantizeTextOnly: Bool = false
+
     @Flag(name: .long, help: "Streaming step-by-step : affiche le canvas decode (argmax) apres CHAQUE step de denoising. Equivalent du `streamer.put_draft` Python = voir le texte se debruiter en live.")
     var streamSteps: Bool = false
 
@@ -127,6 +139,24 @@ struct DiffusionCommand: AsyncParsableCommand {
         print("Modele charge en \(String(format: "%.1f", loadTime))s")
         print("Config: hidden=\(config.textConfig.base.hiddenSize), layers=\(config.textConfig.base.numHiddenLayers), canvas=\(config.textConfig.canvasLength), vocab=\(config.textConfig.base.vocabSize)")
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
+
+        // 1b) Quantification a la volee
+        if let bits = quantizeBits {
+            guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
+                print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
+                throw ExitCode.failure
+            }
+            let excluded = quantizeTextOnly ? DiffusionOnTheFlyQuantization.multimodalEncoderPrefixes : []
+            let quantStart = Date()
+            let count = DiffusionOnTheFlyQuantization.apply(
+                to: model, bits: bits, groupSize: quantizeGroupSize, mode: mode,
+                excludedPathPrefixes: excluded
+            )
+            let quantTime = Date().timeIntervalSince(quantStart)
+            let scope = quantizeTextOnly ? "text-only" : "all"
+            print("Quantification a la volee (\(scope)): \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue)) en \(String(format: "%.1f", quantTime))s")
+            print("GPU apres quantization : \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs")
+        }
 
         if smoke {
             print("Smoke test : modele charge avec succes. Pas de generation.")

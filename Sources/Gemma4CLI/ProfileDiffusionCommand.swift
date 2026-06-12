@@ -64,6 +64,18 @@ struct ProfileDiffusion: AsyncParsableCommand {
     @Flag(name: .long, help: "Tracker la memoire par step (overhead)")
     var perStepMemory: Bool = false
 
+    @Option(name: .customLong("quantize-bits"), help: "Quantization a la volee (4, 6, 8). Mesure perf apres quantization.")
+    var quantizeBits: Int?
+
+    @Option(name: .customLong("quantize-group-size"), help: "Group size de quantization (defaut 64).")
+    var quantizeGroupSize: Int = 64
+
+    @Option(name: .customLong("quantize-mode"), help: "Mode : affine | mxfp4 | mxfp8.")
+    var quantizeMode: String = "affine"
+
+    @Flag(name: .customLong("quantize-text-only"), help: "Preserve vision_tower / embed_vision en bf16.")
+    var quantizeTextOnly: Bool = false
+
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
@@ -108,6 +120,25 @@ struct ProfileDiffusion: AsyncParsableCommand {
         )
         session.endPhase("1. Model Loading", category: .modelLoad)
         session.metadata["weightsBytes"] = "\(MLX.GPU.activeMemory / (1024 * 1024)) MB GPU"
+
+        // 3b) Quantification a la volee
+        if let bits = quantizeBits {
+            guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
+                print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
+                throw ExitCode.failure
+            }
+            let excluded = quantizeTextOnly ? DiffusionOnTheFlyQuantization.multimodalEncoderPrefixes : []
+            session.beginPhase("1b. Quantization", category: .modelLoad)
+            let count = DiffusionOnTheFlyQuantization.apply(
+                to: diffModel, bits: bits, groupSize: quantizeGroupSize, mode: mode,
+                excludedPathPrefixes: excluded
+            )
+            session.endPhase("1b. Quantization", category: .modelLoad)
+            let scope = quantizeTextOnly ? "text-only" : "all"
+            session.metadata["onTheFlyQuant"] = "\(bits)-bit g=\(quantizeGroupSize) \(mode.rawValue) (\(count) modules, \(scope))"
+            print("Quantization : \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue), \(scope))")
+            print("GPU apres quantization : \(MLX.GPU.activeMemory / (1024 * 1024)) MB")
+        }
 
         // 4) Tokenizer
         let tokenizer = try await AutoTokenizer.from(modelFolder: directory)
