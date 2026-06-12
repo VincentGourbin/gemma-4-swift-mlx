@@ -73,22 +73,43 @@ public class DiffusionGemmaDecoderTextModel: Module {
         var inputsEmbeds = embedTokens(decoderInputIds)
         inputsEmbeds = inputsEmbeds * MLXArray(embedScale, dtype: inputsEmbeds.dtype)
 
-        // 2) Soft-embeddings (self-conditioning)
+        // 2) Soft-embeddings (self-conditioning) : probs @ weight
+        //    [B, canvas, vocab] @ [vocab, hidden] = [B, canvas, hidden]
+        //
+        //    Pour gerer le cas embedTokens quantize (QuantizedEmbedding), on
+        //    appelle quantizedMM avec transpose=false directement, ce qui
+        //    dequantize le weight au vol. Pour embedTokens standard, matmul
+        //    classique.
         let softEmbeddings: MLXArray
         if let scLogits = selfConditioningLogits {
-            // softmax fp32 puis cast vers weight dtype
-            let weight = embedTokens.weight  // [vocab_size, hidden_size]
-            let weightDtype = weight.dtype
             var probs = softmax(scLogits.asType(.float32), axis: -1)
-            probs = probs.asType(weightDtype)
-            // soft = probs @ weight : [B, canvas, vocab] @ [vocab, hidden] = [B, canvas, hidden]
-            var soft = matmul(probs, weight) * MLXArray(embedScale, dtype: inputsEmbeds.dtype)
-            // selfConditioningMask : [B] bool -> [B, 1, 1]
+            let inputsDtype = inputsEmbeds.dtype
+
+            var soft: MLXArray
+            if let qEmbed = embedTokens as? QuantizedEmbedding {
+                // weight quantize : utilise quantizedMM (transpose=false)
+                probs = probs.asType(qEmbed.scales.dtype)
+                soft = quantizedMM(
+                    probs, qEmbed.weight,
+                    scales: qEmbed.scales,
+                    biases: qEmbed.biases,
+                    transpose: false,
+                    groupSize: qEmbed.groupSize,
+                    bits: qEmbed.bits,
+                    mode: qEmbed.mode
+                )
+            } else {
+                let weight = embedTokens.weight  // [vocab, hidden]
+                probs = probs.asType(weight.dtype)
+                soft = matmul(probs, weight)
+            }
+            soft = soft * MLXArray(embedScale, dtype: inputsDtype)
+
             if let mask = selfConditioningMask {
                 let maskExpanded = mask.asType(soft.dtype)[0..., .newAxis, .newAxis]
                 soft = soft * maskExpanded
             }
-            softEmbeddings = soft.asType(inputsEmbeds.dtype)
+            softEmbeddings = soft.asType(inputsDtype)
         } else {
             softEmbeddings = MLXArray.zeros(like: inputsEmbeds)
         }
