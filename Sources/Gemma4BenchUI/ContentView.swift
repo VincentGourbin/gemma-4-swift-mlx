@@ -88,10 +88,10 @@ struct ContentView: View {
 
                 // Max tokens
                 paramBox(label: "Tokens", color: .white) {
-                    Stepper(value: $vm.maxTokens, in: 64 ... 1024, step: 64) {
-                        Text("\(vm.maxTokens)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white)
+                    HStack(spacing: 3) {
+                        Text("\(vm.maxTokens)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white).frame(minWidth: 32, alignment: .leading)
+                        Stepper("", value: $vm.maxTokens, in: 64 ... 1024, step: 64).labelsHidden().controlSize(.mini)
                     }
-                    .labelsHidden().controlSize(.mini)
                 }
 
                 // Seed Diffusion
@@ -127,10 +127,10 @@ struct ContentView: View {
 
                 // Max steps Diffusion
                 paramBox(label: "Steps", color: .purple) {
-                    Stepper(value: $vm.diffMaxSteps, in: 8 ... 128, step: 4) {
-                        Text("\(vm.diffMaxSteps)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white)
+                    HStack(spacing: 3) {
+                        Text("\(vm.diffMaxSteps)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white).frame(minWidth: 24, alignment: .leading)
+                        Stepper("", value: $vm.diffMaxSteps, in: 8 ... 128, step: 4).labelsHidden().controlSize(.mini)
                     }
-                    .labelsHidden().controlSize(.mini)
                 }
                 .onChange(of: vm.diffMaxSteps) { _, _ in vm.preset = .custom }
 
