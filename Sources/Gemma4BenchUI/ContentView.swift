@@ -51,9 +51,10 @@ struct ContentView: View {
     }
 
     private var controlBar: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
+            // Ligne 1 : Prompt
             HStack(spacing: 12) {
-                Text("Prompt").font(.caption).foregroundStyle(.white.opacity(0.6))
+                Text("Prompt").font(.caption).foregroundStyle(.white.opacity(0.6)).frame(width: 60, alignment: .leading)
                 TextField("", text: $vm.prompt)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13, design: .monospaced))
@@ -70,19 +71,68 @@ struct ContentView: View {
                     )
             }
 
-            HStack(spacing: 16) {
+            // Ligne 2 : Presets (picker chips)
+            HStack(spacing: 12) {
+                Text("Preset").font(.caption).foregroundStyle(.white.opacity(0.6)).frame(width: 60, alignment: .leading)
                 HStack(spacing: 6) {
-                    Text("Max tokens").font(.caption).foregroundStyle(.white.opacity(0.6))
-                    Stepper(value: $vm.maxTokens, in: 64 ... 1024, step: 64) {
-                        Text("\(vm.maxTokens)").font(.system(size: 12, design: .monospaced)).foregroundStyle(.white)
+                    ForEach(BenchViewModel.Preset.allCases) { preset in
+                        presetChip(preset)
                     }
-                    .labelsHidden()
                 }
-                HStack(spacing: 6) {
-                    Text("Temperature").font(.caption).foregroundStyle(.white.opacity(0.6))
-                    Slider(value: $vm.temperature, in: 0 ... 1, step: 0.05).frame(width: 120)
-                    Text(String(format: "%.2f", vm.temperature)).font(.system(size: 12, design: .monospaced)).foregroundStyle(.white).frame(width: 36)
+                Spacer()
+            }
+
+            // Ligne 3 : Parametres detailles
+            HStack(spacing: 14) {
+                Text("Params").font(.caption).foregroundStyle(.white.opacity(0.6)).frame(width: 60, alignment: .leading)
+
+                // Max tokens
+                paramBox(label: "Tokens", color: .white) {
+                    Stepper(value: $vm.maxTokens, in: 64 ... 1024, step: 64) {
+                        Text("\(vm.maxTokens)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white)
+                    }
+                    .labelsHidden().controlSize(.mini)
                 }
+
+                // Seed Diffusion
+                paramBox(label: "Seed", color: .purple) {
+                    HStack(spacing: 3) {
+                        Text("\(vm.diffSeed)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white).frame(minWidth: 30, alignment: .leading)
+                        Stepper("", value: $vm.diffSeed, in: 0 ... 999_999, step: 1).labelsHidden().controlSize(.mini)
+                    }
+                }
+                .onChange(of: vm.diffSeed) { _, _ in vm.preset = .custom }
+
+                // Temperature AR
+                paramBox(label: "T (AR)", color: .green) {
+                    HStack(spacing: 4) {
+                        Slider(value: $vm.arTemperature, in: 0 ... 2, step: 0.05).frame(width: 80)
+                        Text(String(format: "%.2f", vm.arTemperature)).font(.system(size: 11, design: .monospaced)).foregroundStyle(.white).frame(width: 30)
+                    }
+                }
+                .onChange(of: vm.arTemperature) { _, _ in vm.preset = .custom }
+
+                // Temperature schedule Diffusion (tMin -> tMax)
+                paramBox(label: "T (Diff)", color: .purple) {
+                    HStack(spacing: 4) {
+                        Slider(value: $vm.diffTMin, in: 0.1 ... 2, step: 0.05).frame(width: 60)
+                        Text(String(format: "%.1f", vm.diffTMin)).font(.system(size: 10, design: .monospaced)).foregroundStyle(.white).frame(width: 22)
+                        Text("→").font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+                        Slider(value: $vm.diffTMax, in: 0.1 ... 2, step: 0.05).frame(width: 60)
+                        Text(String(format: "%.1f", vm.diffTMax)).font(.system(size: 10, design: .monospaced)).foregroundStyle(.white).frame(width: 22)
+                    }
+                }
+                .onChange(of: vm.diffTMin) { _, _ in vm.preset = .custom }
+                .onChange(of: vm.diffTMax) { _, _ in vm.preset = .custom }
+
+                // Max steps Diffusion
+                paramBox(label: "Steps", color: .purple) {
+                    Stepper(value: $vm.diffMaxSteps, in: 8 ... 128, step: 4) {
+                        Text("\(vm.diffMaxSteps)").font(.system(size: 11, design: .monospaced)).foregroundStyle(.white)
+                    }
+                    .labelsHidden().controlSize(.mini)
+                }
+                .onChange(of: vm.diffMaxSteps) { _, _ in vm.preset = .custom }
 
                 Spacer()
 
@@ -165,6 +215,65 @@ struct ContentView: View {
         case .diffusionReady: return .purple
         case .error: return .red
         }
+    }
+
+    // MARK: - Preset chip
+
+    private func presetChip(_ preset: BenchViewModel.Preset) -> some View {
+        let isSelected = vm.preset == preset
+        let color = presetColor(preset)
+        return Button {
+            vm.preset = preset
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: preset.icon).font(.system(size: 10))
+                Text(preset.rawValue).font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+            }
+            .foregroundStyle(isSelected ? Color.white : color.opacity(0.9))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(isSelected ? color.opacity(0.5) : color.opacity(0.12))
+                    .overlay(
+                        Capsule().strokeBorder(color.opacity(isSelected ? 0.9 : 0.4), lineWidth: 1)
+                    )
+            )
+            .shadow(color: isSelected ? color.opacity(0.6) : .clear, radius: 4)
+        }
+        .buttonStyle(.plain)
+        .help(preset.description)
+        .disabled(vm.isPipelineActive)
+    }
+
+    private func presetColor(_ preset: BenchViewModel.Preset) -> Color {
+        switch preset {
+        case .deterministic: return .cyan
+        case .balanced: return .green
+        case .creative: return .orange
+        case .chaotic: return .pink
+        case .custom: return .white
+        }
+    }
+
+    // MARK: - Param box
+
+    private func paramBox<Content: View>(label: String, color: Color, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(color.opacity(0.8))
+            content()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(color.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6).strokeBorder(color.opacity(0.2), lineWidth: 1)
+                )
+        )
     }
 }
 

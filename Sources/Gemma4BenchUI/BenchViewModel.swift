@@ -86,7 +86,83 @@ final class BenchViewModel: ObservableObject {
 
     @Published var prompt: String = "Why is the sky blue? Answer in 3 short paragraphs."
     @Published var maxTokens: Int = 256
-    @Published var temperature: Float = 0.3
+
+    // MARK: - Parametres de generation (avec presets)
+
+    enum Preset: String, CaseIterable, Identifiable {
+        case deterministic = "Deterministe"
+        case balanced = "Equilibre"
+        case creative = "Creatif"
+        case chaotic = "Chaotique"
+        case custom = "Personnalise"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .deterministic: return "snowflake"
+            case .balanced: return "scale.3d"
+            case .creative: return "sparkles"
+            case .chaotic: return "tornado"
+            case .custom: return "slider.horizontal.3"
+            }
+        }
+
+        var color: String {
+            switch self {
+            case .deterministic: return "cyan"
+            case .balanced: return "green"
+            case .creative: return "orange"
+            case .chaotic: return "pink"
+            case .custom: return "white"
+            }
+        }
+
+        /// (temperatureAR, tMinDiff, tMaxDiff, seed, maxStepsDiff?)
+        var params: (arTemp: Float, tMin: Float, tMax: Float, seed: UInt64, maxSteps: Int?) {
+            switch self {
+            case .deterministic:
+                return (0.1, 0.4, 0.8, 0, nil)
+            case .balanced:
+                return (0.5, 0.5, 1.0, 42, nil)
+            case .creative:
+                return (0.8, 0.8, 1.5, 42, nil)
+            case .chaotic:
+                return (1.2, 1.0, 2.0, 99, 64)
+            case .custom:
+                return (0.5, 0.5, 1.0, 0, nil)  // pas appliquee
+            }
+        }
+
+        var description: String {
+            switch self {
+            case .deterministic: return "Defaut du checkpoint, tres reproductible"
+            case .balanced: return "Compromis qualite/diversite"
+            case .creative: return "Plus de variation, encore coherent"
+            case .chaotic: return "Diversite max, peut deraper"
+            case .custom: return "Sliders manuels"
+            }
+        }
+    }
+
+    @Published var preset: Preset = .deterministic {
+        didSet { if preset != .custom { applyPreset() } }
+    }
+
+    @Published var arTemperature: Float = 0.1
+    @Published var diffTMin: Float = 0.4
+    @Published var diffTMax: Float = 0.8
+    @Published var diffSeed: UInt64 = 0
+    @Published var diffMaxSteps: Int = 48
+
+    private func applyPreset() {
+        let p = preset.params
+        arTemperature = p.arTemp
+        diffTMin = p.tMin
+        diffTMax = p.tMax
+        diffSeed = p.seed
+        diffMaxSteps = p.maxSteps ?? 48
+    }
 
     // MARK: - Modèles
 
@@ -213,7 +289,7 @@ final class BenchViewModel: ObservableObject {
             let stream = try pipeline.chatStream(
                 prompt: prompt,
                 systemPrompt: nil,
-                temperature: temperature,
+                temperature: arTemperature,
                 maxTokens: maxTokens
             )
             for try await piece in stream {
@@ -252,9 +328,22 @@ final class BenchViewModel: ObservableObject {
     func runDiffusion() async {
         guard let model = diffusionModel,
               let config = diffusionConfig,
-              let genConfig = diffusionGenConfig,
+              let baseGenConfig = diffusionGenConfig,
               let tokenizer = diffusionTokenizer
         else { return }
+
+        // Override avec les params UI
+        let genConfig = DiffusionGenerationConfig(
+            tMin: diffTMin,
+            tMax: diffTMax,
+            maxDenoisingSteps: diffMaxSteps,
+            entropyBound: baseGenConfig.entropyBound,
+            stabilityThreshold: baseGenConfig.stabilityThreshold,
+            confidenceThreshold: baseGenConfig.confidenceThreshold,
+            eosTokenIds: baseGenConfig.eosTokenIds,
+            padTokenId: baseGenConfig.padTokenId
+        )
+        let captureSeed = diffSeed
 
         diffusionPanel.text = ""
         diffusionPanel.tokensGenerated = 0
@@ -291,7 +380,7 @@ final class BenchViewModel: ObservableObject {
                 let result = await pipeline.generate(
                     promptIds: promptIds,
                     maxBlocks: maxBlocks,
-                    seed: 0,
+                    seed: captureSeed,
                     onCanvas: { @Sendable canvasIdx, canvas in
                         canvas.eval()
                         let tokens = canvas.asArray(Int32.self).map { Int($0) }
