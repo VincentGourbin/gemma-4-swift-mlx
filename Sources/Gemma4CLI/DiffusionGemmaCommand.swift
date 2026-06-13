@@ -77,6 +77,9 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Option(name: .customLong("mixed-precision"), help: "Mixed precision (Q-DiT/ViDiT-Q) : preset 'default' | 'conservative' | 'aggressive'. Mutuellement exclusif avec --quantize-bits.")
     var mixedPrecision: String?
 
+    @Option(name: .customLong("cache-limit-gb"), help: "Force MLX cache GPU limit a N GB. Test pour forcer la liberation des anciens bf16 apres quantize. 0 = no limit (defaut MLX).")
+    var cacheLimitGB: Int?
+
     @Flag(name: .long, help: "Streaming step-by-step : affiche le canvas decode (argmax) apres CHAQUE step de denoising. Equivalent du `streamer.put_draft` Python = voir le texte se debruiter en live.")
     var streamSteps: Bool = false
 
@@ -142,6 +145,13 @@ struct DiffusionCommand: AsyncParsableCommand {
         print("Modele charge en \(String(format: "%.1f", loadTime))s")
         print("Config: hidden=\(config.textConfig.base.hiddenSize), layers=\(config.textConfig.base.numHiddenLayers), canvas=\(config.textConfig.canvasLength), vocab=\(config.textConfig.base.vocabSize)")
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
+
+        // 1a-bis) Override du cache MLX si demande
+        if let cacheGB = cacheLimitGB {
+            let bytes = cacheGB * 1024 * 1024 * 1024
+            MLX.Memory.cacheLimit = bytes
+            print("MLX cache limit force a \(cacheGB) GB (\(bytes) bytes)")
+        }
 
         // 1b) Quantification a la volee
         if let preset = mixedPrecision {

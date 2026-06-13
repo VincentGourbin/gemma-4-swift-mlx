@@ -79,6 +79,9 @@ struct ProfileDiffusion: AsyncParsableCommand {
     @Option(name: .customLong("mixed-precision"), help: "Mixed precision Q-DiT/ViDiT-Q : 'default' | 'conservative' | 'aggressive'.")
     var mixedPrecision: String?
 
+    @Option(name: .customLong("cache-limit-gb"), help: "Force MLX cache GPU limit a N GB.")
+    var cacheLimitGB: Int?
+
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
@@ -123,6 +126,14 @@ struct ProfileDiffusion: AsyncParsableCommand {
         )
         session.endPhase("1. Model Loading", category: .modelLoad)
         session.metadata["weightsBytes"] = "\(MLX.GPU.activeMemory / (1024 * 1024)) MB GPU"
+
+        // 3a-bis) Cache limit override
+        if let cacheGB = cacheLimitGB {
+            let bytes = cacheGB * 1024 * 1024 * 1024
+            MLX.Memory.cacheLimit = bytes
+            session.metadata["cacheLimitGB"] = "\(cacheGB)"
+            print("MLX cache limit force a \(cacheGB) GB")
+        }
 
         // 3b) Quantification a la volee
         if let preset = mixedPrecision {

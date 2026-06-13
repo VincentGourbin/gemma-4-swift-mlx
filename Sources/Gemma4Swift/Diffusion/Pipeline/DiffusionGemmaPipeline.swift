@@ -105,7 +105,6 @@ public actor DiffusionGemmaPipeline {
         // - Canvas N+1 : on encode juste les 256 nouveaux tokens (argmax du canvas N)
         //   et on append au cache. Pas de re-encode du prompt initial.
         var encoderCache: EncoderKVCache? = nil
-        var lastEncoderHidden: MLXArray? = nil
 
         for canvasIdx in 0 ..< maxBlocks {
             // 1) Encoder forward incremental
@@ -127,8 +126,9 @@ public actor DiffusionGemmaPipeline {
                 priorCache: encoderCache
             )
             encoderCache = encOut.kvCache
-            lastEncoderHidden = encOut.lastHiddenState
-            _ = lastEncoderHidden
+            // encOut.lastHiddenState : pas utilise dans le pipeline de generation
+            // (l'encoder text n'a pas de role direct dans le denoising, c'est le
+            // KV cache qui est utilise par le decoder cross-attention).
 
             // Apres le 1er forward (qui a encode les soft-tokens vision dans le
             // KV cache), on peut decharger vision_tower + embed_vision pour
@@ -186,7 +186,12 @@ public actor DiffusionGemmaPipeline {
                 canvas = sampler.renoise(acceptedCanvas: canvas, batchSize: batchSize, key: kR)
                 rngKey = kNext
 
-                prevLogits = scaled
+                // prevLogits en bf16 plutot que fp32 : economie 128 MB par step.
+                // Le decoder cast en fp32 pour la softmax interne, donc precision
+                // preservee pour les positions piquees. Pour les positions tail
+                // (probs ~ 1e-7), bf16 introduit du bruit numerique acceptable
+                // car amplifie par la softmax fp32 dans le forward suivant.
+                prevLogits = scaled.asType(.bfloat16)
 
                 // Note : on a teste asyncEval(canvas, prevLogits, argmaxCanvas) ici
                 // pour casser le graph entre steps. Resultat : gain ~0 sur le
