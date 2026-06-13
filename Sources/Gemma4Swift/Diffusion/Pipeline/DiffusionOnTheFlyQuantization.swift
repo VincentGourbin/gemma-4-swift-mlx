@@ -107,5 +107,157 @@ public enum DiffusionOnTheFlyQuantization {
         MLX.Memory.clearCache()
         return quantizedCount
     }
+
+    // MARK: - Mixed Precision Quantization
+    //
+    // Pattern issu de Q-DiT (CVPR 2025) et ViDiT-Q (ICLR 2025) : les premieres
+    // et dernieres couches du transformer sont sensibles a la quantization,
+    // les couches du milieu tolerent du 4-bit aggressif.
+    //
+    // Pour DiffusionGemma 30 layers x 2 (encoder + decoder) :
+    //   - layers {0..3} U {26..29} en 8-bit (high precision)
+    //   - layers {4..25} en 4-bit (low precision)
+    //   - embed_tokens en 8-bit (vocabulaire critique)
+    //   - self_conditioning en 8-bit (modulation soft signals)
+    //   - vision_tower en bf16 (skip, sensible et petit)
+
+    public struct MixedPrecisionConfig: Sendable {
+        public var highPrecisionLayers: Set<Int>
+        public var highPrecisionBits: Int
+        public var lowPrecisionBits: Int
+        public var groupSize: Int
+
+        /// Si true, embed_tokens + self_conditioning + lm_head sont quantizes
+        /// en `highPrecisionBits`. Sinon ils restent en bf16.
+        public var quantizeSensitiveAtHighPrecision: Bool
+
+        public init(
+            highPrecisionLayers: Set<Int>,
+            highPrecisionBits: Int = 8,
+            lowPrecisionBits: Int = 4,
+            groupSize: Int = 64,
+            quantizeSensitiveAtHighPrecision: Bool = true
+        ) {
+            self.highPrecisionLayers = highPrecisionLayers
+            self.highPrecisionBits = highPrecisionBits
+            self.lowPrecisionBits = lowPrecisionBits
+            self.groupSize = groupSize
+            self.quantizeSensitiveAtHighPrecision = quantizeSensitiveAtHighPrecision
+        }
+
+        /// Default : 4 premiers + 4 derniers en 8-bit, le reste en 4-bit
+        /// (sur 30 layers). Cible empirique Q-DiT/ViDiT-Q.
+        public static let `default` = MixedPrecisionConfig(
+            highPrecisionLayers: Set(0...3).union(Set(26...29)),
+            highPrecisionBits: 8,
+            lowPrecisionBits: 4
+        )
+
+        /// Conservative : 6 premiers + 6 derniers en 8-bit (qualite max).
+        public static let conservative = MixedPrecisionConfig(
+            highPrecisionLayers: Set(0...5).union(Set(24...29)),
+            highPrecisionBits: 8,
+            lowPrecisionBits: 4
+        )
+
+        /// Aggressive : seulement 2 premiers + 2 derniers en 8-bit (RAM min).
+        public static let aggressive = MixedPrecisionConfig(
+            highPrecisionLayers: Set(0...1).union(Set(28...29)),
+            highPrecisionBits: 8,
+            lowPrecisionBits: 4
+        )
+    }
+
+    /// Stats retournees par applyMixedPrecision pour reporting.
+    public struct MixedPrecisionStats {
+        public var quantizedHigh: Int = 0
+        public var quantizedLow: Int = 0
+        public var skipped: [String] = []
+        public var totalQuantized: Int { quantizedHigh + quantizedLow }
+    }
+
+    /// Applique une quantization mixed precision sur DiffusionGemmaForBlockDiffusion.
+    ///
+    /// Strategy :
+    ///   1. Parcourt encoder.language_model.layers et decoder.layers.
+    ///   2. Pour chaque layer index, choisit highPrecisionBits si dans la liste
+    ///      `highPrecisionLayers`, sinon lowPrecisionBits.
+    ///   3. embed_tokens / self_conditioning quantizes en highPrecisionBits si
+    ///      `quantizeSensitiveAtHighPrecision`, sinon laisses en bf16.
+    ///   4. vision_tower et embed_vision : laisses en bf16 (skip explicite).
+    ///
+    /// - Parameter model: DiffusionGemmaForBlockDiffusion
+    /// - Returns: stats de quantization
+    @discardableResult
+    public static func applyMixedPrecision(
+        to model: DiffusionGemmaForBlockDiffusion,
+        config: MixedPrecisionConfig = .default
+    ) -> MixedPrecisionStats {
+        var stats = MixedPrecisionStats()
+
+        // Helper : quantize un Module avec un certain nb de bits + filtre divisibilite
+        func quantizeModule(_ module: Module, bits: Int, label: String) {
+            MLXNN.quantize(
+                model: module,
+                filter: { path, m -> (groupSize: Int, bits: Int, mode: QuantizationMode)? in
+                    if let lin = m as? Linear {
+                        let lastDim = lin.weight.shape.last ?? 0
+                        if lastDim % config.groupSize != 0 {
+                            stats.skipped.append("\(label)/\(path) [last_dim=\(lastDim)]")
+                            return nil
+                        }
+                    }
+                    if let emb = m as? Embedding {
+                        let lastDim = emb.weight.shape.last ?? 0
+                        if lastDim % config.groupSize != 0 {
+                            stats.skipped.append("\(label)/\(path) [last_dim=\(lastDim)]")
+                            return nil
+                        }
+                    }
+                    if m is Linear || m is Embedding {
+                        return (groupSize: config.groupSize, bits: bits, mode: .affine)
+                    }
+                    return nil
+                },
+                apply: { layer, gs, b, qmode in
+                    if b == config.highPrecisionBits {
+                        stats.quantizedHigh += 1
+                    } else {
+                        stats.quantizedLow += 1
+                    }
+                    return quantizeSingle(layer: layer, groupSize: gs, bits: b, mode: qmode)
+                }
+            )
+        }
+
+        // 1) Encoder text layers
+        let encoderTextLayers = model.encoder.languageModel.layers
+        for (i, layer) in encoderTextLayers.enumerated() {
+            let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
+            quantizeModule(layer, bits: bits, label: "encoder.language_model.layers.\(i)")
+        }
+
+        // 2) Decoder layers (memes index, partagent les poids tied avec encoder)
+        let decoderLayers = model.decoder.layers
+        for (i, layer) in decoderLayers.enumerated() {
+            let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
+            quantizeModule(layer, bits: bits, label: "decoder.layers.\(i)")
+        }
+
+        // 3) Sensible : embed_tokens + self_conditioning en highPrecision si demande
+        if config.quantizeSensitiveAtHighPrecision {
+            quantizeModule(model.decoder.embedTokens, bits: config.highPrecisionBits, label: "decoder.embed_tokens")
+            quantizeModule(model.encoder.languageModel.embedTokens, bits: config.highPrecisionBits, label: "encoder.embed_tokens")
+            quantizeModule(model.decoder.selfConditioning, bits: config.highPrecisionBits, label: "decoder.self_conditioning")
+        }
+
+        // 4) vision_tower / embed_vision restent en bf16 (volontaire).
+
+        // Materialise les nouveaux poids + clear cache pour liberer bf16
+        eval(model)
+        MLX.Memory.clearCache()
+
+        return stats
+    }
 }
 

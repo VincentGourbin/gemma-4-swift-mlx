@@ -30,8 +30,8 @@ public class DiffusionGemmaForBlockDiffusion: Module {
     public let config: DiffusionGemmaConfig
     public let finalLogitSoftcapping: Float
 
-    @ModuleInfo(key: "encoder") var encoder: DiffusionGemmaEncoderModel
-    @ModuleInfo(key: "decoder") var decoder: DiffusionGemmaDecoderTextModel
+    @ModuleInfo(key: "encoder") public var encoder: DiffusionGemmaEncoderModel
+    @ModuleInfo(key: "decoder") public var decoder: DiffusionGemmaDecoderTextModel
 
     public init(_ config: DiffusionGemmaConfig) {
         self.config = config

@@ -130,6 +130,13 @@ public actor DiffusionGemmaPipeline {
             lastEncoderHidden = encOut.lastHiddenState
             _ = lastEncoderHidden
 
+            // Apres le 1er forward (qui a encode les soft-tokens vision dans le
+            // KV cache), on peut decharger vision_tower + embed_vision pour
+            // liberer ~600 MB. Pattern LTX unloadAfterUse.
+            if canvasIdx == 0 && pixelValues != nil && model.encoder.hasVisionLoaded {
+                model.encoder.unloadVision()
+            }
+
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)
             var canvas = sampler.initializeCanvas(batchSize: batchSize, key: k1)
@@ -202,6 +209,11 @@ public actor DiffusionGemmaPipeline {
             if containsEOS(canvas: argmaxCanvas, eosSet: eosSet) {
                 break
             }
+
+            // 6) Liberation du pic transient du denoising loop (~440 MB observe).
+            //    Pattern Flux 2 clearCacheEveryNSteps mais ici entre canvases
+            //    (entre steps : neutre testé Phase 5).
+            MLX.Memory.clearCache()
         }
 
         let promptLen = promptIds.dim(1)

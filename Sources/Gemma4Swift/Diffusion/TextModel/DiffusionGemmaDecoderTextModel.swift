@@ -23,10 +23,10 @@ public class DiffusionGemmaDecoderTextModel: Module {
     let config: Gemma4TextConfig
     let canvasLength: Int
 
-    @ModuleInfo(key: "embed_tokens") var embedTokens: Embedding
-    @ModuleInfo var layers: [DiffusionGemmaDecoderTextLayer]
-    @ModuleInfo var norm: RMSNorm
-    @ModuleInfo(key: "self_conditioning") var selfConditioning: DiffusionGemmaSelfConditioning
+    @ModuleInfo(key: "embed_tokens") public var embedTokens: Embedding
+    @ModuleInfo public var layers: [DiffusionGemmaDecoderTextLayer]
+    @ModuleInfo public var norm: RMSNorm
+    @ModuleInfo(key: "self_conditioning") public var selfConditioning: DiffusionGemmaSelfConditioning
 
     let embedScale: Float
 

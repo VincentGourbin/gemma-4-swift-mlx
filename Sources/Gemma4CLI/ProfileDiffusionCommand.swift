@@ -76,6 +76,9 @@ struct ProfileDiffusion: AsyncParsableCommand {
     @Flag(name: .customLong("quantize-text-only"), help: "Preserve vision_tower / embed_vision en bf16.")
     var quantizeTextOnly: Bool = false
 
+    @Option(name: .customLong("mixed-precision"), help: "Mixed precision Q-DiT/ViDiT-Q : 'default' | 'conservative' | 'aggressive'.")
+    var mixedPrecision: String?
+
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
@@ -122,7 +125,24 @@ struct ProfileDiffusion: AsyncParsableCommand {
         session.metadata["weightsBytes"] = "\(MLX.GPU.activeMemory / (1024 * 1024)) MB GPU"
 
         // 3b) Quantification a la volee
-        if let bits = quantizeBits {
+        if let preset = mixedPrecision {
+            let mpConfig: DiffusionOnTheFlyQuantization.MixedPrecisionConfig
+            switch preset.lowercased() {
+            case "default": mpConfig = .default
+            case "conservative": mpConfig = .conservative
+            case "aggressive": mpConfig = .aggressive
+            default:
+                print("Erreur : --mixed-precision doit etre 'default' | 'conservative' | 'aggressive'")
+                throw ExitCode.failure
+            }
+            session.beginPhase("1b. MixedPrecision", category: .modelLoad)
+            let stats = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: diffModel, config: mpConfig)
+            session.endPhase("1b. MixedPrecision", category: .modelLoad)
+            session.metadata["mixedPrecision"] = "\(preset) (\(stats.quantizedHigh) high + \(stats.quantizedLow) low)"
+            print("Mixed precision (\(preset)) : \(stats.quantizedHigh) modules \(mpConfig.highPrecisionBits)-bit + \(stats.quantizedLow) modules \(mpConfig.lowPrecisionBits)-bit")
+            print("High-prec layers : \(mpConfig.highPrecisionLayers.sorted())")
+            print("GPU apres mixed-precision : \(MLX.GPU.activeMemory / (1024 * 1024)) MB")
+        } else if let bits = quantizeBits {
             guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
                 print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
                 throw ExitCode.failure
@@ -257,6 +277,13 @@ struct ProfileDiffusion: AsyncParsableCommand {
             }
             session.endPhase("4. Encoder forward (canvas \(canvasIdx))", category: .textEncoding)
 
+            // Apres le 1er forward (vision encodee dans le cache) -> decharge vision_tower
+            if canvasIdx == 0 && pixelValues != nil && diffModel.encoder.hasVisionLoaded {
+                session.beginPhase("4b. Unload vision_tower", category: .modelUnload)
+                diffModel.encoder.unloadVision()
+                session.endPhase("4b. Unload vision_tower", category: .modelUnload)
+            }
+
             // Phase 5 — Init canvas
             let split = MLXRandom.split(key: key, into: 2)
             var canvas = sampler.initializeCanvas(batchSize: 1, key: split[0])
@@ -322,6 +349,9 @@ struct ProfileDiffusion: AsyncParsableCommand {
             argmaxCanvas.eval()
             let arr = argmaxCanvas.asArray(Int32.self)
             if arr.contains(Int32(1)) || arr.contains(Int32(106)) { break }
+
+            // Libere le pic transient (~440 MB)
+            MLX.Memory.clearCache()
         }
         session.endPhase("3. Generation", category: .denoisingLoop)
 

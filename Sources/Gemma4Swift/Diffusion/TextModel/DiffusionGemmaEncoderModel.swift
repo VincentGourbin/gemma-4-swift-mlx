@@ -45,6 +45,24 @@ public class DiffusionGemmaEncoderModel: Module {
         super.init()
     }
 
+    /// Decharge les modules vision (vision_tower + embed_vision) une fois que
+    /// les soft-tokens ont ete encodes dans l'EncoderKVCache. Pattern LTX
+    /// `unloadAfterUse`. Libere ~600 MB (vision SigLIP 27 layers hidden 1152).
+    ///
+    /// A appeler APRES le 1er forward (qui place les soft-tokens vision dans
+    /// le cache). Les forwards suivants peuvent etre incrementaux sur du texte
+    /// pur sans vision.
+    public func unloadVision() {
+        self._visionTower.wrappedValue = nil
+        self._embedVision.wrappedValue = nil
+        MLX.Memory.clearCache()
+    }
+
+    /// True si le vision_tower est encore charge.
+    public var hasVisionLoaded: Bool {
+        visionTower != nil
+    }
+
     /// Forward de l'encoder.
     ///
     /// - Parameters:

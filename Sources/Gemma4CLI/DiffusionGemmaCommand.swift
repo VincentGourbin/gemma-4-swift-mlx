@@ -74,6 +74,9 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Flag(name: .customLong("quantize-text-only"), help: "Preserve vision_tower / embed_vision en bf16, quantize seulement encoder.language_model + decoder + self_conditioning.")
     var quantizeTextOnly: Bool = false
 
+    @Option(name: .customLong("mixed-precision"), help: "Mixed precision (Q-DiT/ViDiT-Q) : preset 'default' | 'conservative' | 'aggressive'. Mutuellement exclusif avec --quantize-bits.")
+    var mixedPrecision: String?
+
     @Flag(name: .long, help: "Streaming step-by-step : affiche le canvas decode (argmax) apres CHAQUE step de denoising. Equivalent du `streamer.put_draft` Python = voir le texte se debruiter en live.")
     var streamSteps: Bool = false
 
@@ -141,7 +144,24 @@ struct DiffusionCommand: AsyncParsableCommand {
         print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
 
         // 1b) Quantification a la volee
-        if let bits = quantizeBits {
+        if let preset = mixedPrecision {
+            // Mixed precision (Q-DiT pattern)
+            let mpConfig: DiffusionOnTheFlyQuantization.MixedPrecisionConfig
+            switch preset.lowercased() {
+            case "default": mpConfig = .default
+            case "conservative": mpConfig = .conservative
+            case "aggressive": mpConfig = .aggressive
+            default:
+                print("Erreur : --mixed-precision doit etre 'default' | 'conservative' | 'aggressive'")
+                throw ExitCode.failure
+            }
+            let quantStart = Date()
+            let stats = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: model, config: mpConfig)
+            let quantTime = Date().timeIntervalSince(quantStart)
+            print("Mixed precision (\(preset)) : \(stats.quantizedHigh) modules en \(mpConfig.highPrecisionBits)-bit, \(stats.quantizedLow) modules en \(mpConfig.lowPrecisionBits)-bit (skipped \(stats.skipped.count)) en \(String(format: "%.1f", quantTime))s")
+            print("Layers high-precision (\(mpConfig.highPrecisionBits)-bit) : \(mpConfig.highPrecisionLayers.sorted())")
+            print("GPU apres mixed-precision : \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs")
+        } else if let bits = quantizeBits {
             guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
                 print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
                 throw ExitCode.failure
