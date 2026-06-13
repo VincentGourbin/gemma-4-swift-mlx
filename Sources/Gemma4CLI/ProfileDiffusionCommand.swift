@@ -88,6 +88,9 @@ struct ProfileDiffusion: AsyncParsableCommand {
     @Flag(name: .customLong("clear-cache-on-eval"), help: "Avec --eval-every-n-layers : appelle MLX.Memory.clearCache() apres chaque eval.")
     var clearCacheOnEval: Bool = false
 
+    @Flag(name: .customLong("compiled-entropy"), help: "Utilise MLX.compile pour fuser les kernels de tokenEntropy (logSoftmax + exp + mul + sum). Pattern Python torch.compile.")
+    var compiledEntropy: Bool = false
+
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
@@ -258,6 +261,11 @@ struct ProfileDiffusion: AsyncParsableCommand {
             vocabSize: diffConfig.textConfig.base.vocabSize,
             canvasLength: diffConfig.textConfig.canvasLength
         )
+        sampler.useCompiledEntropy = compiledEntropy
+        if compiledEntropy {
+            session.metadata["compiledEntropy"] = "true"
+            print("MLX.compile activee sur tokenEntropy (JIT kernel fusion)")
+        }
         let temperatureSchedule = LinearTemperatureSchedule(
             tMin: genConfig.tMin,
             tMax: genConfig.tMax,
