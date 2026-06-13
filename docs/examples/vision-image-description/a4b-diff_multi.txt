@@ -1,0 +1,48 @@
+# DiffusionGemma 26B-A4B-it (bf16) — Multi-Image Reasoning
+
+## Setup
+Model : google/diffusiongemma-26B-A4B-it (block-AR diffusion, canvas 256)
+Images : input_sample.jpg + UI.png
+Prompt : "Find 3 things these two images have in common. Be creative!"
+
+================================================================================
+
+## NOT SUPPORTED — Phase 4 simplification
+
+Multi-image input is currently **not supported** by the Swift port of
+DiffusionGemma 26B-A4B (Phase 4 implementation).
+
+### Root cause
+
+Python reference `DiffusionGemmaEncoderModel.forward` supports multi-image via
+`pixel_values: [B*nImages, 3, H, W]` and a `masked_scatter` that handles the
+flat image_mask correctly:
+
+    inputs_embeds = inputs_embeds.masked_scatter(
+        image_mask.to(inputs_embeds.device),
+        image_features.to(inputs_embeds.device)
+    )
+
+The Swift port `DiffusionGemmaEncoderModel.maskedScatter()` was implemented
+with a Phase 4 simplification :
+
+    precondition(B == 1, "maskedScatter multi-batch a implementer (Phase 6)")
+
+(see `Sources/Gemma4Swift/Diffusion/TextModel/DiffusionGemmaEncoderModel.swift`
+line ~111).
+
+### Roadmap
+
+Multi-image support is tracked for a future phase. The fix involves :
+
+1. Generalize `maskedScatter()` to handle arbitrary batch size
+2. Update CLI `--image` to accept multiple occurrences (currently `String?`)
+3. Stack pixel_values along axis 0 from multiple processed images
+4. Verify prompt template expansion handles N×280 image tokens correctly
+
+### Workaround
+
+For Phase 4, use single-image inference via `--image <path>` and combine
+analyses externally if needed.
+
+================================================================================

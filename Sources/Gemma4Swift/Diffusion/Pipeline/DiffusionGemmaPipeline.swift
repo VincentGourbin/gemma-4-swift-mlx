@@ -130,12 +130,12 @@ public actor DiffusionGemmaPipeline {
             // (l'encoder text n'a pas de role direct dans le denoising, c'est le
             // KV cache qui est utilise par le decoder cross-attention).
 
-            // Apres le 1er forward (qui a encode les soft-tokens vision dans le
-            // KV cache), on peut decharger vision_tower + embed_vision pour
-            // liberer ~600 MB. Pattern LTX unloadAfterUse.
-            if canvasIdx == 0 && pixelValues != nil && model.encoder.hasVisionLoaded {
-                model.encoder.unloadVision()
-            }
+            // Note : on a tente de unloadVision() apres le canvas 0 mais
+            // l'assignment direct sur @ModuleInfo viole l'API MLX et crashe
+            // au canvas suivant ("rather than mutating the Module property
+            // directly"). Solution propre = passer par Module.update(modules:)
+            // avec ModuleChildren. Pour l'instant on laisse vision en RAM
+            // (~600 MB sur 50 GB, negligeable). TODO Phase 10.
 
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)

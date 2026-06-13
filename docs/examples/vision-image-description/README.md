@@ -48,6 +48,7 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-{
 | **E4B 4-bit** | 325 | 44.9 tok/s | 5.9 Go | "FIAT 600 or similar era microcar" |
 | **26B-A4B 4-bit** | 337 | 24.8 tok/s | 15.9 Go | "Citroën 2CV (Deux Chevaux)" |
 | **31B 4-bit** | 145 | 7.4 tok/s | 19.0 Go | "red Citroën 2CV" |
+| **DiffusionGemma 26B-A4B bf16** | 256 | 22.9 tok/s | 50.8 Go | "Citroën 2CV (classic French)" |
 
 ### Key Observations
 
@@ -55,6 +56,10 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-{
 - **E4B** guesses "FIAT 600" — close but wrong manufacturer
 - **26B-A4B** correctly identifies "Citroën 2CV" with the French nickname "Deux Chevaux"
 - **31B** also identifies "Citroën 2CV" and provides the most concise, accurate description with specific details (black soft-top roof, chrome hubcaps, gravel path)
+- **DiffusionGemma 26B-A4B** correctly identifies the Citroën 2CV via block-AR
+  diffusion (256-token canvas, 9-15 denoising steps per canvas via adaptive
+  stopping). Quality on par with 26B-A4B AR, generation paradigm is fundamentally
+  different (parallel denoising vs token-by-token). See `a4b-diff_2cv.txt`.
 
 ### 31B Output (Best Quality)
 
@@ -74,10 +79,11 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-{
 | **E4B 4-bit** | 500 | 46.1 tok/s | 5.9 Go |
 | **26B-A4B 4-bit** | 500 | 24.7 tok/s | 15.9 Go |
 | **31B 4-bit** | 500 | 8.3 tok/s | 19.5 Go |
+| **DiffusionGemma 26B-A4B bf16** | 512 | 26.7 tok/s | 50.9 Go |
 
 ### Text Recognition (French UI Elements)
 
-All 4 models correctly read the following French text:
+All 4 AR models + DiffusionGemma correctly read the following French text:
 
 | UI Element | Text | All Models |
 |------------|------|:---:|
@@ -94,15 +100,21 @@ All 4 models correctly read the following French text:
 | Help | "Documentation" | yes |
 | App name | "FluxForge Studio" (central area) | 26B, 31B |
 | Status | "Débruitage... 36%" | 26B, 31B |
-| Button | "Nouvelle idée" | 26B, 31B |
-| Status | "Auto-sauvé" | 26B |
+| Button | "Nouvelle idée" | 26B, 31B, **DiffusionGemma** |
+| Status | "Auto-sauvé" / "Auto-sauveé" | 26B, **DiffusionGemma** |
+| Section | "Historique 2" | **DiffusionGemma only** |
+| Misc | "Site web & Support" | **DiffusionGemma only** |
 
 ### Key Observations
 
 - All models read the main menu items correctly (French text)
 - **26B-A4B** and **31B** additionally identify smaller UI elements (progress bar text, button labels, app name in the central area)
 - **E4B** identifies the application as "an AI image generation tool"
-- **26B-A4B** provides the most complete inventory of visible text
+- **26B-A4B** provides the most complete inventory of visible text for the AR family
+- **DiffusionGemma 26B-A4B** is the **most thorough** : reads "Historique 2" and
+  "Site web & Support" that no AR model mentions, and ventures into the "Forge
+  ton idée" workspace description with "Nouvelle idée" back button and
+  "Auto-sauveé" badge. See `a4b-diff_ui.txt`.
 
 ---
 
@@ -126,6 +138,7 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-2
 | **E4B 4-bit** | 400 | 42.0 tok/s | 6.7 Go |
 | **26B-A4B 4-bit** | 242 | 20.2 tok/s | 16.3 Go |
 | **31B 4-bit** | 233 | 6.7 tok/s | 19.9 Go |
+| **DiffusionGemma 26B-A4B** | — | — | — | not supported (Phase 4 simplification, see `a4b-diff_multi.txt`) |
 
 ### 26B-A4B Output (Most Creative)
 

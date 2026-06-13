@@ -1,0 +1,94 @@
+# DiffusionGemma 26B-A4B-it (bf16) — UI/OCR Comprehension (French)
+
+## Setup
+Model : google/diffusiongemma-26B-A4B-it (block-AR diffusion, canvas 256)
+Image : UI.png (1920x1280, FluxForge Studio macOS interface, French UI)
+Prompt : "Describe this user interface screenshot in detail. Read all visible text including French text. Describe the layout and application purpose."
+
+================================================================================
+--- DiffusionGemma loader (Phase 4 experimental) ---
+Repertoire : /Users/vincent/Library/Caches/models/google/diffusiongemma-26B-A4B-it
+Modele charge en 7.6s
+Config: hidden=2816, layers=30, canvas=256, vocab=262144
+GPU: 49255 Mo actifs, 49255 Mo pic
+Image preprocessee : [1, 3, 624, 1008]
+Prompt tokens : 320
+Premiers tokens : [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880]
+
+--- Generation ---
+max_blocks=2, canvas_length=256, max_denoising_steps=48
+temperature schedule : 0.4 -> 0.8, seed=0
+---
+[canvas 0] This is a screenshot of a dark-themed software application, likely designed for AI-powered image or video generation. The interface is in French and features a deep navy blue and purple color palette.
+
+### **Layout and Structure**
+The interface is divided into two main sections: a narrow sidebar on the left and a large primary workspace on the right.
+
+#### **1. Left Sidebar (Navigation)**
+The sidebar contains navigation links organized into several labeled categories:
+*   **Création (Creation):**
+    *   **Forge ton idée** (Forge your idea): Currently selected, featuring a lightbulb icon.
+    *   **Génération d'image** (Image generation): With a gallery icon.
+    *   **Générer une vidéo** (Generate a video): With a movie camera icon.
+    *   **File d'attente** (Queue): With a folder icon and a blue notification badge showing "1".
+*   **Outils (Tools):**
+    *   **Supprimer l'arrière-...** (Remove background...): With a person silhouette icon.
+    *   **Upscale:** With an upward double-arrow icon.
+    *   **Créer un LoRA** (
+[canvas 1] Create a LoRA): With a magic wand icon.
+*   **Bibliothèque (Library):**
+    *   **Bibliothèque**: With a book icon.
+    *   **Adaptateurs LoRA** (LoRA Adapters): With a chip icon.
+*   **Réglages (Settings):**
+    *   **Modèles** (Models): With a grid icon.
+    *   **Préférences** (Preferences): With a list icon.
+    *   **Cache**: With a folder icon.
+*   **Aide (Help):**
+    *   **Documentation**: With a question mark icon.
+    *   **Site web & Support**: With a globe icon.
+
+#### **2. Main Workspace (Right Area)**
+The main area displays the active project, "Forge ton idée."
+*   **Top Bar:** At the top left, there is a back button labeled "**Nouvelle idée**" (New idea) and a green badge that says "**Auto-sauveé**" (Auto-saved).
+*   **History Section:** Below the bar, a section labeled "**Historique 2**" (History 2) shows a horizontal timeline or workflow with two nodes connected
+
+--- Output complete ---
+This is a screenshot of a dark-themed software application, likely designed for AI-powered image or video generation. The interface is in French and features a deep navy blue and purple color palette.
+
+### **Layout and Structure**
+The interface is divided into two main sections: a narrow sidebar on the left and a large primary workspace on the right.
+
+#### **1. Left Sidebar (Navigation)**
+The sidebar contains navigation links organized into several labeled categories:
+*   **Création (Creation):**
+    *   **Forge ton idée** (Forge your idea): Currently selected, featuring a lightbulb icon.
+    *   **Génération d'image** (Image generation): With a gallery icon.
+    *   **Générer une vidéo** (Generate a video): With a movie camera icon.
+    *   **File d'attente** (Queue): With a folder icon and a blue notification badge showing "1".
+*   **Outils (Tools):**
+    *   **Supprimer l'arrière-...** (Remove background...): With a person silhouette icon.
+    *   **Upscale:** With an upward double-arrow icon.
+    *   **Créer un LoRA** (Create a LoRA): With a magic wand icon.
+*   **Bibliothèque (Library):**
+    *   **Bibliothèque**: With a book icon.
+    *   **Adaptateurs LoRA** (LoRA Adapters): With a chip icon.
+*   **Réglages (Settings):**
+    *   **Modèles** (Models): With a grid icon.
+    *   **Préférences** (Preferences): With a list icon.
+    *   **Cache**: With a folder icon.
+*   **Aide (Help):**
+    *   **Documentation**: With a question mark icon.
+    *   **Site web & Support**: With a globe icon.
+
+#### **2. Main Workspace (Right Area)**
+The main area displays the active project, "Forge ton idée."
+*   **Top Bar:** At the top left, there is a back button labeled "**Nouvelle idée**" (New idea) and a green badge that says "**Auto-sauveé**" (Auto-saved).
+*   **History Section:** Below the bar, a section labeled "**Historique 2**" (History 2) shows a horizontal timeline or workflow with two nodes connected
+
+--- Stats ---
+Tokens generes : 512
+Canvases : 2
+Decoder forwards : 27
+Temps : 19.16s
+Vitesse : 26.7 tok/s (0.71s/step)
+GPU pic : 50929 Mo
