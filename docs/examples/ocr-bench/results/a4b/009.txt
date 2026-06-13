@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample/img_009.png
+  Image preprocessee: [1, 3, 96, 432]
+  Total: 1 image(s), batch: [1, 3, 96, 432]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [563, 5267, 528, 506, 2471, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 304
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is written in the image?
+---
+The image contains the word:
+
+**seem**<turn|>
+
+--- Stats ---
+Tokens: 11
+Temps: 1.81s, Vitesse: 6.1 t/s
+GPU pic: 16310 Mo
