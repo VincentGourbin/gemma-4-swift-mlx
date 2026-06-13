@@ -60,14 +60,17 @@ public class DiffusionGemmaForBlockDiffusion: Module {
     }
 
     /// Encode un prompt et retourne le cache encoder + le last hidden state.
-    /// - Parameter pixelValues : si non nil, les images sont encodees par
-    ///   `vision_tower` puis splices dans inputs_embeds via masked_scatter
-    ///   aux positions `image_token_id`.
+    /// - Parameters:
+    ///   - promptIds : si priorCache nil, c'est le prompt complet. Sinon, ce sont
+    ///     SEULEMENT les nouveaux tokens a appender (delta).
+    ///   - pixelValues : ignore si priorCache != nil (vision deja dans le cache).
+    ///   - priorCache : K/V cache encoder existant a etendre (mode incremental).
     public func encodePrompt(
         promptIds: MLXArray,
-        pixelValues: MLXArray? = nil
+        pixelValues: MLXArray? = nil,
+        priorCache: EncoderKVCache? = nil
     ) -> DiffusionEncoderOutput {
-        encoder(inputIds: promptIds, pixelValues: pixelValues)
+        encoder(inputIds: promptIds, pixelValues: pixelValues, priorCache: priorCache)
     }
 
     /// Forward d'un step de denoising : canvas -> logits.

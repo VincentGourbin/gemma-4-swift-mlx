@@ -89,15 +89,20 @@ public class DiffusionGemmaEncoderTextAttention: Module {
     }
 
     /// - Parameters:
-    ///   - x : `[B, T, H]`, hidden states post-input_layernorm.
-    ///   - mask : masque encoder (causal ou bidir selon config).
-    ///   - positionOffset : offset RoPE (== past_seen_tokens en cas de cache continu).
-    /// - Returns: tuple (output, keys, values) — K/V deja transposes en
-    ///   shape `[B, numKVHeads, T, headDim]` pour collecte par l'encoder model.
+    ///   - x : `[B, T_new, H]`, hidden states post-input_layernorm pour les nouveaux tokens uniquement.
+    ///   - mask : masque encoder. Si priorKV est fourni, doit etre shape
+    ///     `[T_new, T_prior + T_new]` (causal avec offset).
+    ///   - positionOffset : offset RoPE pour les nouveaux tokens (== T_prior si cache).
+    ///   - priorKV : K/V des tokens precedents (de cache). Si fourni, concatene
+    ///     avec les nouveaux K/V avant attention. Les queries (nouvelles uniquement)
+    ///     attendent ainsi sur tout l'historique cumule.
+    /// - Returns: (output, newKeys, newValues) — newKeys/newValues sont uniquement
+    ///   ceux des NOUVEAUX tokens, prets a etre appended au EncoderKVCache.
     public func callAsFunction(
         _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
-        positionOffset: Int = 0
+        positionOffset: Int = 0,
+        priorKV: (keys: MLXArray, values: MLXArray)? = nil
     ) -> (output: MLXArray, keys: MLXArray, values: MLXArray) {
         let (B, L, _) = (x.dim(0), x.dim(1), x.dim(2))
 
@@ -106,31 +111,44 @@ public class DiffusionGemmaEncoderTextAttention: Module {
         queries = queries.transposed(0, 2, 1, 3)
         queries = rope(queries, offset: positionOffset)
 
-        var keys = kProj(x).reshaped(B, L, numKVHeads, headDim)
-        var values: MLXArray
+        var newKeys = kProj(x).reshaped(B, L, numKVHeads, headDim)
+        var newValues: MLXArray
         if useKEqV {
-            values = keys
+            newValues = newKeys
         } else {
-            values = vProj!(x).reshaped(B, L, numKVHeads, headDim)
+            newValues = vProj!(x).reshaped(B, L, numKVHeads, headDim)
         }
 
-        keys = kNorm(keys)
-        keys = keys.transposed(0, 2, 1, 3)
-        keys = rope(keys, offset: positionOffset)
+        newKeys = kNorm(newKeys)
+        newKeys = newKeys.transposed(0, 2, 1, 3)
+        newKeys = rope(newKeys, offset: positionOffset)
 
-        values = vNorm(values)
-        values = values.transposed(0, 2, 1, 3)
+        newValues = vNorm(newValues)
+        newValues = newValues.transposed(0, 2, 1, 3)
+
+        // Attention : si priorKV fourni, on concat avec les nouveaux K/V pour que
+        // les nouvelles queries voient tout le contexte cumule.
+        let attentionKeys: MLXArray
+        let attentionValues: MLXArray
+        if let prior = priorKV {
+            attentionKeys = concatenated([prior.keys, newKeys], axis: 2)
+            attentionValues = concatenated([prior.values, newValues], axis: 2)
+        } else {
+            attentionKeys = newKeys
+            attentionValues = newValues
+        }
 
         let output = MLXFast.scaledDotProductAttention(
             queries: queries,
-            keys: keys,
-            values: values,
+            keys: attentionKeys,
+            values: attentionValues,
             scale: scale,
             mask: mask
         )
         .transposed(0, 2, 1, 3)
         .reshaped(B, L, -1)
 
-        return (oProj(output), keys, values)
+        // On retourne UNIQUEMENT les nouveaux K/V (a appender au cache)
+        return (oProj(output), newKeys, newValues)
     }
 }

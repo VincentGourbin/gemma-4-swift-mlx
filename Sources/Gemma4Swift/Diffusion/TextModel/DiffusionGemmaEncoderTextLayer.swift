@@ -56,16 +56,23 @@ public class DiffusionGemmaEncoderTextLayer: Module {
         super.init()
     }
 
-    /// - Returns: tuple (output, keys, values) — K/V transposes prets pour collecte.
+    /// - Parameters:
+    ///   - priorKV : K/V des tokens precedents (cache). Si fourni, l'attention
+    ///     concatene avec les nouveaux K/V avant scaledDotProduct.
+    /// - Returns: tuple (output, newKeys, newValues) — uniquement les NOUVEAUX K/V
+    ///   (a appender au cache externe).
     public func callAsFunction(
         _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode = .none,
-        positionOffset: Int = 0
+        positionOffset: Int = 0,
+        priorKV: (keys: MLXArray, values: MLXArray)? = nil
     ) -> (output: MLXArray, keys: MLXArray, values: MLXArray) {
         var residual = x
 
         var h = inputLayernorm(x)
-        let (attnOut, keys, values) = selfAttn(h, mask: mask, positionOffset: positionOffset)
+        let (attnOut, keys, values) = selfAttn(
+            h, mask: mask, positionOffset: positionOffset, priorKV: priorKV
+        )
         h = postAttentionLayernorm(attnOut)
         h = residual + h
 

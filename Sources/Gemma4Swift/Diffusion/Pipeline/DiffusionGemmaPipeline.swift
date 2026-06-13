@@ -100,13 +100,35 @@ public actor DiffusionGemmaPipeline {
         var totalSteps = 0
         var canvasesUsed = 0
 
+        // KV cache encoder incremental : maintenu entre les canvases.
+        // - Canvas 0 : on encode le prompt complet (+ vision si fourni)
+        // - Canvas N+1 : on encode juste les 256 nouveaux tokens (argmax du canvas N)
+        //   et on append au cache. Pas de re-encode du prompt initial.
+        var encoderCache: EncoderKVCache? = nil
+        var lastEncoderHidden: MLXArray? = nil
+
         for canvasIdx in 0 ..< maxBlocks {
-            // 1) Encoder forward sur l'entierete du prompt + canvases deja commits.
-            //    Note : on passe pixel_values a TOUS les canvases car le prompt
-            //    contient toujours les image_token_id qui doivent etre remplaces
-            //    par les soft-tokens vision. KV cache encoder incremental
-            //    (Phase 6) eliminera ce recalcul.
-            let encOut = model.encodePrompt(promptIds: fullIds, pixelValues: pixelValues)
+            // 1) Encoder forward incremental
+            let deltaIds: MLXArray
+            let pixelsForCall: MLXArray?
+            if encoderCache == nil {
+                // Premier appel : encode tout le prompt + vision
+                deltaIds = fullIds
+                pixelsForCall = pixelValues
+            } else {
+                // Append : seulement les nouveaux tokens du dernier canvas commit
+                let promptLen = encoderCache!.seqLength
+                deltaIds = fullIds[0..., promptLen ..< fullIds.dim(1)]
+                pixelsForCall = nil
+            }
+            let encOut = model.encodePrompt(
+                promptIds: deltaIds,
+                pixelValues: pixelsForCall,
+                priorCache: encoderCache
+            )
+            encoderCache = encOut.kvCache
+            lastEncoderHidden = encOut.lastHiddenState
+            _ = lastEncoderHidden
 
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)
@@ -122,7 +144,7 @@ public actor DiffusionGemmaPipeline {
                 // a) decoder forward
                 let logits = model.denoiseStep(
                     canvasIds: canvas,
-                    encoderCache: encOut.kvCache,
+                    encoderCache: encoderCache!,
                     selfConditioningLogits: prevLogits,
                     decoderAttentionMask: nil
                 )

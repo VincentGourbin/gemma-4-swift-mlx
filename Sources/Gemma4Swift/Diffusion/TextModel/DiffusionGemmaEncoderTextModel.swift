@@ -63,10 +63,18 @@ public class DiffusionGemmaEncoderTextModel: Module {
         super.init()
     }
 
-    /// Forward avec inputs_embeds deja calcule (utile pour multimodal).
+    /// Forward complet (sans cache) ou incremental (avec priorCache).
+    ///
+    /// - Parameters:
+    ///   - inputs : nouveaux tokens (delta). Si priorCache nil, c'est tout le prompt.
+    ///   - inputsEmbeds : alternative a inputs (utile multimodal).
+    ///   - priorCache : si fourni, on encode SEULEMENT les nouveaux tokens.
+    ///     Le K/V cache est etendu avec append. positionOffset = priorCache.seqLength.
+    /// - Returns: DiffusionEncoderOutput avec cache mis a jour (priorCache + nouveaux).
     public func callAsFunction(
         inputs: MLXArray? = nil,
-        inputsEmbeds: MLXArray? = nil
+        inputsEmbeds: MLXArray? = nil,
+        priorCache: EncoderKVCache? = nil
     ) -> DiffusionEncoderOutput {
         var hiddenStates: MLXArray
         if let inputsEmbeds = inputsEmbeds {
@@ -78,44 +86,49 @@ public class DiffusionGemmaEncoderTextModel: Module {
             fatalError("inputs ou inputsEmbeds requis")
         }
 
-        let T = hiddenStates.dim(1)
+        let T_new = hiddenStates.dim(1)
+        let positionOffset = priorCache?.seqLength ?? 0
+        let T_total = positionOffset + T_new
 
-        // Masque encoder :
-        // - "all"   -> bidirectionnel total = .none
-        // - autre   -> causal
-        // TODO Phase 3+: "vision" demande l'overlay bidir sur les tokens d'image
-        //   (cf. mm_token_type_ids cote Python). Pour l'instant on tombe sur causal.
+        // Masque encoder avec offset pour les nouvelles queries vs cache total.
+        // - "all"   -> bidir : .none (mais alors cache n'est pas semantique correct)
+        // - causal  -> createCausalMask(n: T_new, offset: positionOffset)
         let mask: MLXFast.ScaledDotProductAttentionMaskMode
         if useBidirectionalAttention == "all" {
             mask = .none
-        } else if T > 1 {
-            mask = .array(MLXLMCommon.createCausalMask(n: T, offset: 0))
+        } else if T_total > 1 {
+            mask = .array(MLXLMCommon.createCausalMask(n: T_new, offset: positionOffset))
         } else {
             mask = .none
         }
-
-        // Note : pour la fenetre glissante, MLXLMCommon.createAttentionMask gere
-        // la window mais cote encoder DiffusionGemma, les layers sliding utilisent
-        // le meme masque que les full (l'attention est meme causal partout). Le
-        // SDPA ignore au-dela de window grace au flag `sliding_window` cote Python.
-        // Cote Swift, on materialise simplement le mask causal complet.
-        // TODO Phase 3+: utiliser sliding_window separe si necessaire.
         let slidingMask = mask
 
-        var cache = EncoderKVCache(numLayers: layers.count)
+        // Cache initial : copie du priorCache si fourni, sinon vide.
+        var cache = priorCache ?? EncoderKVCache(numLayers: layers.count)
         let layerTypes = config.resolvedLayerTypes
 
         for (i, layer) in layers.enumerated() {
             let isGlobal = layerTypes[i] == "full_attention"
             let layerMask = isGlobal ? mask : slidingMask
 
-            let (output, keys, values) = layer(
+            let priorKV = priorCache?.entries[i].map { (keys: $0.keys, values: $0.values) }
+
+            let (output, newKeys, newValues) = layer(
                 hiddenStates,
                 mask: layerMask,
-                positionOffset: 0
+                positionOffset: positionOffset,
+                priorKV: priorKV
             )
             hiddenStates = output
-            cache.set(layerIdx: i, keys: keys, values: values)
+
+            // Cache : si priorKV present, append. Sinon, set direct.
+            if let prior = priorKV {
+                let mergedKeys = concatenated([prior.keys, newKeys], axis: 2)
+                let mergedValues = concatenated([prior.values, newValues], axis: 2)
+                cache.set(layerIdx: i, keys: mergedKeys, values: mergedValues)
+            } else {
+                cache.set(layerIdx: i, keys: newKeys, values: newValues)
+            }
         }
 
         let normed = norm(hiddenStates)

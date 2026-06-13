@@ -51,18 +51,26 @@ public class DiffusionGemmaEncoderModel: Module {
     ///   - inputIds : `[B, T]` int. Tokens du prompt (avec `imageTokenId` aux
     ///     positions a remplacer par les soft-tokens vision).
     ///   - pixelValues : `[B*nImages, 3, H, W]` float ou nil. Images preprocessees.
+    ///   - priorCache : si fourni, encode SEULEMENT les nouveaux tokens. Le
+    ///     traitement vision (vision_tower) n'est exécuté que si priorCache est nil
+    ///     (les soft-tokens vision sont supposés déjà encodés dans le cache).
     public func callAsFunction(
         inputIds: MLXArray,
-        pixelValues: MLXArray? = nil
+        pixelValues: MLXArray? = nil,
+        priorCache: EncoderKVCache? = nil
     ) -> DiffusionEncoderOutput {
+        // En mode incremental (priorCache != nil) : on suppose que la vision a
+        // ete encodee au premier appel, donc on traite les inputIds comme du
+        // texte pur (les nouveaux tokens sont du canvas argmax, pas d'image).
+        let useVision = pixelValues != nil && priorCache == nil
+
         // 1) Mask des positions image_token AVANT de remplacer par pad
         let imageMask = inputIds .== MLXArray(Int32(imageTokenId))
 
         // 2) Remplace image_token par pad pour eviter l'OOV d'embedding
-        //    (le decoder n'a pas d'embedding > vocab_size, image_token est hors vocab)
         let padTokenId = config.textConfig.base.vocabSize > imageTokenId ? imageTokenId : 0
         let safeInputIds: MLXArray
-        if pixelValues != nil {
+        if useVision {
             safeInputIds = MLX.where(imageMask, MLXArray(Int32(padTokenId)), inputIds)
         } else {
             safeInputIds = inputIds
@@ -72,19 +80,17 @@ public class DiffusionGemmaEncoderModel: Module {
         var inputsEmbeds = languageModel.embedTokens(safeInputIds)
         inputsEmbeds = inputsEmbeds * MLXArray(languageModel.embedScale, dtype: inputsEmbeds.dtype)
 
-        // 4) Vision : extrait soft-tokens et splice via masked_scatter
-        if let pixelValues = pixelValues,
+        // 4) Vision : extrait soft-tokens et splice via masked_scatter (1er appel uniquement)
+        if useVision,
+           let pixelValues = pixelValues,
            let visionTower = visionTower,
            let embedVision = embedVision {
             let visionFeatures = visionTower(pixelValues)             // [B, 280, 1152]
             let mmFeatures = embedVision(visionFeatures)              // [B, 280, 2816]
 
-            // Expand image_mask : [B, T] -> [B, T, H]
             let maskExpanded = expandedDimensions(imageMask, axis: -1)
             let maskBroadcast = broadcast(maskExpanded, to: inputsEmbeds.shape)
 
-            // masked_scatter : remplace les positions True par les valeurs flatten de mm_features
-            // En MLX : on flatten les positions image, scatter, puis reshape
             inputsEmbeds = maskedScatter(
                 inputsEmbeds: inputsEmbeds,
                 mask: maskBroadcast,
@@ -92,8 +98,8 @@ public class DiffusionGemmaEncoderModel: Module {
             )
         }
 
-        // 5) Forward du language_model
-        return languageModel(inputsEmbeds: inputsEmbeds)
+        // 5) Forward du language_model avec priorCache si fourni
+        return languageModel(inputsEmbeds: inputsEmbeds, priorCache: priorCache)
     }
 
     /// Splice les valeurs `source` aux positions `mask=True` dans `inputsEmbeds`.

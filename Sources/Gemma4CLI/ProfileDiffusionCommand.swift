@@ -229,13 +229,30 @@ struct ProfileDiffusion: AsyncParsableCommand {
         let totalStepsExpected = maxBlocks * genConfig.maxDenoisingSteps
         var stepGlobalIdx = 0
 
+        var encoderCache: EncoderKVCache? = nil
+
         for canvasIdx in 0 ..< maxBlocks {
-            // Phase 4 — Encoder forward
+            // Phase 4 — Encoder forward (incremental : encode delta tokens uniquement
+            // apres le 1er canvas, reuse priorCache)
             session.beginPhase("4. Encoder forward (canvas \(canvasIdx))", category: .textEncoding)
-            let encOut = diffModel.encodePrompt(promptIds: fullIds, pixelValues: pixelValues)
+            let deltaIds: MLXArray
+            let pixelsForCall: MLXArray?
+            if encoderCache == nil {
+                deltaIds = fullIds
+                pixelsForCall = pixelValues
+            } else {
+                let promptLen = encoderCache!.seqLength
+                deltaIds = fullIds[0..., promptLen ..< fullIds.dim(1)]
+                pixelsForCall = nil
+            }
+            let encOut = diffModel.encodePrompt(
+                promptIds: deltaIds,
+                pixelValues: pixelsForCall,
+                priorCache: encoderCache
+            )
+            encoderCache = encOut.kvCache
             _ = encOut.lastHiddenState
-            // Force eval pour mesurer le temps reel
-            for entry in encOut.kvCache.entries.prefix(1) {
+            for entry in encoderCache!.entries.prefix(1) {
                 if let e = entry { e.keys.eval() }
             }
             session.endPhase("4. Encoder forward (canvas \(canvasIdx))", category: .textEncoding)
@@ -256,7 +273,7 @@ struct ProfileDiffusion: AsyncParsableCommand {
 
                 let logits = diffModel.denoiseStep(
                     canvasIds: canvas,
-                    encoderCache: encOut.kvCache,
+                    encoderCache: encoderCache!,
                     selfConditioningLogits: prevLogits,
                     decoderAttentionMask: nil
                 )
