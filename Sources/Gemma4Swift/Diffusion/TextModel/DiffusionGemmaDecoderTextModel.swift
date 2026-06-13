@@ -23,6 +23,15 @@ public class DiffusionGemmaDecoderTextModel: Module {
     let config: Gemma4TextConfig
     let canvasLength: Int
 
+    /// Frequence d'eval intermediaire dans la boucle de layers.
+    /// 0 = jamais (defaut). >0 = eval(hiddenStates) tous les N layers.
+    /// Pattern Flux2/LTX : casse le graph MLX plus tot pour liberer le pic
+    /// transient (mesure ~440 MB par forward decoder).
+    public var evalEveryNLayers: Int = 0
+
+    /// Si true, MLX.Memory.clearCache() apres chaque eval intermediaire.
+    public var clearCacheOnEval: Bool = false
+
     @ModuleInfo(key: "embed_tokens") public var embedTokens: Embedding
     @ModuleInfo public var layers: [DiffusionGemmaDecoderTextLayer]
     @ModuleInfo public var norm: RMSNorm
@@ -143,6 +152,16 @@ public class DiffusionGemmaDecoderTextModel: Module {
                 encoderEntry: encoderEntry,
                 encoderCacheLength: encoderCacheLength
             )
+
+            // Pattern Flux2/LTX : eval intermediaire pour casser le graph
+            // et liberer le pic transient (~440 MB par forward decoder).
+            // Sur 30 layers, freq=8 → 3 evals (apres layer 7, 15, 23).
+            if evalEveryNLayers > 0 && (i + 1) % evalEveryNLayers == 0 && i < layers.count - 1 {
+                eval(hiddenStates)
+                if clearCacheOnEval {
+                    MLX.Memory.clearCache()
+                }
+            }
         }
 
         // 7) Norm finale

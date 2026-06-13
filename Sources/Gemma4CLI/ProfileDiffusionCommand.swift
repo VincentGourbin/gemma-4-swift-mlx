@@ -82,6 +82,12 @@ struct ProfileDiffusion: AsyncParsableCommand {
     @Option(name: .customLong("cache-limit-gb"), help: "Force MLX cache GPU limit a N GB.")
     var cacheLimitGB: Int?
 
+    @Option(name: .customLong("eval-every-n-layers"), help: "Pattern Flux2/LTX : eval(hiddenStates) tous les N layers du decoder. 0 = jamais. 8 = 3 evals sur 30 layers, libere le pic transient.")
+    var evalEveryNLayers: Int = 0
+
+    @Flag(name: .customLong("clear-cache-on-eval"), help: "Avec --eval-every-n-layers : appelle MLX.Memory.clearCache() apres chaque eval.")
+    var clearCacheOnEval: Bool = false
+
     @Flag(name: .long, help: "Desactiver l'export Chrome Trace")
     var noChromeTrace: Bool = false
 
@@ -126,6 +132,15 @@ struct ProfileDiffusion: AsyncParsableCommand {
         )
         session.endPhase("1. Model Loading", category: .modelLoad)
         session.metadata["weightsBytes"] = "\(MLX.GPU.activeMemory / (1024 * 1024)) MB GPU"
+
+        // 3a-ter) Eval frequency override (pattern Flux2/LTX)
+        if evalEveryNLayers > 0 {
+            diffModel.decoder.evalEveryNLayers = evalEveryNLayers
+            diffModel.decoder.clearCacheOnEval = clearCacheOnEval
+            session.metadata["evalEveryNLayers"] = "\(evalEveryNLayers)"
+            session.metadata["clearCacheOnEval"] = "\(clearCacheOnEval)"
+            print("Eval intermediate : tous les \(evalEveryNLayers) layers (\(clearCacheOnEval ? "avec" : "sans") clearCache)")
+        }
 
         // 3a-bis) Cache limit override
         if let cacheGB = cacheLimitGB {
