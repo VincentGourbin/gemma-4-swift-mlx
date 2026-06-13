@@ -1,0 +1,27 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_143.png
+  Image preprocessee: [1, 3, 192, 1008]
+  Total: 1 image(s), batch: [1, 3, 192, 1008]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [529, 506, 6581, 528, 506, 2471, 1699, 115226, 6518, 236761, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 308
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+---
+The expression in the image appears to be:
+
+$$\text{arccos}\left(\frac{1}{4}\right), \pi]$$
+
+If you want to represent this as a mathematical expression, it likely represents an interval or a condition involving the arccosine function.
+
+Here is the
+
+--- Stats ---
+Tokens: 60
+Temps: 4.88s, Vitesse: 12.3 t/s
+GPU pic: 6056 Mo

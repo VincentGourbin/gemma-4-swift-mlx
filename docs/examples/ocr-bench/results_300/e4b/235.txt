@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_235.png
+  Image preprocessee: [1, 3, 96, 144]
+  Total: 1 image(s), batch: [1, 3, 96, 144]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258882, 107, 14070, 563, 5267, 528, 506, 2471, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 300
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is written in the image?
+---
+The image contains the word **espt** followed by a partial or obscured word that starts with **e**.
+
+It appears to be the beginning of a word, possibly **espt** followed by **e** or another letter.<turn|>
+
+--- Stats ---
+Tokens: 48
+Temps: 3.96s, Vitesse: 12.1 t/s
+GPU pic: 6032 Mo

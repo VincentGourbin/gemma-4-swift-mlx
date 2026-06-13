@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_284.png
+  Image preprocessee: [1, 3, 768, 816]
+  Total: 1 image(s), batch: [1, 3, 768, 816]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [107, 3689, 563, 506, 1051, 13762, 580, 672, 14626, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 302
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What is the year printed on this calendar?
+---
+The year printed on this calendar is **2015**.<turn|>
+
+--- Stats ---
+Tokens: 14
+Temps: 1.62s, Vitesse: 8.6 t/s
+GPU pic: 6045 Mo

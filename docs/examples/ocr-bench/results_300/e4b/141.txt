@@ -1,0 +1,31 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_141.png
+  Image preprocessee: [1, 3, 96, 624]
+  Total: 1 image(s), batch: [1, 3, 96, 624]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236800, 568, 236743, 236812, 1732, 640, 2222, 236778, 555, 708, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 325
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+N a H C O _3 ( 4 ) H _2 S O
+---
+Here is the LaTeX code to typeset the chemical formula shown in the image:
+
+```latex
+\text{NaHCO}_3 \cdot (\text{4}) \text{H}_2\text{SO}
+```
+
+**Explanation and Refinement:**
+
+The image shows:
+$$\
+
+--- Stats ---
+Tokens: 60
+Temps: 4.90s, Vitesse: 12.2 t/s
+GPU pic: 6105 Mo

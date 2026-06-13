@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_198.png
+  Image preprocessee: [1, 3, 864, 672]
+  Total: 1 image(s), batch: [1, 3, 864, 672]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [1816, 528, 506, 2471, 5467, 236761, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 320
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is the value for '(D) STATE/ZIP'? Answer this question using the text in the image directly.
+---
+Maryland 21205<turn|>
+
+--- Stats ---
+Tokens: 8
+Temps: 1.86s, Vitesse: 4.3 t/s
+GPU pic: 16311 Mo

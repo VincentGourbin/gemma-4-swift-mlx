@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_075.png
+  Image preprocessee: [1, 3, 768, 768]
+  Total: 1 image(s), batch: [1, 3, 768, 768]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [8321, 600, 740, 577, 40399, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 311
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Which is listed fourth among the types of waste that can be recycled?
+---
+Based on the infographic, the types of waste that can be recycled are listed at the bottom. The fourth item in that list is **plastic**.<turn|>
+
+--- Stats ---
+Tokens: 30
+Temps: 3.35s, Vitesse: 9.0 t/s
+GPU pic: 16311 Mo

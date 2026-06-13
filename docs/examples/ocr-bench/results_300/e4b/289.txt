@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_289.png
+  Image preprocessee: [1, 3, 624, 960]
+  Total: 1 image(s), batch: [1, 3, 624, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258882, 107, 7650, 15337, 2544, 1603, 506, 8334, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 300
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: which clothing company made the shirt?
+---
+The shirt is made by **Adidas**.<turn|>
+
+--- Stats ---
+Tokens: 9
+Temps: 1.27s, Vitesse: 7.1 t/s
+GPU pic: 6039 Mo

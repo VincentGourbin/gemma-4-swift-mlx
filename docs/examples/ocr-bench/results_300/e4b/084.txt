@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_084.png
+  Image preprocessee: [1, 3, 672, 960]
+  Total: 1 image(s), batch: [1, 3, 672, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [7302, 100661, 11682, 528, 236743, 236778, 236771, 236770, 236819, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 309
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: How many people were on antiretroviral therapy in 2019?
+---
+Based on the bar chart, the number of people on antiretroviral therapy (ART) in 2019 was **25.4 million**.<turn|>
+
+--- Stats ---
+Tokens: 33
+Temps: 2.93s, Vitesse: 11.2 t/s
+GPU pic: 6064 Mo

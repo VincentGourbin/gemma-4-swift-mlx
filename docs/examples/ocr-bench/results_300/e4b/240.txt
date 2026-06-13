@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_240.png
+  Image preprocessee: [1, 3, 384, 1440]
+  Total: 1 image(s), batch: [1, 3, 384, 1440]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258882, 107, 14070, 563, 5267, 528, 506, 2471, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 300
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is written in the image?
+---
+The image shows the word **WONDERS.** in large letters.
+
+The letters are stylized and appear to have different patterns or colors behind them, suggesting they might be part of a larger sign or display.<turn|>
+
+--- Stats ---
+Tokens: 43
+Temps: 3.62s, Vitesse: 11.9 t/s
+GPU pic: 6038 Mo

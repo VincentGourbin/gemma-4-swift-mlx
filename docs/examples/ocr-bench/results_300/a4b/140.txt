@@ -1,0 +1,25 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_140.png
+  Image preprocessee: [1, 3, 144, 1008]
+  Total: 1 image(s), batch: [1, 3, 144, 1008]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [620, 549, 965, 520, 236884, 236800, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 368
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+\rho = \frac { m } { V } = \frac { 2 k g } { 2 . 5 \times 1 0 ^ { - 3 } m ^3 } = 8 0 0 k g / m^3
+---
+Based on the image provided, here is the expression in LaTeX format:
+
+```latex
+\rho = \frac{m}{V} = \frac{2 \text{ kg}}{2.5 \times 10^{-3} \text{ m}^3} = 80
+
+--- Stats ---
+Tokens: 60
+Temps: 5.28s, Vitesse: 11.4 t/s
+GPU pic: 16306 Mo

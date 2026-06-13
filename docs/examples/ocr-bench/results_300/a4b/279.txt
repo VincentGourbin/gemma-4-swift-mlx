@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_279.png
+  Image preprocessee: [1, 3, 672, 912]
+  Total: 1 image(s), batch: [1, 3, 672, 912]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236751, 1463, 580, 506, 1447, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 308
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Whats is the store's name on the right?
+---
+The store's name on the right is PIZZA & PASTA.<turn|>
+
+--- Stats ---
+Tokens: 17
+Temps: 2.47s, Vitesse: 6.9 t/s
+GPU pic: 16311 Mo

@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_005.png
+  Image preprocessee: [1, 3, 432, 720]
+  Total: 1 image(s), batch: [1, 3, 432, 720]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258882, 107, 14070, 563, 5267, 528, 506, 2471, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 300
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is written in the image?
+---
+The image contains the word **"Fear"** written in a stylized, cursive font.
+
+Below the word "Fear," there is a partial word that appears to start with **"tonge"** or something similar, but it is cut off or incomplete in the visible portion of the image.
+
+--- Stats ---
+Tokens: 60
+Temps: 4.98s, Vitesse: 12.0 t/s
+GPU pic: 6035 Mo

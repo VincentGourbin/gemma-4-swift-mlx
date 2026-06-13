@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_088.png
+  Image preprocessee: [1, 3, 672, 960]
+  Total: 1 image(s), batch: [1, 3, 672, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236789, 236751, 506, 1346, 4913, 5354, 528, 506, 9535, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 304
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What's the most popular mode in the chart?
+---
+The most popular mode in the chart is **Passenger cars** at **71.7%**.<turn|>
+
+--- Stats ---
+Tokens: 21
+Temps: 2.12s, Vitesse: 9.9 t/s
+GPU pic: 6048 Mo

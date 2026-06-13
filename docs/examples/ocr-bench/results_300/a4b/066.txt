@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_066.png
+  Image preprocessee: [1, 3, 672, 960]
+  Total: 1 image(s), batch: [1, 3, 672, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236743, 236778, 236771, 236778, 236771, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 310
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What was the population of Panama in 2020?
+---
+Based on the chart provided, the population in 2020 was **4.28 million** inhabitants.<turn|>
+
+--- Stats ---
+Tokens: 25
+Temps: 3.07s, Vitesse: 8.2 t/s
+GPU pic: 16312 Mo

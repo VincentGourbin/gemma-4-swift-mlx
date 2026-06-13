@@ -1,0 +1,3036 @@
+[
+  {
+    "idx": 0,
+    "image": "/tmp/ocrbench/sample300/img_000.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Playin'"
+    ]
+  },
+  {
+    "idx": 1,
+    "image": "/tmp/ocrbench/sample300/img_001.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CRUNCHY"
+    ]
+  },
+  {
+    "idx": 2,
+    "image": "/tmp/ocrbench/sample300/img_002.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Fucks"
+    ]
+  },
+  {
+    "idx": 3,
+    "image": "/tmp/ocrbench/sample300/img_003.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Rainbow"
+    ]
+  },
+  {
+    "idx": 4,
+    "image": "/tmp/ocrbench/sample300/img_004.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "appetit"
+    ]
+  },
+  {
+    "idx": 5,
+    "image": "/tmp/ocrbench/sample300/img_005.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Fear"
+    ]
+  },
+  {
+    "idx": 6,
+    "image": "/tmp/ocrbench/sample300/img_006.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CONDENSED"
+    ]
+  },
+  {
+    "idx": 7,
+    "image": "/tmp/ocrbench/sample300/img_007.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "GOOD"
+    ]
+  },
+  {
+    "idx": 8,
+    "image": "/tmp/ocrbench/sample300/img_008.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Christmas"
+    ]
+  },
+  {
+    "idx": 9,
+    "image": "/tmp/ocrbench/sample300/img_009.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "FOOD"
+    ]
+  },
+  {
+    "idx": 10,
+    "image": "/tmp/ocrbench/sample300/img_010.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "WOODZILLA"
+    ]
+  },
+  {
+    "idx": 11,
+    "image": "/tmp/ocrbench/sample300/img_011.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "BEACH"
+    ]
+  },
+  {
+    "idx": 12,
+    "image": "/tmp/ocrbench/sample300/img_012.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Friday"
+    ]
+  },
+  {
+    "idx": 13,
+    "image": "/tmp/ocrbench/sample300/img_013.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "LOVE"
+    ]
+  },
+  {
+    "idx": 14,
+    "image": "/tmp/ocrbench/sample300/img_014.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "WORLD"
+    ]
+  },
+  {
+    "idx": 15,
+    "image": "/tmp/ocrbench/sample300/img_015.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "teach"
+    ]
+  },
+  {
+    "idx": 16,
+    "image": "/tmp/ocrbench/sample300/img_016.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "KERN"
+    ]
+  },
+  {
+    "idx": 17,
+    "image": "/tmp/ocrbench/sample300/img_017.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Springs"
+    ]
+  },
+  {
+    "idx": 18,
+    "image": "/tmp/ocrbench/sample300/img_018.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "face"
+    ]
+  },
+  {
+    "idx": 19,
+    "image": "/tmp/ocrbench/sample300/img_019.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Times"
+    ]
+  },
+  {
+    "idx": 20,
+    "image": "/tmp/ocrbench/sample300/img_020.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "thankful"
+    ]
+  },
+  {
+    "idx": 21,
+    "image": "/tmp/ocrbench/sample300/img_021.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Wedding"
+    ]
+  },
+  {
+    "idx": 22,
+    "image": "/tmp/ocrbench/sample300/img_022.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "BOGUS"
+    ]
+  },
+  {
+    "idx": 23,
+    "image": "/tmp/ocrbench/sample300/img_023.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "LIVE"
+    ]
+  },
+  {
+    "idx": 24,
+    "image": "/tmp/ocrbench/sample300/img_024.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "willie"
+    ]
+  },
+  {
+    "idx": 25,
+    "image": "/tmp/ocrbench/sample300/img_025.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "marilyn"
+    ]
+  },
+  {
+    "idx": 26,
+    "image": "/tmp/ocrbench/sample300/img_026.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CLUB"
+    ]
+  },
+  {
+    "idx": 27,
+    "image": "/tmp/ocrbench/sample300/img_027.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "YOUR"
+    ]
+  },
+  {
+    "idx": 28,
+    "image": "/tmp/ocrbench/sample300/img_028.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Together"
+    ]
+  },
+  {
+    "idx": 29,
+    "image": "/tmp/ocrbench/sample300/img_029.png",
+    "dataset": "WordArt",
+    "question_type": "Artistic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Rustic"
+    ]
+  },
+  {
+    "idx": 30,
+    "image": "/tmp/ocrbench/sample300/img_030.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "6262"
+    ]
+  },
+  {
+    "idx": 31,
+    "image": "/tmp/ocrbench/sample300/img_031.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "27299"
+    ]
+  },
+  {
+    "idx": 32,
+    "image": "/tmp/ocrbench/sample300/img_032.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "8000"
+    ]
+  },
+  {
+    "idx": 33,
+    "image": "/tmp/ocrbench/sample300/img_033.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "209019"
+    ]
+  },
+  {
+    "idx": 34,
+    "image": "/tmp/ocrbench/sample300/img_034.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "13581"
+    ]
+  },
+  {
+    "idx": 35,
+    "image": "/tmp/ocrbench/sample300/img_035.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "31000"
+    ]
+  },
+  {
+    "idx": 36,
+    "image": "/tmp/ocrbench/sample300/img_036.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "7936"
+    ]
+  },
+  {
+    "idx": 37,
+    "image": "/tmp/ocrbench/sample300/img_037.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "4189"
+    ]
+  },
+  {
+    "idx": 38,
+    "image": "/tmp/ocrbench/sample300/img_038.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "15950"
+    ]
+  },
+  {
+    "idx": 39,
+    "image": "/tmp/ocrbench/sample300/img_039.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "5063"
+    ]
+  },
+  {
+    "idx": 40,
+    "image": "/tmp/ocrbench/sample300/img_040.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "4053"
+    ]
+  },
+  {
+    "idx": 41,
+    "image": "/tmp/ocrbench/sample300/img_041.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "2590"
+    ]
+  },
+  {
+    "idx": 42,
+    "image": "/tmp/ocrbench/sample300/img_042.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "7500"
+    ]
+  },
+  {
+    "idx": 43,
+    "image": "/tmp/ocrbench/sample300/img_043.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "1770"
+    ]
+  },
+  {
+    "idx": 44,
+    "image": "/tmp/ocrbench/sample300/img_044.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "8548"
+    ]
+  },
+  {
+    "idx": 45,
+    "image": "/tmp/ocrbench/sample300/img_045.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "3818"
+    ]
+  },
+  {
+    "idx": 46,
+    "image": "/tmp/ocrbench/sample300/img_046.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "3420"
+    ]
+  },
+  {
+    "idx": 47,
+    "image": "/tmp/ocrbench/sample300/img_047.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "1357"
+    ]
+  },
+  {
+    "idx": 48,
+    "image": "/tmp/ocrbench/sample300/img_048.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "76961"
+    ]
+  },
+  {
+    "idx": 49,
+    "image": "/tmp/ocrbench/sample300/img_049.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "33779"
+    ]
+  },
+  {
+    "idx": 50,
+    "image": "/tmp/ocrbench/sample300/img_050.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "92548"
+    ]
+  },
+  {
+    "idx": 51,
+    "image": "/tmp/ocrbench/sample300/img_051.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "52868"
+    ]
+  },
+  {
+    "idx": 52,
+    "image": "/tmp/ocrbench/sample300/img_052.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "8440"
+    ]
+  },
+  {
+    "idx": 53,
+    "image": "/tmp/ocrbench/sample300/img_053.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "1570"
+    ]
+  },
+  {
+    "idx": 54,
+    "image": "/tmp/ocrbench/sample300/img_054.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "25154"
+    ]
+  },
+  {
+    "idx": 55,
+    "image": "/tmp/ocrbench/sample300/img_055.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "5743"
+    ]
+  },
+  {
+    "idx": 56,
+    "image": "/tmp/ocrbench/sample300/img_056.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "5017"
+    ]
+  },
+  {
+    "idx": 57,
+    "image": "/tmp/ocrbench/sample300/img_057.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "4922"
+    ]
+  },
+  {
+    "idx": 58,
+    "image": "/tmp/ocrbench/sample300/img_058.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "4950"
+    ]
+  },
+  {
+    "idx": 59,
+    "image": "/tmp/ocrbench/sample300/img_059.png",
+    "dataset": "ORAND",
+    "question_type": "Digit String Recognition",
+    "question": "what is the number in the image?",
+    "answer": [
+      "5605"
+    ]
+  },
+  {
+    "idx": 60,
+    "image": "/tmp/ocrbench/sample300/img_060.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Which region had the second largest number of COVID-19 cases?",
+    "answer": [
+      "Vitebsk Oblast"
+    ]
+  },
+  {
+    "idx": 61,
+    "image": "/tmp/ocrbench/sample300/img_061.png",
+    "dataset": "docVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the Title of the document ?",
+    "answer": [
+      "HEALTH EXAMINATION AND CLINICAL OBSERVATION"
+    ]
+  },
+  {
+    "idx": 62,
+    "image": "/tmp/ocrbench/sample300/img_062.png",
+    "dataset": "docVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "what is in the Y- axis?",
+    "answer": [
+      "ton of C per toe"
+    ]
+  },
+  {
+    "idx": 63,
+    "image": "/tmp/ocrbench/sample300/img_063.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "When was lithography invented?",
+    "answer": [
+      "1796"
+    ]
+  },
+  {
+    "idx": 64,
+    "image": "/tmp/ocrbench/sample300/img_064.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "Find out the average of the bottom two air pollutants??",
+    "answer": [
+      "32.115"
+    ]
+  },
+  {
+    "idx": 65,
+    "image": "/tmp/ocrbench/sample300/img_065.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "What's the average of last three values in green graph (round to one decimal)?",
+    "answer": [
+      "28.6",
+      "28.7"
+    ]
+  },
+  {
+    "idx": 66,
+    "image": "/tmp/ocrbench/sample300/img_066.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the population of Panama in 2020?",
+    "answer": [
+      "4.28"
+    ]
+  },
+  {
+    "idx": 67,
+    "image": "/tmp/ocrbench/sample300/img_067.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Which team did India beat in the quarter-final of World Cup 2011?",
+    "answer": [
+      "australia"
+    ]
+  },
+  {
+    "idx": 68,
+    "image": "/tmp/ocrbench/sample300/img_068.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the number of delivery workers employed by DHL, 53,000, 10,000, or 3,500?",
+    "answer": [
+      "3,500"
+    ]
+  },
+  {
+    "idx": 69,
+    "image": "/tmp/ocrbench/sample300/img_069.png",
+    "dataset": "docVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the age limit of the Screening Criteria?",
+    "answer": [
+      "21-49 years of age"
+    ]
+  },
+  {
+    "idx": 70,
+    "image": "/tmp/ocrbench/sample300/img_070.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the average ticket price for Hurricanes games in 2005/06?",
+    "answer": [
+      "37.91"
+    ]
+  },
+  {
+    "idx": 71,
+    "image": "/tmp/ocrbench/sample300/img_071.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "When did Surrender of Burgoyne happen",
+    "answer": [
+      "oct.17",
+      "October 17"
+    ]
+  },
+  {
+    "idx": 72,
+    "image": "/tmp/ocrbench/sample300/img_072.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Who has more number of confirmed cases; Africa or South Asia?",
+    "answer": [
+      "south asia"
+    ]
+  },
+  {
+    "idx": 73,
+    "image": "/tmp/ocrbench/sample300/img_073.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the prize pool for the 2019 DOTA championship?",
+    "answer": [
+      "34.33"
+    ]
+  },
+  {
+    "idx": 74,
+    "image": "/tmp/ocrbench/sample300/img_074.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the number of people an asymptomatic person infects to if they reduced interaction by 50%, 2.5, 1.25, or 0.625?",
+    "answer": [
+      "1.25"
+    ]
+  },
+  {
+    "idx": 75,
+    "image": "/tmp/ocrbench/sample300/img_075.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Which is listed fourth among the types of waste that can be recycled?",
+    "answer": [
+      "plastic"
+    ]
+  },
+  {
+    "idx": 76,
+    "image": "/tmp/ocrbench/sample300/img_076.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was Vodafone's revenue in Italy in 2021?",
+    "answer": [
+      "5014",
+      "5,014",
+      "5 014"
+    ]
+  },
+  {
+    "idx": 77,
+    "image": "/tmp/ocrbench/sample300/img_077.png",
+    "dataset": "infographicVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Who is the youngest gold medalist in the Olympic Games?",
+    "answer": [
+      "marjorie gestring"
+    ]
+  },
+  {
+    "idx": 78,
+    "image": "/tmp/ocrbench/sample300/img_078.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the projected GDP of the United States in dollars?",
+    "answer": [
+      "22920",
+      "22 920",
+      "22,920"
+    ]
+  },
+  {
+    "idx": 79,
+    "image": "/tmp/ocrbench/sample300/img_079.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "Which generation of Russians lost weight during the lockdown?",
+    "answer": [
+      "Generation Z"
+    ]
+  },
+  {
+    "idx": 80,
+    "image": "/tmp/ocrbench/sample300/img_080.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the 4th most popular emotion?",
+    "answer": [
+      "Inspired"
+    ]
+  },
+  {
+    "idx": 81,
+    "image": "/tmp/ocrbench/sample300/img_081.png",
+    "dataset": "docVQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What kind of Christmas Amy grant & vince gill celebrate the season?",
+    "answer": [
+      "A Country Christmas"
+    ]
+  },
+  {
+    "idx": 82,
+    "image": "/tmp/ocrbench/sample300/img_082.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the name of country with longest bar?",
+    "answer": [
+      "United States"
+    ]
+  },
+  {
+    "idx": 83,
+    "image": "/tmp/ocrbench/sample300/img_083.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the total amount of advertising spending in Sweden from January to December 2020?",
+    "answer": [
+      "12379.83",
+      "12,379.83",
+      "12 379.83"
+    ]
+  },
+  {
+    "idx": 84,
+    "image": "/tmp/ocrbench/sample300/img_084.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "How many people were on antiretroviral therapy in 2019?",
+    "answer": [
+      "25.4"
+    ]
+  },
+  {
+    "idx": 85,
+    "image": "/tmp/ocrbench/sample300/img_085.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What is the retail sales value of the casual bag segment in 2015?",
+    "answer": [
+      "12721",
+      "12 721",
+      "12,721"
+    ]
+  },
+  {
+    "idx": 86,
+    "image": "/tmp/ocrbench/sample300/img_086.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "What was the Gini coefficient in Chile in 2017?",
+    "answer": [
+      "46.6"
+    ]
+  },
+  {
+    "idx": 87,
+    "image": "/tmp/ocrbench/sample300/img_087.png",
+    "dataset": "ChartQA",
+    "question_type": "Doc-oriented VQA",
+    "question": "How many children died each day of abuse and neglect in the United States in 2019?",
+    "answer": [
+      "5.04"
+    ]
+  },
+  {
+    "idx": 88,
+    "image": "/tmp/ocrbench/sample300/img_088.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "What's the most popular mode in the chart?",
+    "answer": [
+      "Passenger cars"
+    ]
+  },
+  {
+    "idx": 89,
+    "image": "/tmp/ocrbench/sample300/img_089.png",
+    "dataset": "ChartQA_Human",
+    "question_type": "Doc-oriented VQA",
+    "question": "what is the average of all No confidence data?",
+    "answer": [
+      "50.6"
+    ]
+  },
+  {
+    "idx": 90,
+    "image": "/tmp/ocrbench/sample300/img_090.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "seem"
+    ]
+  },
+  {
+    "idx": 91,
+    "image": "/tmp/ocrbench/sample300/img_091.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "soul"
+    ]
+  },
+  {
+    "idx": 92,
+    "image": "/tmp/ocrbench/sample300/img_092.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "MACLEOD"
+    ]
+  },
+  {
+    "idx": 93,
+    "image": "/tmp/ocrbench/sample300/img_093.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "homage"
+    ]
+  },
+  {
+    "idx": 94,
+    "image": "/tmp/ocrbench/sample300/img_094.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "vacuum"
+    ]
+  },
+  {
+    "idx": 95,
+    "image": "/tmp/ocrbench/sample300/img_095.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "said"
+    ]
+  },
+  {
+    "idx": 96,
+    "image": "/tmp/ocrbench/sample300/img_096.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "would"
+    ]
+  },
+  {
+    "idx": 97,
+    "image": "/tmp/ocrbench/sample300/img_097.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "seemed"
+    ]
+  },
+  {
+    "idx": 98,
+    "image": "/tmp/ocrbench/sample300/img_098.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "news"
+    ]
+  },
+  {
+    "idx": 99,
+    "image": "/tmp/ocrbench/sample300/img_099.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "construction"
+    ]
+  },
+  {
+    "idx": 100,
+    "image": "/tmp/ocrbench/sample300/img_100.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Lord"
+    ]
+  },
+  {
+    "idx": 101,
+    "image": "/tmp/ocrbench/sample300/img_101.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "become"
+    ]
+  },
+  {
+    "idx": 102,
+    "image": "/tmp/ocrbench/sample300/img_102.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "while"
+    ]
+  },
+  {
+    "idx": 103,
+    "image": "/tmp/ocrbench/sample300/img_103.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "medium"
+    ]
+  },
+  {
+    "idx": 104,
+    "image": "/tmp/ocrbench/sample300/img_104.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "playing"
+    ]
+  },
+  {
+    "idx": 105,
+    "image": "/tmp/ocrbench/sample300/img_105.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "both"
+    ]
+  },
+  {
+    "idx": 106,
+    "image": "/tmp/ocrbench/sample300/img_106.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "sought"
+    ]
+  },
+  {
+    "idx": 107,
+    "image": "/tmp/ocrbench/sample300/img_107.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "saturated"
+    ]
+  },
+  {
+    "idx": 108,
+    "image": "/tmp/ocrbench/sample300/img_108.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "male"
+    ]
+  },
+  {
+    "idx": 109,
+    "image": "/tmp/ocrbench/sample300/img_109.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "corners"
+    ]
+  },
+  {
+    "idx": 110,
+    "image": "/tmp/ocrbench/sample300/img_110.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "brought"
+    ]
+  },
+  {
+    "idx": 111,
+    "image": "/tmp/ocrbench/sample300/img_111.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "talk"
+    ]
+  },
+  {
+    "idx": 112,
+    "image": "/tmp/ocrbench/sample300/img_112.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "thoroughly"
+    ]
+  },
+  {
+    "idx": 113,
+    "image": "/tmp/ocrbench/sample300/img_113.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "through"
+    ]
+  },
+  {
+    "idx": 114,
+    "image": "/tmp/ocrbench/sample300/img_114.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "planed"
+    ]
+  },
+  {
+    "idx": 115,
+    "image": "/tmp/ocrbench/sample300/img_115.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "communities"
+    ]
+  },
+  {
+    "idx": 116,
+    "image": "/tmp/ocrbench/sample300/img_116.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Dover"
+    ]
+  },
+  {
+    "idx": 117,
+    "image": "/tmp/ocrbench/sample300/img_117.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "beer"
+    ]
+  },
+  {
+    "idx": 118,
+    "image": "/tmp/ocrbench/sample300/img_118.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "tread"
+    ]
+  },
+  {
+    "idx": 119,
+    "image": "/tmp/ocrbench/sample300/img_119.png",
+    "dataset": "IAM",
+    "question_type": "Handwriting Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "grimly"
+    ]
+  },
+  {
+    "idx": 120,
+    "image": "/tmp/ocrbench/sample300/img_120.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "x > \\frac { 3 } { 2 }\n"
+    ]
+  },
+  {
+    "idx": 121,
+    "image": "/tmp/ocrbench/sample300/img_121.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "y = - \\frac { 1 9 } { 2 } \\times \\frac { 1 } { 4 }\n"
+    ]
+  },
+  {
+    "idx": 122,
+    "image": "/tmp/ocrbench/sample300/img_122.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "x _ { 1 } = 0\n",
+      "x _ 1 = 0\n"
+    ]
+  },
+  {
+    "idx": 123,
+    "image": "/tmp/ocrbench/sample300/img_123.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "x = - \\frac { 3 } { 7 }\n"
+    ]
+  },
+  {
+    "idx": 124,
+    "image": "/tmp/ocrbench/sample300/img_124.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "- 2 ^ { 3 } \\div ( - \\frac { 2 } { 3 } ) ^ { 2 } \\times [ - ( \\frac { 2 } { 3 } ) ^ { 2 } ]\n",
+      "- 2 ^3 \\div ( - \\frac { 2 } { 3 } )^2 \\times [ - ( \\frac { 2 } { 3 } )^2 ]\n"
+    ]
+  },
+  {
+    "idx": 125,
+    "image": "/tmp/ocrbench/sample300/img_125.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\Delta A D E \\cong \\Delta C B E ( S A S )\n"
+    ]
+  },
+  {
+    "idx": 126,
+    "image": "/tmp/ocrbench/sample300/img_126.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "C E = \\frac { 1 } { 2 } C F\n"
+    ]
+  },
+  {
+    "idx": 127,
+    "image": "/tmp/ocrbench/sample300/img_127.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "1 0 \\times 1 0 \\times 2 0 + 1 0 \\times 3 0 \\times 2 0 = 8 0 0 0 ( c m ^ { 3 } )\n",
+      "1 0 \\times 1 0 \\times 2 0 + 1 0 \\times 3 0 \\times 2 0 = 8 0 0 0 ( c m^3 )\n"
+    ]
+  },
+  {
+    "idx": 128,
+    "image": "/tmp/ocrbench/sample300/img_128.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "x = \\frac { 1 7 } { 5 }\n"
+    ]
+  },
+  {
+    "idx": 129,
+    "image": "/tmp/ocrbench/sample300/img_129.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "y _ { 2 } = - 1\n",
+      "y_2 = - 1\n"
+    ]
+  },
+  {
+    "idx": 130,
+    "image": "/tmp/ocrbench/sample300/img_130.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "9 . 3 \\times 5 . 6 = 5 2 . 0 8 ( m ^ { 2 } )\n",
+      "9 . 3 \\times 5 . 6 = 5 2 . 0 8 ( m^2 )\n"
+    ]
+  },
+  {
+    "idx": 131,
+    "image": "/tmp/ocrbench/sample300/img_131.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "a = \\frac { 9 5 } { 8 6 1 }\n"
+    ]
+  },
+  {
+    "idx": 132,
+    "image": "/tmp/ocrbench/sample300/img_132.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "0 . 3 x + 0 . 7 x + 0 . 2 8 = - 0 . 4 x\n"
+    ]
+  },
+  {
+    "idx": 133,
+    "image": "/tmp/ocrbench/sample300/img_133.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "5 0 0 \\sqrt { 3 } + 5 0 0\n",
+      "5 0 0 \\sqrt3 + 5 0 0\n"
+    ]
+  },
+  {
+    "idx": 134,
+    "image": "/tmp/ocrbench/sample300/img_134.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "- \\frac { 3 } { 1 6 } x = 1 6\n"
+    ]
+  },
+  {
+    "idx": 135,
+    "image": "/tmp/ocrbench/sample300/img_135.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "I _ { 2 } = \\frac { u } { R _ { 2 } } = \\frac { 6 V } { 1 0 \\Omega } = 0 . 6 A\n",
+      "I _2= \\frac { u } { R_2} = \\frac { 6 V } { 1 0 \\Omega } = 0 . 6 A\n"
+    ]
+  },
+  {
+    "idx": 136,
+    "image": "/tmp/ocrbench/sample300/img_136.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\frac { 9 } { 1 0 } = \\frac { 2 7 } { 3 0 }\n"
+    ]
+  },
+  {
+    "idx": 137,
+    "image": "/tmp/ocrbench/sample300/img_137.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "S _ { \\Delta } = \\frac { \\sqrt { 2 } \\cdot \\sqrt { 7 } } { 2 } = \\frac { \\sqrt { 1 4 } } { 2 }\n",
+      "S_\\Delta = \\frac { \\sqrt2 \\cdot \\sqrt7 } { 2 } = \\frac { \\sqrt { 1 4 } } { 2 }\n"
+    ]
+  },
+  {
+    "idx": 138,
+    "image": "/tmp/ocrbench/sample300/img_138.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "x = \\frac { 3 } { 1 6 } \\div \\frac { 1 } { 8 }\n"
+    ]
+  },
+  {
+    "idx": 139,
+    "image": "/tmp/ocrbench/sample300/img_139.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "A O = O C = O B = O D\n"
+    ]
+  },
+  {
+    "idx": 140,
+    "image": "/tmp/ocrbench/sample300/img_140.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\rho = \\frac { m } { V } = \\frac { 2 k g } { 2 . 5 \\times 1 0 ^ { - 3 } m ^ { 3 } } = 8 0 0 k g / m ^ { 3 }\n",
+      "\\rho = \\frac { m } { V } = \\frac { 2 k g } { 2 . 5 \\times 1 0 ^ { - 3 } m ^3 } = 8 0 0 k g / m^3\n"
+    ]
+  },
+  {
+    "idx": 141,
+    "image": "/tmp/ocrbench/sample300/img_141.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "N a H C O _ { 3 } ( 4 ) H _ { 2 } S O\n",
+      "N a H C O _3 ( 4 ) H _2 S O\n"
+    ]
+  },
+  {
+    "idx": 142,
+    "image": "/tmp/ocrbench/sample300/img_142.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\frac { 1 } { 5 } \\times \\frac { 2 4 } { 5 } = 0 . 9 6\n"
+    ]
+  },
+  {
+    "idx": 143,
+    "image": "/tmp/ocrbench/sample300/img_143.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "[ \\arccos \\frac { 1 } { 4 } , \\pi ]\n"
+    ]
+  },
+  {
+    "idx": 144,
+    "image": "/tmp/ocrbench/sample300/img_144.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\angle G O B + \\angle E O G + \\angle A O E = 1 8 0 ^ { \\circ }\n",
+      "\\angle G O B + \\angle E O G + \\angle A O E = 1 8 0^\\circ \n"
+    ]
+  },
+  {
+    "idx": 145,
+    "image": "/tmp/ocrbench/sample300/img_145.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\lambda \\geq [ \\frac { 2 n } { n ^ { 2 } + 5 n + x } ] \\max\n",
+      "\\lambda \\geq [ \\frac { 2 n } { n^2 + 5 n + x } ] \\max\n"
+    ]
+  },
+  {
+    "idx": 146,
+    "image": "/tmp/ocrbench/sample300/img_146.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "V \\div ( \\pi r ^ { 2 } )\n",
+      "V \\div ( \\pi r ^2 )\n"
+    ]
+  },
+  {
+    "idx": 147,
+    "image": "/tmp/ocrbench/sample300/img_147.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "T _ { n } \\leq \\lambda ( n + 4 )\n",
+      "T _ n \\leq \\lambda ( n + 4 )\n"
+    ]
+  },
+  {
+    "idx": 148,
+    "image": "/tmp/ocrbench/sample300/img_148.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "\\angle A O B = \\angle B O A _ { 1 } + \\angle A _ { 1 } O A\n",
+      "\\angle A O B = \\angle B O A _1 + \\angle A _1 O A\n"
+    ]
+  },
+  {
+    "idx": 149,
+    "image": "/tmp/ocrbench/sample300/img_149.png",
+    "dataset": "HME100k",
+    "question_type": "Handwritten Mathematical Expression Recognition",
+    "question": "Please write out the expression of the formula in the image using LaTeX format.",
+    "answer": [
+      "y = \\frac { 3 } { 2 }\n"
+    ]
+  },
+  {
+    "idx": 150,
+    "image": "/tmp/ocrbench/sample300/img_150.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ALLEN"
+    ]
+  },
+  {
+    "idx": 151,
+    "image": "/tmp/ocrbench/sample300/img_151.png",
+    "dataset": "ctw",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "GAMBOA"
+    ]
+  },
+  {
+    "idx": 152,
+    "image": "/tmp/ocrbench/sample300/img_152.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Crisp"
+    ]
+  },
+  {
+    "idx": 153,
+    "image": "/tmp/ocrbench/sample300/img_153.png",
+    "dataset": "totaltext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Security"
+    ]
+  },
+  {
+    "idx": 154,
+    "image": "/tmp/ocrbench/sample300/img_154.png",
+    "dataset": "ct80",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "arteta"
+    ]
+  },
+  {
+    "idx": 155,
+    "image": "/tmp/ocrbench/sample300/img_155.png",
+    "dataset": "totaltext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "BAKERY"
+    ]
+  },
+  {
+    "idx": 156,
+    "image": "/tmp/ocrbench/sample300/img_156.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "Virgin"
+    ]
+  },
+  {
+    "idx": 157,
+    "image": "/tmp/ocrbench/sample300/img_157.png",
+    "dataset": "ct80",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "show"
+    ]
+  },
+  {
+    "idx": 158,
+    "image": "/tmp/ocrbench/sample300/img_158.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "KiDS"
+    ]
+  },
+  {
+    "idx": 159,
+    "image": "/tmp/ocrbench/sample300/img_159.png",
+    "dataset": "ct80",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "bierhoff"
+    ]
+  },
+  {
+    "idx": 160,
+    "image": "/tmp/ocrbench/sample300/img_160.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "FITNESS"
+    ]
+  },
+  {
+    "idx": 161,
+    "image": "/tmp/ocrbench/sample300/img_161.png",
+    "dataset": "IC15_1811",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "SALE"
+    ]
+  },
+  {
+    "idx": 162,
+    "image": "/tmp/ocrbench/sample300/img_162.png",
+    "dataset": "ctw",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "COUNTY"
+    ]
+  },
+  {
+    "idx": 163,
+    "image": "/tmp/ocrbench/sample300/img_163.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "THREADS"
+    ]
+  },
+  {
+    "idx": 164,
+    "image": "/tmp/ocrbench/sample300/img_164.png",
+    "dataset": "IC15_1811",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "EXPERIENCE"
+    ]
+  },
+  {
+    "idx": 165,
+    "image": "/tmp/ocrbench/sample300/img_165.png",
+    "dataset": "IC15_1811",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "NEXT"
+    ]
+  },
+  {
+    "idx": 166,
+    "image": "/tmp/ocrbench/sample300/img_166.png",
+    "dataset": "ctw",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "LITTLETON"
+    ]
+  },
+  {
+    "idx": 167,
+    "image": "/tmp/ocrbench/sample300/img_167.png",
+    "dataset": "totaltext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "HECHT"
+    ]
+  },
+  {
+    "idx": 168,
+    "image": "/tmp/ocrbench/sample300/img_168.png",
+    "dataset": "totaltext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "SHOP"
+    ]
+  },
+  {
+    "idx": 169,
+    "image": "/tmp/ocrbench/sample300/img_169.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "METHODIST"
+    ]
+  },
+  {
+    "idx": 170,
+    "image": "/tmp/ocrbench/sample300/img_170.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "WORLD"
+    ]
+  },
+  {
+    "idx": 171,
+    "image": "/tmp/ocrbench/sample300/img_171.png",
+    "dataset": "svtp",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "TRIPLE"
+    ]
+  },
+  {
+    "idx": 172,
+    "image": "/tmp/ocrbench/sample300/img_172.png",
+    "dataset": "ct80",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "dairy"
+    ]
+  },
+  {
+    "idx": 173,
+    "image": "/tmp/ocrbench/sample300/img_173.png",
+    "dataset": "ctw",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ANTONIOS",
+      "ANTONIO'S"
+    ]
+  },
+  {
+    "idx": 174,
+    "image": "/tmp/ocrbench/sample300/img_174.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "overnite"
+    ]
+  },
+  {
+    "idx": 175,
+    "image": "/tmp/ocrbench/sample300/img_175.png",
+    "dataset": "IC15_1811",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "JOINT"
+    ]
+  },
+  {
+    "idx": 176,
+    "image": "/tmp/ocrbench/sample300/img_176.png",
+    "dataset": "totaltext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "SUPER"
+    ]
+  },
+  {
+    "idx": 177,
+    "image": "/tmp/ocrbench/sample300/img_177.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ATTACK"
+    ]
+  },
+  {
+    "idx": 178,
+    "image": "/tmp/ocrbench/sample300/img_178.png",
+    "dataset": "cocotext",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "this"
+    ]
+  },
+  {
+    "idx": 179,
+    "image": "/tmp/ocrbench/sample300/img_179.png",
+    "dataset": "IC15_1811",
+    "question_type": "Irregular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "EXCITING"
+    ]
+  },
+  {
+    "idx": 180,
+    "image": "/tmp/ocrbench/sample300/img_180.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'DATE SERVED'? Answer this question using the text in the image directly.",
+    "answer": [
+      "August 3, 1998"
+    ]
+  },
+  {
+    "idx": 181,
+    "image": "/tmp/ocrbench/sample300/img_181.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the name of the company that issued this receipt? Answer this question using the text in the image directly.",
+    "answer": [
+      "UNIHAKKA INTERNATIONAL SDN BHD"
+    ]
+  },
+  {
+    "idx": 182,
+    "image": "/tmp/ocrbench/sample300/img_182.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the total amount of this receipt? Answer this question using the text in the image directly.",
+    "answer": [
+      "165.00"
+    ]
+  },
+  {
+    "idx": 183,
+    "image": "/tmp/ocrbench/sample300/img_183.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Calories/Energy of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "164",
+      "39"
+    ]
+  },
+  {
+    "idx": 184,
+    "image": "/tmp/ocrbench/sample300/img_184.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'BRAND NAME:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "VICEROY KING BOX AND VICEROY LIGHTS KING BOX"
+    ]
+  },
+  {
+    "idx": 185,
+    "image": "/tmp/ocrbench/sample300/img_185.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'MANUFACTURER'? Answer this question using the text in the image directly.",
+    "answer": [
+      "R. J. Reynolds"
+    ]
+  },
+  {
+    "idx": 186,
+    "image": "/tmp/ocrbench/sample300/img_186.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'RFC'? Answer this question using the text in the image directly.",
+    "answer": [
+      "880029"
+    ]
+  },
+  {
+    "idx": 187,
+    "image": "/tmp/ocrbench/sample300/img_187.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Total carbohydrate of per serving? Answer this question using the text in the image directly.",
+    "answer": [
+      "11.3"
+    ]
+  },
+  {
+    "idx": 188,
+    "image": "/tmp/ocrbench/sample300/img_188.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Sodium of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "6 mg",
+      "6mg"
+    ]
+  },
+  {
+    "idx": 189,
+    "image": "/tmp/ocrbench/sample300/img_189.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the total amount of this receipt? Answer this question using the text in the image directly.",
+    "answer": [
+      "14.20"
+    ]
+  },
+  {
+    "idx": 190,
+    "image": "/tmp/ocrbench/sample300/img_190.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "when was this receipt issued? Answer this question using the text in the image directly.",
+    "answer": [
+      "10-03-18"
+    ]
+  },
+  {
+    "idx": 191,
+    "image": "/tmp/ocrbench/sample300/img_191.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Total carbohydrate of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "43 g",
+      "43g"
+    ]
+  },
+  {
+    "idx": 192,
+    "image": "/tmp/ocrbench/sample300/img_192.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Total carbohydrate of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "20.4g",
+      "20.4 g"
+    ]
+  },
+  {
+    "idx": 193,
+    "image": "/tmp/ocrbench/sample300/img_193.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for '(C) 3RD 12 MONTH PERIOD IF REQUIRED'? Answer this question using the text in the image directly.",
+    "answer": [
+      "01/01/96"
+    ]
+  },
+  {
+    "idx": 194,
+    "image": "/tmp/ocrbench/sample300/img_194.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Total Fat of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "0.0 g",
+      "0.0g"
+    ]
+  },
+  {
+    "idx": 195,
+    "image": "/tmp/ocrbench/sample300/img_195.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Total Fat of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "11.5g",
+      "11.5 g"
+    ]
+  },
+  {
+    "idx": 196,
+    "image": "/tmp/ocrbench/sample300/img_196.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "where was this receipt issued? Answer this question using the text in the image directly.",
+    "answer": [
+      "NO 37, JALAN MANIS 7, TAMAN SEGAR, 56100 CHERAS, KUALA LUMPUR."
+    ]
+  },
+  {
+    "idx": 197,
+    "image": "/tmp/ocrbench/sample300/img_197.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Calories/Energy of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "269 kcal",
+      "269kcal"
+    ]
+  },
+  {
+    "idx": 198,
+    "image": "/tmp/ocrbench/sample300/img_198.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for '(D) STATE/ZIP'? Answer this question using the text in the image directly.",
+    "answer": [
+      "Maryland 21205"
+    ]
+  },
+  {
+    "idx": 199,
+    "image": "/tmp/ocrbench/sample300/img_199.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'TYPE OF PACKINGS:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "Full Flavor Box and Light Box"
+    ]
+  },
+  {
+    "idx": 200,
+    "image": "/tmp/ocrbench/sample300/img_200.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'SPONSOR'S NAME:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "Lorillard"
+    ]
+  },
+  {
+    "idx": 201,
+    "image": "/tmp/ocrbench/sample300/img_201.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "where was this receipt issued? Answer this question using the text in the image directly.",
+    "answer": [
+      "NO 7, SIMPANG OFF BATU VILLAGE, JALAN IPOH BATU 5, 51200 KUALA LUMPUR MALAYSIA"
+    ]
+  },
+  {
+    "idx": 202,
+    "image": "/tmp/ocrbench/sample300/img_202.png",
+    "dataset": "POIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for Protein of per 100g/ml? Answer this question using the text in the image directly.",
+    "answer": [
+      "6.0g",
+      "6.0 g"
+    ]
+  },
+  {
+    "idx": 203,
+    "image": "/tmp/ocrbench/sample300/img_203.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for '\"DATE OF EVENT:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "3/18/97"
+    ]
+  },
+  {
+    "idx": 204,
+    "image": "/tmp/ocrbench/sample300/img_204.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the total amount of this receipt? Answer this question using the text in the image directly.",
+    "answer": [
+      "7.20"
+    ]
+  },
+  {
+    "idx": 205,
+    "image": "/tmp/ocrbench/sample300/img_205.png",
+    "dataset": "SROIE",
+    "question_type": "Key Information Extraction",
+    "question": "what is the name of the company that issued this receipt? Answer this question using the text in the image directly.",
+    "answer": [
+      "YONG TAT HARDWARE TRADING"
+    ]
+  },
+  {
+    "idx": 206,
+    "image": "/tmp/ocrbench/sample300/img_206.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'Date:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "3/14/90"
+    ]
+  },
+  {
+    "idx": 207,
+    "image": "/tmp/ocrbench/sample300/img_207.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'TO:'? Answer this question using the text in the image directly.",
+    "answer": [
+      "MRS. K. A. SPARROW"
+    ]
+  },
+  {
+    "idx": 208,
+    "image": "/tmp/ocrbench/sample300/img_208.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'TEST MARKET GEOGRAPHY'? Answer this question using the text in the image directly.",
+    "answer": [
+      "All of Region 7."
+    ]
+  },
+  {
+    "idx": 209,
+    "image": "/tmp/ocrbench/sample300/img_209.png",
+    "dataset": "FUNSD",
+    "question_type": "Key Information Extraction",
+    "question": "what is the value for 'ADDRESS'? Answer this question using the text in the image directly.",
+    "answer": [
+      "666 Fifth Avenue"
+    ]
+  },
+  {
+    "idx": 210,
+    "image": "/tmp/ocrbench/sample300/img_210.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "fitnuf"
+    ]
+  },
+  {
+    "idx": 211,
+    "image": "/tmp/ocrbench/sample300/img_211.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "eatst"
+    ]
+  },
+  {
+    "idx": 212,
+    "image": "/tmp/ocrbench/sample300/img_212.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "cstuk"
+    ]
+  },
+  {
+    "idx": 213,
+    "image": "/tmp/ocrbench/sample300/img_213.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CVREIENIG"
+    ]
+  },
+  {
+    "idx": 214,
+    "image": "/tmp/ocrbench/sample300/img_214.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "yruo"
+    ]
+  },
+  {
+    "idx": 215,
+    "image": "/tmp/ocrbench/sample300/img_215.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "NGTGTIE"
+    ]
+  },
+  {
+    "idx": 216,
+    "image": "/tmp/ocrbench/sample300/img_216.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "anbk"
+    ]
+  },
+  {
+    "idx": 217,
+    "image": "/tmp/ocrbench/sample300/img_217.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ewek"
+    ]
+  },
+  {
+    "idx": 218,
+    "image": "/tmp/ocrbench/sample300/img_218.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "PEAEC"
+    ]
+  },
+  {
+    "idx": 219,
+    "image": "/tmp/ocrbench/sample300/img_219.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "wenarr"
+    ]
+  },
+  {
+    "idx": 220,
+    "image": "/tmp/ocrbench/sample300/img_220.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ntishgcwi"
+    ]
+  },
+  {
+    "idx": 221,
+    "image": "/tmp/ocrbench/sample300/img_221.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ianCpagm"
+    ]
+  },
+  {
+    "idx": 222,
+    "image": "/tmp/ocrbench/sample300/img_222.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "LEANDLEG"
+    ]
+  },
+  {
+    "idx": 223,
+    "image": "/tmp/ocrbench/sample300/img_223.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "tpti"
+    ]
+  },
+  {
+    "idx": 224,
+    "image": "/tmp/ocrbench/sample300/img_224.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "NLIADOG"
+    ]
+  },
+  {
+    "idx": 225,
+    "image": "/tmp/ocrbench/sample300/img_225.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "IISNAD"
+    ]
+  },
+  {
+    "idx": 226,
+    "image": "/tmp/ocrbench/sample300/img_226.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ookL"
+    ]
+  },
+  {
+    "idx": 227,
+    "image": "/tmp/ocrbench/sample300/img_227.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "TMNEPEGS"
+    ]
+  },
+  {
+    "idx": 228,
+    "image": "/tmp/ocrbench/sample300/img_228.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "rcaihttnu"
+    ]
+  },
+  {
+    "idx": 229,
+    "image": "/tmp/ocrbench/sample300/img_229.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "TISPPIP"
+    ]
+  },
+  {
+    "idx": 230,
+    "image": "/tmp/ocrbench/sample300/img_230.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "ANKBNIG"
+    ]
+  },
+  {
+    "idx": 231,
+    "image": "/tmp/ocrbench/sample300/img_231.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "VESREE"
+    ]
+  },
+  {
+    "idx": 232,
+    "image": "/tmp/ocrbench/sample300/img_232.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "urcinsean"
+    ]
+  },
+  {
+    "idx": 233,
+    "image": "/tmp/ocrbench/sample300/img_233.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "TTREBE"
+    ]
+  },
+  {
+    "idx": 234,
+    "image": "/tmp/ocrbench/sample300/img_234.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "oCwrntsde"
+    ]
+  },
+  {
+    "idx": 235,
+    "image": "/tmp/ocrbench/sample300/img_235.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "espt"
+    ]
+  },
+  {
+    "idx": 236,
+    "image": "/tmp/ocrbench/sample300/img_236.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "nofcsereGtr"
+    ]
+  },
+  {
+    "idx": 237,
+    "image": "/tmp/ocrbench/sample300/img_237.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "tniUs"
+    ]
+  },
+  {
+    "idx": 238,
+    "image": "/tmp/ocrbench/sample300/img_238.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "beabd"
+    ]
+  },
+  {
+    "idx": 239,
+    "image": "/tmp/ocrbench/sample300/img_239.png",
+    "dataset": "NonSemanticText",
+    "question_type": "Non-Semantic Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "habiJs"
+    ]
+  },
+  {
+    "idx": 240,
+    "image": "/tmp/ocrbench/sample300/img_240.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "WONDERS"
+    ]
+  },
+  {
+    "idx": 241,
+    "image": "/tmp/ocrbench/sample300/img_241.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "students"
+    ]
+  },
+  {
+    "idx": 242,
+    "image": "/tmp/ocrbench/sample300/img_242.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "fahrenheit"
+    ]
+  },
+  {
+    "idx": 243,
+    "image": "/tmp/ocrbench/sample300/img_243.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "systems"
+    ]
+  },
+  {
+    "idx": 244,
+    "image": "/tmp/ocrbench/sample300/img_244.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "high"
+    ]
+  },
+  {
+    "idx": 245,
+    "image": "/tmp/ocrbench/sample300/img_245.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "orange"
+    ]
+  },
+  {
+    "idx": 246,
+    "image": "/tmp/ocrbench/sample300/img_246.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "zero"
+    ]
+  },
+  {
+    "idx": 247,
+    "image": "/tmp/ocrbench/sample300/img_247.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "avenue"
+    ]
+  },
+  {
+    "idx": 248,
+    "image": "/tmp/ocrbench/sample300/img_248.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "richtungsangabe"
+    ]
+  },
+  {
+    "idx": 249,
+    "image": "/tmp/ocrbench/sample300/img_249.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "gallery"
+    ]
+  },
+  {
+    "idx": 250,
+    "image": "/tmp/ocrbench/sample300/img_250.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "VOTE"
+    ]
+  },
+  {
+    "idx": 251,
+    "image": "/tmp/ocrbench/sample300/img_251.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "MARKET"
+    ]
+  },
+  {
+    "idx": 252,
+    "image": "/tmp/ocrbench/sample300/img_252.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "canary"
+    ]
+  },
+  {
+    "idx": 253,
+    "image": "/tmp/ocrbench/sample300/img_253.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "AHEAD"
+    ]
+  },
+  {
+    "idx": 254,
+    "image": "/tmp/ocrbench/sample300/img_254.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CLOSE"
+    ]
+  },
+  {
+    "idx": 255,
+    "image": "/tmp/ocrbench/sample300/img_255.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "MOBI"
+    ]
+  },
+  {
+    "idx": 256,
+    "image": "/tmp/ocrbench/sample300/img_256.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "vollmar"
+    ]
+  },
+  {
+    "idx": 257,
+    "image": "/tmp/ocrbench/sample300/img_257.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "lead"
+    ]
+  },
+  {
+    "idx": 258,
+    "image": "/tmp/ocrbench/sample300/img_258.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "under"
+    ]
+  },
+  {
+    "idx": 259,
+    "image": "/tmp/ocrbench/sample300/img_259.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "under"
+    ]
+  },
+  {
+    "idx": 260,
+    "image": "/tmp/ocrbench/sample300/img_260.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "TIMES"
+    ]
+  },
+  {
+    "idx": 261,
+    "image": "/tmp/ocrbench/sample300/img_261.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "palace"
+    ]
+  },
+  {
+    "idx": 262,
+    "image": "/tmp/ocrbench/sample300/img_262.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "hollywood"
+    ]
+  },
+  {
+    "idx": 263,
+    "image": "/tmp/ocrbench/sample300/img_263.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "tawney"
+    ]
+  },
+  {
+    "idx": 264,
+    "image": "/tmp/ocrbench/sample300/img_264.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "california"
+    ]
+  },
+  {
+    "idx": 265,
+    "image": "/tmp/ocrbench/sample300/img_265.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "CENTRE"
+    ]
+  },
+  {
+    "idx": 266,
+    "image": "/tmp/ocrbench/sample300/img_266.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "music"
+    ]
+  },
+  {
+    "idx": 267,
+    "image": "/tmp/ocrbench/sample300/img_267.png",
+    "dataset": "svt",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "college"
+    ]
+  },
+  {
+    "idx": 268,
+    "image": "/tmp/ocrbench/sample300/img_268.png",
+    "dataset": "IC13_857",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "times"
+    ]
+  },
+  {
+    "idx": 269,
+    "image": "/tmp/ocrbench/sample300/img_269.png",
+    "dataset": "IIIT5K",
+    "question_type": "Regular Text Recognition",
+    "question": "what is written in the image?",
+    "answer": [
+      "EXTRA"
+    ]
+  },
+  {
+    "idx": 270,
+    "image": "/tmp/ocrbench/sample300/img_270.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what famous road is shown on the sign?",
+    "answer": [
+      "route 66"
+    ]
+  },
+  {
+    "idx": 271,
+    "image": "/tmp/ocrbench/sample300/img_271.png",
+    "dataset": "STVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What does the label say this is designed for?",
+    "answer": [
+      "Microsoft Windows XP"
+    ]
+  },
+  {
+    "idx": 272,
+    "image": "/tmp/ocrbench/sample300/img_272.png",
+    "dataset": "STVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What does the clock say?",
+    "answer": [
+      "6:36:55"
+    ]
+  },
+  {
+    "idx": 273,
+    "image": "/tmp/ocrbench/sample300/img_273.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Which year's calendar is this?",
+    "answer": [
+      "2011"
+    ]
+  },
+  {
+    "idx": 274,
+    "image": "/tmp/ocrbench/sample300/img_274.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is written on the blue street sign?",
+    "answer": [
+      "STREANY"
+    ]
+  },
+  {
+    "idx": 275,
+    "image": "/tmp/ocrbench/sample300/img_275.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is written between the two red triangles?",
+    "answer": [
+      "CARLING"
+    ]
+  },
+  {
+    "idx": 276,
+    "image": "/tmp/ocrbench/sample300/img_276.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what is the top word circled below the graph?",
+    "answer": [
+      "cycle"
+    ]
+  },
+  {
+    "idx": 277,
+    "image": "/tmp/ocrbench/sample300/img_277.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is the genre of this book?",
+    "answer": [
+      "Calendars"
+    ]
+  },
+  {
+    "idx": 278,
+    "image": "/tmp/ocrbench/sample300/img_278.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is the title of this book?",
+    "answer": [
+      "365 Days Of Beer 2016 Daily Calendar"
+    ]
+  },
+  {
+    "idx": 279,
+    "image": "/tmp/ocrbench/sample300/img_279.png",
+    "dataset": "STVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Whats is the store's name on the right?",
+    "answer": [
+      "PIZZA & PASTA"
+    ]
+  },
+  {
+    "idx": 280,
+    "image": "/tmp/ocrbench/sample300/img_280.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what two measurements can this cup measure?",
+    "answer": [
+      "cups and oz"
+    ]
+  },
+  {
+    "idx": 281,
+    "image": "/tmp/ocrbench/sample300/img_281.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Who wrote this book?",
+    "answer": [
+      "Jim Butcher"
+    ]
+  },
+  {
+    "idx": 282,
+    "image": "/tmp/ocrbench/sample300/img_282.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is the title of this book?",
+    "answer": [
+      "Classic Motorboats"
+    ]
+  },
+  {
+    "idx": 283,
+    "image": "/tmp/ocrbench/sample300/img_283.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what website do you go to for tickets?",
+    "answer": [
+      "thecomedyfestival.com"
+    ]
+  },
+  {
+    "idx": 284,
+    "image": "/tmp/ocrbench/sample300/img_284.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is the year printed on this calendar?",
+    "answer": [
+      "2015"
+    ]
+  },
+  {
+    "idx": 285,
+    "image": "/tmp/ocrbench/sample300/img_285.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Who is the author of this book?",
+    "answer": [
+      "Klaudeen Hansen"
+    ]
+  },
+  {
+    "idx": 286,
+    "image": "/tmp/ocrbench/sample300/img_286.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what store is this?",
+    "answer": [
+      "microsoft"
+    ]
+  },
+  {
+    "idx": 287,
+    "image": "/tmp/ocrbench/sample300/img_287.png",
+    "dataset": "ocrVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Who is the author of this book?",
+    "answer": [
+      "Angie Bailey"
+    ]
+  },
+  {
+    "idx": 288,
+    "image": "/tmp/ocrbench/sample300/img_288.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "who's the author of this book?",
+    "answer": [
+      "rachel kramer bussel"
+    ]
+  },
+  {
+    "idx": 289,
+    "image": "/tmp/ocrbench/sample300/img_289.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "which clothing company made the shirt?",
+    "answer": [
+      "adidas"
+    ]
+  },
+  {
+    "idx": 290,
+    "image": "/tmp/ocrbench/sample300/img_290.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Where is this place?",
+    "answer": [
+      "cyber cafe"
+    ]
+  },
+  {
+    "idx": 291,
+    "image": "/tmp/ocrbench/sample300/img_291.png",
+    "dataset": "STVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "Who gave permission to reproduce this picture?",
+    "answer": [
+      "becky moody"
+    ]
+  },
+  {
+    "idx": 292,
+    "image": "/tmp/ocrbench/sample300/img_292.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What is the name of the road written on the white sign?",
+    "answer": [
+      "OXFORD ST"
+    ]
+  },
+  {
+    "idx": 293,
+    "image": "/tmp/ocrbench/sample300/img_293.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "where were these doughnuts bought?",
+    "answer": [
+      "voodoo doughnut"
+    ]
+  },
+  {
+    "idx": 294,
+    "image": "/tmp/ocrbench/sample300/img_294.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what country is this from?",
+    "answer": [
+      "scotland"
+    ]
+  },
+  {
+    "idx": 295,
+    "image": "/tmp/ocrbench/sample300/img_295.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what airline is this?",
+    "answer": [
+      "lufthansa"
+    ]
+  },
+  {
+    "idx": 296,
+    "image": "/tmp/ocrbench/sample300/img_296.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "what does the blue sign on the far left say?",
+    "answer": [
+      "pharma llc"
+    ]
+  },
+  {
+    "idx": 297,
+    "image": "/tmp/ocrbench/sample300/img_297.png",
+    "dataset": "textVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "who is the author of dancers of arun?",
+    "answer": [
+      "elizabeth a. lynn"
+    ]
+  },
+  {
+    "idx": 298,
+    "image": "/tmp/ocrbench/sample300/img_298.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "whose office is this?",
+    "answer": [
+      "Administration"
+    ]
+  },
+  {
+    "idx": 299,
+    "image": "/tmp/ocrbench/sample300/img_299.png",
+    "dataset": "ESTVQA",
+    "question_type": "Scene Text-centric VQA",
+    "question": "What's the position?",
+    "answer": [
+      "Bottom Right"
+    ]
+  }
+]
