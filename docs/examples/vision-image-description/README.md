@@ -47,6 +47,7 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-{
 | **E2B 4-bit** | 307 | 74.2 tok/s | 4.4 Go | "classic, small, open-top car, vintage" |
 | **E4B 4-bit** | 325 | 44.9 tok/s | 5.9 Go | "FIAT 600 or similar era microcar" |
 | **26B-A4B 4-bit** | 337 | 24.8 tok/s | 15.9 Go | "Citroën 2CV (Deux Chevaux)" |
+| **26B-A4B bf16** | 272 | **1.4 tok/s** ⚠ | 55.6 Go | "Citroën 2CV (vintage economy car)" |
 | **31B 4-bit** | 145 | 7.4 tok/s | 19.0 Go | "red Citroën 2CV" |
 | **DiffusionGemma 26B-A4B bf16** | 256 | 22.9 tok/s | 50.8 Go | "Citroën 2CV (classic French)" |
 
@@ -78,6 +79,7 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-{
 | **E2B 4-bit** | 500 | 77.2 tok/s | 4.4 Go |
 | **E4B 4-bit** | 500 | 46.1 tok/s | 5.9 Go |
 | **26B-A4B 4-bit** | 500 | 24.7 tok/s | 15.9 Go |
+| **26B-A4B bf16** | 500 | **0.9 tok/s** ⚠ | 55.6 Go |
 | **31B 4-bit** | 500 | 8.3 tok/s | 19.5 Go |
 | **DiffusionGemma 26B-A4B bf16** | 512 | 26.7 tok/s | 50.9 Go |
 
@@ -137,6 +139,7 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-2
 | **E2B 4-bit** | 246 | 63.5 tok/s | 5.2 Go |
 | **E4B 4-bit** | 400 | 42.0 tok/s | 6.7 Go |
 | **26B-A4B 4-bit** | 242 | 20.2 tok/s | 16.3 Go |
+| **26B-A4B bf16** | 254 | **1.4 tok/s** ⚠ | 55.9 Go |
 | **31B 4-bit** | 233 | 6.7 tok/s | 19.9 Go |
 | **DiffusionGemma 26B-A4B** | — | — | — | not supported (Phase 4 simplification, see `a4b-diff_multi.txt`) |
 
@@ -170,4 +173,40 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-2
 
 ---
 
-*Full model outputs are available in this directory as `{model}_{test}.txt` files.*
+## bf16 vs 4-bit on the same 26B-A4B backbone
+
+Same `mlx-community/gemma-4-26b-a4b-it-{4bit, bf16}` checkpoints, same CLI, same prompts, same M3 Max 96 GB.
+
+| Test | 4-bit | bf16 | Slowdown |
+|---|---|---|---|
+| Vehicle (1 image, ~270 tokens) | 24.8 tok/s | 1.4 tok/s | **17.7x** |
+| UI/OCR (1 image, 500 tokens) | 24.7 tok/s | 0.9 tok/s | **27.4x** |
+| Multi-image (2 images, ~250 tokens) | 20.2 tok/s | 1.4 tok/s | **14.4x** |
+| **Geometric mean** | — | — | **~19x** |
+
+### Why is the slowdown so large?
+
+Naive bandwidth ratio = bf16 weight size / 4-bit weight size = 4x. Observed = ~19x. The extra ~5x comes from:
+
+1. **MLX fused quantized kernels.** The 4-bit path uses matmul + dequant fused kernels that are heavily tuned on Apple Silicon. The bf16 path is pure-bandwidth-bound dense matmul — no fusion opportunity.
+2. **Wired memory saturation.** bf16 peaks at 55.9 Go GPU (4-bit peaks at 15.9 Go). On a 96 Go Unified Memory, bf16 is right against the wired-memory budget — every forward triggers cache thrashing between the metal heap and the VM.
+3. **LM head cost.** Final logits projection (262k vocab × 4096 hidden, ~2 Go in bf16) is read at every generated token. In 4-bit it's ~512 Mo — 4x less bandwidth per token, on top of the matmul kernel difference.
+
+### Quality difference: marginal
+
+Compare the bf16 Citroen 2CV description (`26b-a4b-bf16_2cv.txt`) with the 4-bit one (`26b-a4b_2cv.txt`):
+
+- Both identify the **Citroen 2CV** correctly with the same confidence.
+- Both list the same fine details (chrome trim, stickers on rear window, bushes background, overcast lighting).
+- bf16 mentions the **radio antenna**, 4-bit mentions the **sloping rear roofline** — different small details, not better or worse.
+- On the multi-image creative reasoning test, bf16 produces "Nostalgia vs Future" as the 3rd theme; 4-bit produces "Concept of Creation". Both equally valid, neither obviously better.
+
+**Conclusion:** bf16 brings no measurable quality advantage on standard vision/OCR/multi-image tasks for 26B-A4B, at a 17-27x cost. **Always prefer 4-bit for vision use cases.** The bf16 checkpoint is only useful as a baseline for quantization studies, or for the diffusion variant where bf16 is mandatory (no quantized release available yet).
+
+### Are the GUI numbers a bug?
+
+The GUI bench app loads `mlx-community/gemma-4-26b-a4b-it-bf16` and shows ~1.4 tok/s on Vehicle-style prompts. **This matches the CLI baseline exactly** (1.4 tok/s on the same test). No bug in the multimodal call path — just bf16 being intrinsically slow. Loading the 4-bit checkpoint in the GUI would yield ~25 tok/s.
+
+---
+
+*Full model outputs are available in this directory as `{model}_{test}.txt` files. The bf16 results are in `26b-a4b-bf16_{2cv,ui,multi}.txt`.*

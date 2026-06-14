@@ -1,0 +1,28 @@
+[Gemma4Config] audio_config present but decode failed (DecodingError.valueNotFound: Expected value of type Dictionary<String, Any> but found null instead. Path: audio_config. Debug description: Cannot get keyed decoding container -- found null value instead); fallback to text-only
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-bf16
+Modele charge.
+Traitement de l'image: /Users/vincent/Developpements/gemma-4-swift-mlx/docs/examples/vision-image-description/input_sample.jpg
+  Image preprocessee: [1, 3, 624, 960]
+Traitement de l'image: /Users/vincent/Developpements/gemma-4-swift-mlx/docs/examples/vision-image-description/UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 2 image(s), batch: [2, 3, 624, 1008]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [528, 3364, 236761, 2199, 9578, 236888, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 560, video_token: 0, audio_token: 0
+  Total input tokens: 594
+
+--- Generation multimodale ---
+  Mode: vision (2 image(s), 280 tokens/image)
+  Prompt: Find 3 things these two images have in common. Be creative!
+---
+Here are three creative ways these two images are connected:
+
+1.  **The "Red" Connection:** While the second image is a dark UI, the first image is dominated by a vibrant, saturated red car. In design terms, the first image is a study in **color saturation**, while the second image is a study in **color depth** (dark mode).
+2.  **The "Processing" Metaphor:** The first image shows a vintage car, which is a mechanical object that requires "processing" (fuel, combustion, and movement) to function. The second image shows a digital interface explicitly stating "Débruitage... 36%" (Denoising... 36%), which is the digital "combustion" required to create an image. Both represent **something in a state of becoming or moving.**
+3.  **The "Nostalgia vs. Future" Paradox:** The first image captures a piece of **analog history** (a classic Citroën 2CV), representing a bygone era of physical engineering. The second image captures **digital futurism** (AI generation), representing the cutting edge of computational engineering. Together, they represent the full spectrum of human invention: from the mechanical to the algorithmic.<turn|>
+
+--- Stats ---
+Tokens: 254
+Temps: 179.21s, Vitesse: 1.4 t/s
+GPU pic: 57239 Mo
