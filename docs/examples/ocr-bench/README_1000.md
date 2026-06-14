@@ -119,9 +119,34 @@ Sur 1000 images, **DiffusionGemma est statistiquement le plus précis**, là où
 
 Compromis architectural intéressant : on génère un canvas complet de 256 tokens en parallèle (et on dépend du tokenizer pour décoder), au lieu de générer token-par-token. Le **throughput en tok/s est 5-7× supérieur** mais le **canvas est rempli** vs **output AR court** → net 2× plus lent par image en wall-clock.
 
-### 2. La qualité ne dépend PAS du nombre de denoising steps
+### 2. Stopping criterion conforme aux recos Google
 
-5 forwards en médiane suffisent pour la plupart des tâches OCR. Le canvas converge vite quand la réponse est courte (read this word). Cela suggère que pour les tâches courtes (OCR pur, scene text), le coût wall-clock de DiffusionGemma pourrait être réduit en cappant `max_denoising_steps` à 10-15 au lieu de 48.
+La [doc officielle Google DiffusionGemma](https://ai.google.dev/gemma/docs/diffusiongemma) précise :
+
+> "Maximum denoising steps: **48** (upper bound). The model typically completes in **12-16 denoising steps**. Simpler prompts and structured tasks like code require fewer denoising steps."
+
+Notre observation de **5 forwards en médiane sur OCR** est **strictement cohérente** avec cette spec :
+- 48 est un upper bound, pas une valeur à atteindre
+- OCR ≈ "simpler prompt + structured task" → naturellement très peu de steps
+- Le stopping criterion `stable + confident` (Google : entropy threshold 0.005) déclenche
+  l'arrêt prématuré dès convergence
+
+Les paramètres utilisés correspondent exactement aux valeurs officielles :
+
+| Paramètre | Google | Notre code | Source |
+|---|---|---|---|
+| Max denoising steps | 48 | 48 | `generation_config.json` du checkpoint |
+| Temperature schedule | Linear 0.8 → 0.4 | tMin=0.4, tMax=0.8 (curStep décroissant) | Identique |
+| Entropy threshold | 0.005 | 0.005 | Identique |
+| Entropy bound | 0.1 | 0.1 | Identique |
+
+### 3. Fondation théorique : Block Diffusion (Arriola et al. 2025)
+
+DiffusionGemma s'appuie sur le paper **Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models** ([arxiv 2503.09573](https://huggingface.co/papers/2503.09573), Arriola et al., Mars 2025) :
+
+> "Block diffusion overcomes key limitations of both approaches by supporting flexible-length generation and improving inference efficiency with KV caching and parallel token sampling."
+
+Notre Phase 5 (KV cache encoder incremental) est exactement cette optimisation citée par le paper.
 
 ### 3. La quantization 4-bit n'a pas fait perdre 26B-A4B AR
 
