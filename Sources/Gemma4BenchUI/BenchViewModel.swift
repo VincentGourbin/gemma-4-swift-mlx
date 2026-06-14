@@ -1,6 +1,7 @@
 // ViewModel central : gère le chargement séquentiel des modèles
 // et l'exécution des 2 générations (AR + Diffusion).
 
+import AppKit
 import Foundation
 import Gemma4Swift
 import MLX
@@ -73,6 +74,14 @@ final class BenchViewModel: ObservableObject {
         var currentStep: Int? = nil
         var totalSteps: Int = 0
         var phase: PanelPhase = .idle
+
+        // Spécifique au pipeline Diffusion : séparation entre canvas committés
+        // (textes figés) et canvas actif (en cours de denoising). Permet
+        // d'éviter que canvas N+1 écrase visuellement le canvas N déjà commit.
+        var committedCanvases: [String] = []
+        var activeCanvasText: String = ""
+        var activeCanvasIdx: Int = 0
+        var maxCanvases: Int = 1
     }
 
     @Published var loadState: LoadState = .idle
@@ -164,6 +173,83 @@ final class BenchViewModel: ObservableObject {
         diffMaxSteps = p.maxSteps ?? 48
     }
 
+    // MARK: - Quantization mixed precision (Diffusion only)
+
+    enum QuantPreset: String, CaseIterable, Identifiable {
+        case none = "bf16"
+        case `default` = "Default"
+        case conservative = "Conservative"
+        case aggressive = "Aggressive"
+
+        var id: String { rawValue }
+
+        var description: String {
+            switch self {
+            case .none: return "Pas de quantization, bf16 natif (~50 Go)"
+            case .default: return "4 first + 4 last layers en 8-bit, reste en 4-bit (Q-DiT)"
+            case .conservative: return "6+6 layers en 8-bit, reste en 4-bit (qualite max)"
+            case .aggressive: return "2+2 layers en 8-bit, reste en 4-bit (RAM min ~15 Go)"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .none: return "circle"
+            case .default: return "circle.lefthalf.filled"
+            case .conservative: return "circle.fill"
+            case .aggressive: return "bolt.fill"
+            }
+        }
+
+        var color: String {
+            switch self {
+            case .none: return "gray"
+            case .default: return "blue"
+            case .conservative: return "cyan"
+            case .aggressive: return "orange"
+            }
+        }
+
+        var mixedConfig: DiffusionOnTheFlyQuantization.MixedPrecisionConfig? {
+            switch self {
+            case .none: return nil
+            case .default: return .default
+            case .conservative: return .conservative
+            case .aggressive: return .aggressive
+            }
+        }
+    }
+
+    @Published var quantPreset: QuantPreset = .none {
+        didSet {
+            // Changement de preset : on doit recharger le modele pour reappliquer.
+            // On flag l'etat pour signaler a l'utilisateur (status bar).
+            if quantPreset != oldValue, loadState.hasDiffusionLoaded {
+                diffusionPanel.status = "Quant change : prochain Lancer rechargera Diffusion"
+                // Force unload : la prochaine generation rechargera.
+                Task { await unloadAll() }
+            }
+        }
+    }
+
+    // MARK: - Image upload (Diffusion only)
+
+    @Published var imageURL: URL? = nil
+
+    func selectImage() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.image]
+        panel.message = "Selectionnez une image (JPEG, PNG, HEIC...)"
+        if panel.runModal() == .OK, let url = panel.url {
+            imageURL = url
+        }
+    }
+
+    func clearImage() { imageURL = nil }
+
     // MARK: - Modèles
 
     private var arPipeline: Gemma4Pipeline?
@@ -220,16 +306,18 @@ final class BenchViewModel: ObservableObject {
     func loadAR() async {
         await unloadAll()
         loadState = .loadingAR("\(arModelID)…")
-        arPanel.phase = .loading(detail: "Chargement \(arModelID) (~48 Go bf16)…")
+        arPanel.phase = .loading(detail: "Chargement \(arModelID) (~48 Go bf16 + vision_tower)…")
         arPanel.status = "Chargement…"
         do {
-            await Gemma4Registration.register(multimodal: false)
+            // Multimodal: true — le 26B-A4B bf16 a un vision_config (~600 MB additionnels)
+            // qui permet d'accepter une image en entree via chatStreamMultimodal.
+            await Gemma4Registration.register(multimodal: true)
             let pipeline = Gemma4Pipeline()
-            try await pipeline.load(from: arPath, multimodal: false)
+            try await pipeline.load(from: arPath, multimodal: true)
             arPipeline = pipeline
             loadState = .arReady
             arPanel.phase = .idle
-            arPanel.status = "Modele charge, pret"
+            arPanel.status = "Modele charge, pret (vision OK)"
         } catch {
             loadState = .error("AR : \(error.localizedDescription)")
             arPanel.phase = .error(error.localizedDescription)
@@ -251,6 +339,13 @@ final class BenchViewModel: ObservableObject {
             )
             diffusionModel = model
             diffusionConfig = config
+
+            // Appliquer la quantization mixed precision si demande (Q-DiT)
+            if let mpConfig = quantPreset.mixedConfig {
+                diffusionPanel.phase = .loading(detail: "Quantization \(quantPreset.rawValue)…")
+                let stats = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: model, config: mpConfig)
+                print("Quantization \(quantPreset.rawValue): \(stats.quantizedHigh) en 8-bit, \(stats.quantizedLow) en 4-bit, \(stats.skipped.count) skipped")
+            }
 
             let genConfigURL = diffusionPath.appendingPathComponent("generation_config.json")
             if FileManager.default.fileExists(atPath: genConfigURL.path),
@@ -284,17 +379,32 @@ final class BenchViewModel: ObservableObject {
         arPanel.currentStep = nil
         arPanel.isRunning = true
         arPanel.phase = .generating(progress: 0, detail: "Token 0 / \(maxTokens)")
-        arPanel.status = "Generation AR (token-par-token)…"
+        arPanel.status = imageURL == nil
+            ? "Generation AR (token-par-token)…"
+            : "Generation AR multimodale (vision active)…"
 
         let start = Date()
         let targetTokens = maxTokens
         do {
-            let stream = try pipeline.chatStream(
-                prompt: prompt,
-                systemPrompt: nil,
-                temperature: arTemperature,
-                maxTokens: maxTokens
-            )
+            // Choisir le path : si une image est selectionnee, on bypass ChatSession
+            // (qui ne supporte pas les pixelValues) via chatStreamMultimodal.
+            let stream: AsyncThrowingStream<String, Error>
+            if let url = imageURL {
+                let pixels = try Gemma4ImageProcessor.processImage(url: url)
+                stream = try pipeline.chatStreamMultimodal(
+                    prompt: prompt,
+                    pixelValues: pixels,
+                    temperature: arTemperature,
+                    maxTokens: maxTokens
+                )
+            } else {
+                stream = try pipeline.chatStream(
+                    prompt: prompt,
+                    systemPrompt: nil,
+                    temperature: arTemperature,
+                    maxTokens: maxTokens
+                )
+            }
             for try await piece in stream {
                 arPanel.text.append(piece)
                 arPanel.tokensGenerated += 1
@@ -356,24 +466,65 @@ final class BenchViewModel: ObservableObject {
         diffusionPanel.totalSteps = genConfig.maxDenoisingSteps
         diffusionPanel.phase = .generating(progress: 0, detail: "Denoising step \(genConfig.maxDenoisingSteps) / \(genConfig.maxDenoisingSteps)")
         diffusionPanel.status = "Generation Diffusion (denoising)…"
+        diffusionPanel.committedCanvases = []
+        diffusionPanel.activeCanvasText = ""
+        diffusionPanel.activeCanvasIdx = 0
+        diffusionPanel.maxCanvases = max(1, Int(ceil(Double(maxTokens) / Double(config.textConfig.canvasLength))))
 
         let canvasLength = config.textConfig.canvasLength
         let maxBlocks = max(1, Int(ceil(Double(maxTokens) / Double(canvasLength))))
         let promptCopy = prompt
         let totalSteps = diffusionPanel.totalSteps
 
+        // Charger l'image si selectionnee (capture pixelValues + ids pour expansion)
+        let pixelValues: MLXArray?
+        let imageTokenId = config.imageTokenId
+        let boiTokenId = config.boiTokenId
+        let eoiTokenId = config.eoiTokenId
+        let numImageSoftTokens = config.visionSoftTokensPerImage
+        if let url = imageURL {
+            do {
+                pixelValues = try Gemma4ImageProcessor.processImage(url: url)
+                diffusionPanel.status = "Image chargee (\(pixelValues!.shape))"
+            } catch {
+                diffusionPanel.phase = .error("Image : \(error.localizedDescription)")
+                diffusionPanel.status = "Erreur image"
+                diffusionPanel.isRunning = false
+                return
+            }
+        } else {
+            pixelValues = nil
+        }
+        let hasImage = pixelValues != nil
+
         // Stream d'events Sendable (text déjà décodé côté pipeline)
         let stream = AsyncStream<DiffusionEvent>(bufferingPolicy: .unbounded) { continuation in
             nonisolated(unsafe) let unsafeModel = model
             nonisolated(unsafe) let unsafeTokenizer = tokenizer
+            nonisolated(unsafe) let unsafePixels = pixelValues
 
             let task = Task.detached {
                 let pipeline = DiffusionGemmaPipeline(model: unsafeModel, genConfig: genConfig)
 
-                let messages: [[String: String]] = [["role": "user", "content": promptCopy]]
-                guard let tokenIds = try? unsafeTokenizer.applyChatTemplate(messages: messages) else {
+                let content = hasImage ? "<|image|>\n\(promptCopy)" : promptCopy
+                let messages: [[String: String]] = [["role": "user", "content": content]]
+                guard var tokenIds = try? unsafeTokenizer.applyChatTemplate(messages: messages) else {
                     continuation.finish()
                     return
+                }
+                // Expanser <|image|> en boi + image_token x N + eoi (cf DiffusionGemmaCommand)
+                if hasImage {
+                    var expanded: [Int] = []
+                    for tid in tokenIds {
+                        if tid == imageTokenId {
+                            expanded.append(boiTokenId)
+                            for _ in 0 ..< numImageSoftTokens { expanded.append(imageTokenId) }
+                            expanded.append(eoiTokenId)
+                        } else {
+                            expanded.append(tid)
+                        }
+                    }
+                    tokenIds = expanded
                 }
                 let promptIds = MLXArray(tokenIds.map { Int32($0) }).reshaped(1, -1)
                 let startDate = Date()
@@ -382,6 +533,7 @@ final class BenchViewModel: ObservableObject {
 
                 let result = await pipeline.generate(
                     promptIds: promptIds,
+                    pixelValues: unsafePixels,
                     maxBlocks: maxBlocks,
                     seed: captureSeed,
                     onCanvas: { @Sendable canvasIdx, canvas in
@@ -428,7 +580,10 @@ final class BenchViewModel: ObservableObject {
         for await event in stream {
             switch event.kind {
             case .step:
-                diffusionPanel.text = event.text
+                // Stocker dans activeCanvasText, pas text — évite l'écrasement
+                // visuel des canvases déjà commit (bug avec maxTokens > 256).
+                diffusionPanel.activeCanvasText = event.text
+                diffusionPanel.activeCanvasIdx = event.canvasIdx
                 diffusionPanel.currentStep = event.step
                 diffusionPanel.elapsed = event.elapsed
                 // Steps décroissent de totalSteps à 1 → progress = (totalSteps - step + 1) / totalSteps
@@ -436,10 +591,14 @@ final class BenchViewModel: ObservableObject {
                 let p = min(1.0, Double(stepsDone) / Double(totalSteps))
                 diffusionPanel.phase = .generating(
                     progress: p,
-                    detail: "Canvas \(event.canvasIdx + 1), denoising step \(event.step) / \(totalSteps)"
+                    detail: "Canvas \(event.canvasIdx + 1) / \(diffusionPanel.maxCanvases), denoising step \(event.step) / \(totalSteps)"
                 )
                 diffusionPanel.status = "Canvas \(event.canvasIdx), step \(event.step) / \(totalSteps)"
             case .canvas:
+                // Commit : on fige le texte courant dans committedCanvases
+                // et on remet à zéro l'activeCanvasText pour le prochain canvas.
+                diffusionPanel.committedCanvases.append(event.text)
+                diffusionPanel.activeCanvasText = ""
                 diffusionPanel.status = "Canvas \(event.canvasIdx) commit"
             case .done(let steps, let canvases, let totalTokens):
                 diffusionPanel.elapsed = event.elapsed
@@ -448,6 +607,9 @@ final class BenchViewModel: ObservableObject {
                 diffusionPanel.isRunning = false
                 diffusionPanel.currentStep = nil
                 diffusionPanel.phase = .done
+                // Le `text` complet = concat des committed (sans le dernier
+                // doublon) pour les stats / export
+                diffusionPanel.text = diffusionPanel.committedCanvases.joined(separator: "\n\n")
             }
         }
     }

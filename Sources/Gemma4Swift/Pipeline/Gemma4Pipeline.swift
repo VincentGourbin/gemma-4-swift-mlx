@@ -5,6 +5,7 @@ import Foundation
 import MLX
 @preconcurrency import MLXLMCommon
 @preconcurrency import MLXLLM
+import MLXRandom
 
 /// Pipeline Gemma 4 de haut niveau pour le chat multimodal.
 /// Le chargement du modele est gere a l'exterieur (CLI via macros, app via loadModelContainer).
@@ -375,6 +376,93 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 await MainActor.run {
                     self?.state = .ready
                 }
+            }
+        }
+    }
+
+    /// Streame une reponse AR avec image(s) en entree. Bypass `ChatSession`
+    /// (qui ne sait pas injecter de pixelValues) mais utilise quand meme le
+    /// `TokenIterator` natif de MLXLMCommon (asyncEval pipeliné, sampler
+    /// optimisé) pour avoir la meme perf que le path text-only.
+    ///
+    /// Steps : (1) `<|image|>\n<prompt>` + chat template + expansion
+    /// `boi + image_token×280 + eoi`. (2) `pendingPixelValues = pixels` sur
+    /// le modele (consume au premier forward). (3) `MLXLMCommon.generate(...)`
+    /// avec `LMInput(tokens:)` et `GenerateParameters` — streame des `.chunk`.
+    ///
+    /// - Requires: `load(multimodal: true)` (necessaire pour vision_tower + embed_vision).
+    public func chatStreamMultimodal(
+        prompt: String,
+        pixelValues: MLXArray,
+        temperature: Float = 0.3,
+        maxTokens: Int = 256
+    ) throws -> AsyncThrowingStream<String, Error> {
+        guard let container = container else {
+            throw Gemma4PipelineError.modelNotLoaded
+        }
+        state = .processing
+        nonisolated(unsafe) let pixelsCapture = pixelValues
+        let temperatureCapture = temperature
+        let maxTokensCapture = maxTokens
+        let promptCapture = prompt
+
+        return AsyncThrowingStream { continuation in
+            Task { [weak self] in
+                do {
+                    let content = "<|image|>\n\(promptCapture)"
+                    let messages: [[String: String]] = [["role": "user", "content": content]]
+
+                    try await container.perform { context in
+                        // 1. Tokenize + expansion <|image|> → boi + image_token × 280 + eoi
+                        var ids = try context.tokenizer.applyChatTemplate(messages: messages)
+                        let imageTokenId = Int(Gemma4Processor.imageTokenId)
+                        let boiTokenId = Int(Gemma4Processor.boiTokenId)
+                        let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
+                        var expanded: [Int] = []
+                        for tid in ids {
+                            if tid == imageTokenId {
+                                expanded.append(boiTokenId)
+                                for _ in 0 ..< 280 { expanded.append(imageTokenId) }
+                                expanded.append(eoiTokenId)
+                            } else {
+                                expanded.append(tid)
+                            }
+                        }
+                        ids = expanded
+
+                        // 2. Injection pixelValues — sera consommé au premier forward du prefill
+                        guard let m = context.model as? Gemma4MultimodalLLMModel else {
+                            throw Gemma4PipelineError.unsupportedModelFamily(
+                                "current",
+                                reason: "chatStreamMultimodal exige Gemma4MultimodalLLMModel (multimodal: true)."
+                            )
+                        }
+                        m.pendingPixelValues = pixelsCapture
+
+                        // 3. Generation native via TokenIterator (asyncEval + sampler optimal)
+                        let lmInput = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
+                        let params = GenerateParameters(
+                            maxTokens: maxTokensCapture,
+                            temperature: temperatureCapture,
+                            topP: 0.95
+                        )
+                        let stream = try MLXLMCommon.generate(
+                            input: lmInput, parameters: params, context: context
+                        )
+                        for await generation in stream {
+                            switch generation {
+                            case .chunk(let text):
+                                continuation.yield(text)
+                            case .info, .toolCall:
+                                break
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+                await MainActor.run { self?.state = .ready }
             }
         }
     }

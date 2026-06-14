@@ -82,6 +82,72 @@ struct ContentView: View {
                 Spacer()
             }
 
+            // Ligne 2b : Quantization (Diffusion only)
+            HStack(spacing: 12) {
+                Text("Quant").font(.caption).foregroundStyle(.purple.opacity(0.7)).frame(width: 60, alignment: .leading)
+                HStack(spacing: 6) {
+                    ForEach(BenchViewModel.QuantPreset.allCases) { qp in
+                        quantChip(qp)
+                    }
+                }
+                Text("Diffusion seulement — change → reload modele")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.4))
+                Spacer()
+            }
+
+            // Ligne 2c : Image (upload pour Diffusion)
+            HStack(spacing: 12) {
+                Text("Image").font(.caption).foregroundStyle(.purple.opacity(0.7)).frame(width: 60, alignment: .leading)
+                if let url = vm.imageURL {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.fill")
+                            .foregroundStyle(.purple)
+                            .font(.system(size: 11))
+                        Text(url.lastPathComponent)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .lineLimit(1)
+                        Button {
+                            vm.clearImage()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.white.opacity(0.55))
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Retirer l'image")
+                        .disabled(vm.isPipelineActive)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule().fill(Color.purple.opacity(0.18))
+                            .overlay(Capsule().strokeBorder(Color.purple.opacity(0.5), lineWidth: 1))
+                    )
+                } else {
+                    Button {
+                        vm.selectImage()
+                    } label: {
+                        Label("Choisir une image", systemImage: "photo.badge.plus")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.85))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule().fill(Color.white.opacity(0.06))
+                                    .overlay(Capsule().strokeBorder(Color.white.opacity(0.2), lineWidth: 1))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(vm.isPipelineActive)
+                }
+                Text("Active vision sur AR (via pendingPixelValues) et Diffusion (via boi+image_token×280)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.4))
+                Spacer()
+            }
+
             // Ligne 3 : Parametres detailles
             HStack(spacing: 14) {
                 Text("Params").font(.caption).foregroundStyle(.white.opacity(0.6)).frame(width: 60, alignment: .leading)
@@ -167,7 +233,8 @@ struct ContentView: View {
                 accent: .green,
                 icon: "arrow.right.circle.fill",
                 state: vm.arPanel,
-                stepInfo: nil
+                stepInfo: nil,
+                displayMode: .linear
             )
             PanelView(
                 title: "Diffusion — DiffusionGemma 26B-A4B bf16",
@@ -175,7 +242,8 @@ struct ContentView: View {
                 accent: .purple,
                 icon: "waveform",
                 state: vm.diffusionPanel,
-                stepInfo: vm.diffusionPanel.currentStep.map { "\($0) / \(vm.diffusionPanel.totalSteps)" }
+                stepInfo: vm.diffusionPanel.currentStep.map { "\($0) / \(vm.diffusionPanel.totalSteps)" },
+                displayMode: .canvases
             )
         }
         .frame(minHeight: 400)
@@ -256,6 +324,42 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Quant chip
+
+    private func quantChip(_ q: BenchViewModel.QuantPreset) -> some View {
+        let isSelected = vm.quantPreset == q
+        let color = quantColor(q)
+        return Button {
+            vm.quantPreset = q
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: q.icon).font(.system(size: 10))
+                Text(q.rawValue).font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+            }
+            .foregroundStyle(isSelected ? Color.white : color.opacity(0.9))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(isSelected ? color.opacity(0.5) : color.opacity(0.12))
+                    .overlay(Capsule().strokeBorder(color.opacity(isSelected ? 0.9 : 0.4), lineWidth: 1))
+            )
+            .shadow(color: isSelected ? color.opacity(0.6) : .clear, radius: 4)
+        }
+        .buttonStyle(.plain)
+        .help(q.description)
+        .disabled(vm.isPipelineActive)
+    }
+
+    private func quantColor(_ q: BenchViewModel.QuantPreset) -> Color {
+        switch q {
+        case .none: return .gray
+        case .default: return .blue
+        case .conservative: return .cyan
+        case .aggressive: return .orange
+        }
+    }
+
     // MARK: - Param box
 
     private func paramBox<Content: View>(label: String, color: Color, @ViewBuilder content: () -> Content) -> some View {
@@ -279,6 +383,11 @@ struct ContentView: View {
 
 // MARK: - PanelView
 
+enum PanelDisplayMode {
+    case linear    // AR : un seul flux de texte qui grandit
+    case canvases  // Diffusion : cartes commit/active/pending pour visualiser les fenêtres
+}
+
 struct PanelView: View {
     let title: String
     let subtitle: String
@@ -286,6 +395,7 @@ struct PanelView: View {
     let icon: String
     let state: BenchViewModel.PanelState
     let stepInfo: String?
+    let displayMode: PanelDisplayMode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -325,15 +435,21 @@ struct PanelView: View {
                 .padding(.vertical, 8)
                 .background(Color.black.opacity(0.15))
 
-            // Texte (scrollable)
+            // Contenu (linear pour AR, cartes canvas pour Diffusion)
             ScrollView {
-                Text(state.text.isEmpty ? "—" : state.text)
-                    .font(.system(size: 13, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .id(state.text.hashValue)
-                    .animation(.easeInOut(duration: 0.25), value: state.text)
+                switch displayMode {
+                case .linear:
+                    Text(state.text.isEmpty ? "—" : state.text)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .id(state.text.hashValue)
+                        .animation(.easeInOut(duration: 0.25), value: state.text)
+                case .canvases:
+                    canvasStack
+                        .padding(12)
+                }
             }
 
             // Footer stats
@@ -362,6 +478,99 @@ struct PanelView: View {
                 .strokeBorder(state.isRunning ? accent.opacity(0.7) : Color.white.opacity(0.1), lineWidth: state.isRunning ? 2 : 1)
         )
         .shadow(color: state.isRunning ? accent.opacity(0.5) : .clear, radius: state.isRunning ? 18 : 0)
+    }
+
+    // MARK: - Diffusion : pile de cartes canvas
+    @ViewBuilder
+    private var canvasStack: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Cas vide : placeholder
+            if state.committedCanvases.isEmpty && state.activeCanvasText.isEmpty {
+                Text("—")
+                    .font(.system(size: 13, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.top, 8)
+            }
+            // Canvases déjà committés (figés)
+            ForEach(Array(state.committedCanvases.enumerated()), id: \.offset) { idx, text in
+                canvasCard(index: idx, text: text, kind: .committed)
+            }
+            // Canvas actif (denoising en cours)
+            if state.isRunning || !state.activeCanvasText.isEmpty {
+                let activeIdx = state.committedCanvases.count
+                if activeIdx < state.maxCanvases {
+                    canvasCard(index: activeIdx, text: state.activeCanvasText, kind: .active)
+                }
+            }
+            // Canvases en attente (slots vides)
+            let usedCount = state.committedCanvases.count + ((state.isRunning || !state.activeCanvasText.isEmpty) ? 1 : 0)
+            if usedCount < state.maxCanvases && state.maxCanvases > 1 {
+                ForEach(usedCount ..< state.maxCanvases, id: \.self) { idx in
+                    canvasCard(index: idx, text: "", kind: .pending)
+                }
+            }
+        }
+    }
+
+    private enum CanvasKind { case committed, active, pending }
+
+    @ViewBuilder
+    private func canvasCard(index: Int, text: String, kind: CanvasKind) -> some View {
+        let bg: Color = {
+            switch kind {
+            case .committed: return accent.opacity(0.10)
+            case .active:    return accent.opacity(0.22)
+            case .pending:   return Color.white.opacity(0.04)
+            }
+        }()
+        let border: Color = {
+            switch kind {
+            case .committed: return accent.opacity(0.45)
+            case .active:    return accent.opacity(0.85)
+            case .pending:   return Color.white.opacity(0.15)
+            }
+        }()
+        let kindLabel: String = {
+            switch kind {
+            case .committed: return "Commit"
+            case .active:    return "En cours"
+            case .pending:   return "En attente"
+            }
+        }()
+
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("Canvas \(index + 1)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                Text(kindLabel)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(kind == .pending ? .white.opacity(0.4) : accent)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule().fill(kind == .pending ? Color.white.opacity(0.06) : accent.opacity(0.15))
+                            .overlay(Capsule().strokeBorder(kind == .pending ? Color.white.opacity(0.15) : accent.opacity(0.45), lineWidth: 0.8))
+                    )
+                Spacer()
+                if kind == .active, let step = state.currentStep, state.totalSteps > 0 {
+                    Text("step \(step)/\(state.totalSteps)")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(accent.opacity(0.8))
+                }
+            }
+            Text(text.isEmpty ? (kind == .pending ? "—" : " ") : text)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(kind == .pending ? .white.opacity(0.3) : .white.opacity(0.92))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.easeInOut(duration: 0.18), value: text)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8).fill(bg)
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(border, lineWidth: kind == .active ? 1.5 : 1))
+        )
+        .shadow(color: kind == .active ? accent.opacity(0.4) : .clear, radius: kind == .active ? 6 : 0)
     }
 
     private func stat(_ value: String, _ icon: String) -> some View {
