@@ -1,0 +1,7367 @@
+[
+  {
+    "id": "simple_327",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Give me the schedule of Manchester United for the next 6 games in Premier League."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "sports_team.get_schedule",
+        "description": "Fetches the schedule of the specified sports team for the specified number of games in the given league.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_name": {
+              "type": "string",
+              "description": "The name of the sports team."
+            },
+            "num_of_games": {
+              "type": "integer",
+              "description": "Number of games for which to fetch the schedule."
+            },
+            "league": {
+              "type": "string",
+              "description": "The name of the sports league. If not provided, the function will fetch the schedule for all games, regardless of the league."
+            },
+            "location": {
+              "type": "string",
+              "description": "Optional. The city or venue where games are to be held. If not provided, default that all venues will be considered."
+            }
+          },
+          "required": [
+            "team_name",
+            "num_of_games",
+            "league"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "sports_team.get_schedule": {
+          "team_name": [
+            "Manchester United",
+            "Man United",
+            "Man U",
+            "MUFC"
+          ],
+          "num_of_games": [
+            6
+          ],
+          "league": [
+            "Premier League"
+          ],
+          "location": [
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_57",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the cell density in a sample with an optical density of 0.6, where the experiment dilution is 5 times."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_cell_density",
+        "description": "Calculate the cell density of a biological sample based on its optical density and the experiment dilution.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "optical_density": {
+              "type": "float",
+              "description": "The optical density of the sample, usually obtained from a spectrophotometer reading."
+            },
+            "dilution": {
+              "type": "integer",
+              "description": "The dilution factor applied during the experiment."
+            },
+            "calibration_factor": {
+              "type": "float",
+              "description": "The calibration factor to adjust the density, default value is 1e9 assuming cell density is in CFU/mL."
+            }
+          },
+          "required": [
+            "optical_density",
+            "dilution"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_cell_density": {
+          "optical_density": [
+            0.6
+          ],
+          "dilution": [
+            5
+          ],
+          "calibration_factor": [
+            1000000000.0,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_12",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the circumference of a circle with radius 3"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "geometry.circumference",
+        "description": "Calculate the circumference of a circle given the radius.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "radius": {
+              "type": "integer",
+              "description": "The radius of the circle."
+            },
+            "units": {
+              "type": "string",
+              "description": "Units for the output circumference measurement. Default is 'cm'."
+            }
+          },
+          "required": [
+            "radius"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "geometry.circumference": {
+          "radius": [
+            3
+          ],
+          "units": [
+            "cm",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_379",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What's the current time in Sydney, Australia?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_current_time",
+        "description": "Retrieve the current time in a specific time zone.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The name of the city."
+            },
+            "country": {
+              "type": "string",
+              "description": "The name of the country."
+            },
+            "timezone": {
+              "type": "string",
+              "description": "The optional timezone to get current time. Default "
+            }
+          },
+          "required": [
+            "location",
+            "country"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_current_time": {
+          "location": [
+            "Sydney"
+          ],
+          "country": [
+            "Australia",
+            "Australia/Sydney"
+          ],
+          "timezone": [
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_140",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the Compound Annual Growth Rate (CAGR) for an initial investment of $2000, final value of $3000 in a period of 4 years."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_cagr",
+        "description": "Calculate the Compound Annual Growth Rate (CAGR) given an initial investment value, a final investment value, and the number of years.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "initial_value": {
+              "type": "integer",
+              "description": "The initial investment value."
+            },
+            "final_value": {
+              "type": "integer",
+              "description": "The final investment value."
+            },
+            "period_in_years": {
+              "type": "integer",
+              "description": "The period of the investment in years."
+            }
+          },
+          "required": [
+            "initial_value",
+            "final_value",
+            "period_in_years"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_cagr": {
+          "initial_value": [
+            2000
+          ],
+          "final_value": [
+            3000
+          ],
+          "period_in_years": [
+            4
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_125",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Predict house price in San Francisco based on its area of 2500 square feet, number of rooms as 5 and year of construction is 1990."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "predict_house_price",
+        "description": "Predict house price based on area, number of rooms and year of construction.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "area": {
+              "type": "integer",
+              "description": "Area of the house in square feet."
+            },
+            "rooms": {
+              "type": "integer",
+              "description": "Number of rooms in the house."
+            },
+            "year": {
+              "type": "integer",
+              "description": "Year when the house was constructed."
+            },
+            "location": {
+              "type": "string",
+              "description": "The location or city of the house."
+            }
+          },
+          "required": [
+            "area",
+            "rooms",
+            "year",
+            "location"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "predict_house_price": {
+          "area": [
+            2500
+          ],
+          "rooms": [
+            5
+          ],
+          "year": [
+            1990
+          ],
+          "location": [
+            "San Francisco",
+            "SF"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_114",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find the probability of getting exactly 5 heads in 10 fair coin tosses."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "prob_dist.binomial",
+        "description": "Compute the probability of having 'success' outcome from binomial distribution.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "trials": {
+              "type": "integer",
+              "description": "The number of independent experiments."
+            },
+            "successes": {
+              "type": "integer",
+              "description": "The number of success events."
+            },
+            "p": {
+              "type": "float",
+              "description": "The probability of success on any given trial, defaults to 0.5"
+            }
+          },
+          "required": [
+            "trials",
+            "successes"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "prob_dist.binomial": {
+          "trials": [
+            10
+          ],
+          "successes": [
+            5
+          ],
+          "p": [
+            0.5,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_71",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Generate a DNA sequence with 100 bases including more G (Guanine) and C (Cytosine)."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "generate_DNA_sequence",
+        "description": "Generate a random DNA sequence with a specific length and nucleotide preference.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "length": {
+              "type": "integer",
+              "description": "The length of the DNA sequence to be generated."
+            },
+            "preferences": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "A",
+                  "T",
+                  "C",
+                  "G"
+                ]
+              },
+              "description": "Preferred nucleotides to include more frequently in the DNA sequence."
+            }
+          },
+          "required": [
+            "length",
+            "preferences"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "generate_DNA_sequence": {
+          "length": [
+            100
+          ],
+          "preferences": [
+            [
+              "G",
+              "C"
+            ],
+            [
+              "C",
+              "G"
+            ]
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_377",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the current time in Sydney, Australia?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_current_time",
+        "description": "Retrieve the current time for a specified city and country.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "city": {
+              "type": "string",
+              "description": "The city for which the current time is to be retrieved."
+            },
+            "country": {
+              "type": "string",
+              "description": "The country where the city is located."
+            },
+            "format": {
+              "type": "string",
+              "description": "The format in which the time is to be displayed, optional (defaults to 'HH:MM:SS')."
+            }
+          },
+          "required": [
+            "city",
+            "country"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_current_time": {
+          "city": [
+            "Sydney"
+          ],
+          "country": [
+            "Australia"
+          ],
+          "format": [
+            "",
+            "HH:MM:SS"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_52",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the heat capacity at constant pressure for air, given its temperature is 298K and volume is 10 m^3."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calc_heat_capacity",
+        "description": "Calculate the heat capacity at constant pressure of air using its temperature and volume.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "temp": {
+              "type": "integer",
+              "description": "The temperature of the gas in Kelvin."
+            },
+            "volume": {
+              "type": "integer",
+              "description": "The volume of the gas in m^3."
+            },
+            "gas": {
+              "type": "string",
+              "description": "Type of gas, with 'air' as default."
+            }
+          },
+          "required": [
+            "temp",
+            "volume"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calc_heat_capacity": {
+          "temp": [
+            298
+          ],
+          "volume": [
+            10
+          ],
+          "gas": [
+            "air",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_346",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Get all collectable items from the game 'Animal Crossing: New Horizons' during the Spring season."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_collectables_in_season",
+        "description": "Retrieve a list of collectable items in a specific game during a specified season.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game_name": {
+              "type": "string",
+              "description": "Name of the game."
+            },
+            "season": {
+              "type": "string",
+              "description": "The season for which to retrieve the collectable items."
+            },
+            "item_type": {
+              "type": "string",
+              "description": "The type of item to search for. Default is 'all'. Possible values: 'all', 'bug', 'fish', 'sea creatures', etc."
+            }
+          },
+          "required": [
+            "game_name",
+            "season"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_collectables_in_season": {
+          "game_name": [
+            "Animal Crossing: New Horizons"
+          ],
+          "season": [
+            "Spring"
+          ],
+          "item_type": [
+            "",
+            "all"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_279",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What's the retail price of a Fender American Professional II Stratocaster in Rosewood Finish?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "instrument_price.get",
+        "description": "Retrieve the current retail price of a specific musical instrument.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "brand": {
+              "type": "string",
+              "description": "The brand of the instrument."
+            },
+            "model": {
+              "type": "string",
+              "description": "The specific model of the instrument."
+            },
+            "finish": {
+              "type": "string",
+              "description": "The color or type of finish on the instrument."
+            }
+          },
+          "required": [
+            "brand",
+            "model",
+            "finish"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "instrument_price.get": {
+          "brand": [
+            "Fender"
+          ],
+          "model": [
+            "American Professional II Stratocaster"
+          ],
+          "finish": [
+            "Rosewood"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_44",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the electric field strength 4 meters away from a charge of 0.01 Coulombs."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_electric_field_strength",
+        "description": "Calculate the electric field strength at a certain distance from a point charge.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "charge": {
+              "type": "float",
+              "description": "The charge in Coulombs."
+            },
+            "distance": {
+              "type": "integer",
+              "description": "The distance from the charge in meters."
+            },
+            "medium": {
+              "type": "string",
+              "description": "The medium in which the charge and the point of calculation is located. Default is 'vacuum'."
+            }
+          },
+          "required": [
+            "charge",
+            "distance"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_electric_field_strength": {
+          "charge": [
+            0.01
+          ],
+          "distance": [
+            4
+          ],
+          "medium": [
+            "",
+            "vacuum"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_302",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the batting average for a baseball player who has 180 hits and 600 at-bats. Round to 3 decimals."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_batting_average",
+        "description": "Calculate the batting average for a baseball player based on their number of hits and at-bats.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "hits": {
+              "type": "integer",
+              "description": "The number of hits."
+            },
+            "at_bats": {
+              "type": "integer",
+              "description": "The number of at-bats."
+            },
+            "decimal_places": {
+              "type": "integer",
+              "description": "The number of decimal places to return in the batting average. Default is 3."
+            }
+          },
+          "required": [
+            "hits",
+            "at_bats"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_batting_average": {
+          "hits": [
+            180
+          ],
+          "at_bats": [
+            600
+          ],
+          "decimal_places": [
+            3,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_216",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Analyze the sentiment of a customer review 'I love the food here! It's always fresh and delicious.'."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "sentiment_analysis",
+        "description": "Perform sentiment analysis on a given piece of text.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text on which to perform sentiment analysis."
+            },
+            "language": {
+              "type": "string",
+              "description": "The language in which the text is written."
+            }
+          },
+          "required": [
+            "text",
+            "language"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "sentiment_analysis": {
+          "text": [
+            "I love the food here! It's always fresh and delicious."
+          ],
+          "language": [
+            "english",
+            "English",
+            "en"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_16",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the derivative of the function 2x^2 at x = 1."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculus.derivative",
+        "description": "Compute the derivative of a function at a specific value.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "function": {
+              "type": "string",
+              "description": "The function to calculate the derivative of."
+            },
+            "value": {
+              "type": "integer",
+              "description": "The value where the derivative needs to be calculated at."
+            },
+            "function_variable": {
+              "type": "string",
+              "description": "The variable present in the function, for instance x or y, etc. Default is 'x'."
+            }
+          },
+          "required": [
+            "function",
+            "value"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculus.derivative": {
+          "function": [
+            "2x**2",
+            "lambda x: 2x**2"
+          ],
+          "value": [
+            1
+          ],
+          "function_variable": [
+            "x",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_15",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the area under the curve from x = -2 to x = 3 for the function y = x^3 using simpson method."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "integrate",
+        "description": "Calculate the area under a curve for a specified function between two x values.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "function": {
+              "type": "string",
+              "description": "The function to integrate, represented as a string. For example, 'x^3'"
+            },
+            "start_x": {
+              "type": "integer",
+              "description": "The starting x-value to integrate over."
+            },
+            "end_x": {
+              "type": "integer",
+              "description": "The ending x-value to integrate over."
+            },
+            "method": {
+              "type": "string",
+              "description": "The method of numerical integration to use. Choices are 'trapezoid' or 'simpson'. Default is 'trapezoid'."
+            }
+          },
+          "required": [
+            "function",
+            "start_x",
+            "end_x"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "integrate": {
+          "function": [
+            "x**3",
+            "lambda x: x**3"
+          ],
+          "start_x": [
+            -2
+          ],
+          "end_x": [
+            3
+          ],
+          "method": [
+            "simpson"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_47",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find the boiling point and melting point of water under the sea level of 5000m."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_boiling_melting_points",
+        "description": "Retrieve the boiling point and melting point of a substance based on its name and the sea level.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "substance": {
+              "type": "string",
+              "description": "The name of the substance."
+            },
+            "sea_level": {
+              "type": "integer",
+              "description": "The sea level in meters."
+            }
+          },
+          "required": [
+            "substance",
+            "sea_level"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_boiling_melting_points": {
+          "substance": [
+            "water"
+          ],
+          "sea_level": [
+            5000
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_111",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Generate a random number from a normal distribution with mean 0 and standard deviation 1."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "random.normalvariate",
+        "description": "Generates a random number from a normal distribution given the mean and standard deviation.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "mu": {
+              "type": "integer",
+              "description": "Mean of the normal distribution."
+            },
+            "sigma": {
+              "type": "integer",
+              "description": "Standard deviation of the normal distribution."
+            }
+          },
+          "required": [
+            "mu",
+            "sigma"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "random.normalvariate": {
+          "mu": [
+            0
+          ],
+          "sigma": [
+            1
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_119",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Perform a hypothesis test for two independent samples with scores of Sample1: [22,33,42,12,34] and Sample2: [23,45,44,14,38] at a significance level of 0.05."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "hypothesis_testing.ttest_ind",
+        "description": "Conducts a hypothesis test for two independent samples.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "sample1": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "First set of observations (array of numbers)."
+            },
+            "sample2": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "Second set of observations (array of numbers)."
+            },
+            "significance_level": {
+              "type": "float",
+              "description": "Significance level of the test (default: 0.05)"
+            }
+          },
+          "required": [
+            "sample1",
+            "sample2"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "hypothesis_testing.ttest_ind": {
+          "sample1": [
+            [
+              22,
+              33,
+              42,
+              12,
+              34
+            ]
+          ],
+          "sample2": [
+            [
+              23,
+              45,
+              44,
+              14,
+              38
+            ]
+          ],
+          "significance_level": [
+            0.05
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_258",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Mix yellow and blue colors and adjust the lightness level to 60 percent."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "mix_paint_color",
+        "description": "Combine two primary paint colors and adjust the resulting color's lightness level.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "color1": {
+              "type": "string",
+              "description": "The first primary color to be mixed."
+            },
+            "color2": {
+              "type": "string",
+              "description": "The second primary color to be mixed."
+            },
+            "lightness": {
+              "type": "integer",
+              "description": "The desired lightness level of the resulting color in percentage. The default level is set to 50."
+            }
+          },
+          "required": [
+            "color1",
+            "color2"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "mix_paint_color": {
+          "color1": [
+            "yellow"
+          ],
+          "color2": [
+            "blue"
+          ],
+          "lightness": [
+            60
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_308",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the next five matches for Manchester United and who are they playing against in the English Premier League?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "sports.match_schedule",
+        "description": "Retrieve the match schedule for a specific sports team.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_name": {
+              "type": "string",
+              "description": "The name of the sports team."
+            },
+            "num_matches": {
+              "type": "integer",
+              "description": "The number of upcoming matches you want to get."
+            },
+            "league": {
+              "type": "string",
+              "description": "The sports league of the team. This is an optional parameter. Default is 'English Premier League'."
+            }
+          },
+          "required": [
+            "team_name",
+            "num_matches"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "sports.match_schedule": {
+          "team_name": [
+            "Manchester United",
+            "Man United",
+            "Man U",
+            "MUFC"
+          ],
+          "num_matches": [
+            5
+          ],
+          "league": [
+            "English Premier League",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_13",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the area under the curve y=x^2 from x=1 to x=3."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_area_under_curve",
+        "description": "Calculate the area under a mathematical function within a given interval.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "function": {
+              "type": "string",
+              "description": "The mathematical function as a string."
+            },
+            "interval": {
+              "type": "array",
+              "items": {
+                "type": "float"
+              },
+              "description": "An array that defines the interval to calculate the area under the curve from the start to the end point."
+            },
+            "method": {
+              "type": "string",
+              "description": "The numerical method to approximate the area under the curve. The default value is 'trapezoidal'."
+            }
+          },
+          "required": [
+            "function",
+            "interval"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_area_under_curve": {
+          "function": [
+            "x**2",
+            "lambda x: x**2",
+            "y=x**2"
+          ],
+          "interval": [
+            [
+              1.0,
+              3.0
+            ]
+          ],
+          "method": [
+            "",
+            "trapezoidal"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_287",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find me a classical concert this weekend in Los Angeles with cheap tickets."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "concert.search",
+        "description": "Locate a concert based on specific criteria like genre, location, and date.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "genre": {
+              "type": "string",
+              "description": "Genre of the concert."
+            },
+            "location": {
+              "type": "string",
+              "description": "City of the concert."
+            },
+            "date": {
+              "type": "string",
+              "description": "Date of the concert, e.g. this weekend, today, tomorrow.",
+              "enum": [
+                "this weekend",
+                "next weekend",
+                "this month",
+                "next month",
+                "today",
+                "tomorrow",
+                "the day after"
+              ]
+            },
+            "price_range": {
+              "type": "string",
+              "enum": [
+                "free",
+                "cheap",
+                "moderate",
+                "expensive"
+              ],
+              "description": "Expected price range of the concert tickets. Default is 'free'."
+            }
+          },
+          "required": [
+            "genre",
+            "location",
+            "date"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "concert.search": {
+          "genre": [
+            "classical"
+          ],
+          "location": [
+            "Los Angeles",
+            "LA"
+          ],
+          "date": [
+            "this weekend"
+          ],
+          "price_range": [
+            "cheap"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_101",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the speed of an object in km/h if it traveled 450 meters in 20 seconds."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_speed",
+        "description": "Calculate the speed of an object based on the distance travelled and the time taken.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "distance": {
+              "type": "integer",
+              "description": "The distance the object travelled in meters."
+            },
+            "time": {
+              "type": "integer",
+              "description": "The time it took for the object to travel in seconds."
+            },
+            "to_unit": {
+              "type": "string",
+              "description": "The unit in which the speed should be calculated, default is m/s."
+            }
+          },
+          "required": [
+            "distance",
+            "time"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_speed": {
+          "distance": [
+            450
+          ],
+          "time": [
+            20
+          ],
+          "to_unit": [
+            "km/h"
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_366",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How many teaspoons are in 2 tablespoons for measurement in my recipe?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "recipe.unit_conversion",
+        "description": "Convert a value from one kitchen unit to another for cooking purposes.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "value": {
+              "type": "integer",
+              "description": "The value to be converted."
+            },
+            "from_unit": {
+              "type": "string",
+              "description": "The unit to convert from. Supports 'teaspoon', 'tablespoon', 'cup', etc."
+            },
+            "to_unit": {
+              "type": "string",
+              "description": "The unit to convert to. Supports 'teaspoon', 'tablespoon', 'cup', etc."
+            },
+            "precision": {
+              "type": "integer",
+              "description": "The precision to round the output to, in case of a non-integer result. Optional, default is 1."
+            }
+          },
+          "required": [
+            "value",
+            "from_unit",
+            "to_unit"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "recipe.unit_conversion": {
+          "value": [
+            2
+          ],
+          "from_unit": [
+            "tablespoon",
+            "tbsp"
+          ],
+          "to_unit": [
+            "teaspoon",
+            "tsp"
+          ],
+          "precision": [
+            1,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_332",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What's the chess classical rating of Magnus Carlsen?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "chess.rating",
+        "description": "Fetches the current chess rating of a given player",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "player_name": {
+              "type": "string",
+              "description": "The full name of the chess player."
+            },
+            "variant": {
+              "type": "string",
+              "description": "The variant of chess for which rating is requested (e.g., 'classical', 'blitz', 'bullet'). Default is 'classical'."
+            }
+          },
+          "required": [
+            "player_name"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "chess.rating": {
+          "player_name": [
+            "Magnus Carlsen"
+          ],
+          "variant": [
+            "classical",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_359",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Give me a recipe for a vegetarian pasta with cheese for 2 servings."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "recipe_search",
+        "description": "Search for a recipe given dietary restriction, ingredients, and number of servings.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "dietary_restriction": {
+              "type": "string",
+              "description": "The dietary restriction, e.g., 'Vegetarian'."
+            },
+            "ingredients": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "The list of ingredients."
+            },
+            "servings": {
+              "type": "integer",
+              "description": "The number of servings the recipe should make"
+            }
+          },
+          "required": [
+            "dietary_restriction",
+            "ingredients",
+            "servings"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "recipe_search": {
+          "dietary_restriction": [
+            "Vegetarian"
+          ],
+          "ingredients": [
+            [
+              "pasta",
+              "cheese"
+            ]
+          ],
+          "servings": [
+            2
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_214",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Search for upcoming month rock concerts in New York."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "event_finder.find_upcoming",
+        "description": "Find upcoming events of a specific genre in a given location.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state where the search will take place, e.g. New York, NY."
+            },
+            "genre": {
+              "type": "string",
+              "description": "The genre of events."
+            },
+            "days_ahead": {
+              "type": "integer",
+              "description": "The number of days from now to include in the search.",
+              "default": 7
+            }
+          },
+          "required": [
+            "location",
+            "genre"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "event_finder.find_upcoming": {
+          "location": [
+            "New York",
+            "New York, NY",
+            "NYC"
+          ],
+          "genre": [
+            "Rock",
+            "rock"
+          ],
+          "days_ahead": [
+            30
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "simple_112",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the probability of drawing a king from a deck of cards."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_probability",
+        "description": "Calculate the probability of an event.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "total_outcomes": {
+              "type": "integer",
+              "description": "Total number of possible outcomes."
+            },
+            "favorable_outcomes": {
+              "type": "integer",
+              "description": "Number of outcomes considered as 'successful'."
+            },
+            "round_to": {
+              "type": "integer",
+              "description": "Number of decimal places to round the result to.",
+              "default": 2
+            }
+          },
+          "required": [
+            "total_outcomes",
+            "favorable_outcomes"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_probability": {
+          "total_outcomes": [
+            52
+          ],
+          "favorable_outcomes": [
+            4
+          ],
+          "round_to": [
+            "",
+            2
+          ]
+        }
+      }
+    ],
+    "category": "simple"
+  },
+  {
+    "id": "multiple_114",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Get me the predictions of the evolutionary rate for Homo Sapiens for next 50 years using Darwin model"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "modify_painting",
+        "description": "Modify an existing painting's attributes such as size, medium, and color.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "size": {
+              "type": "string",
+              "description": "The size of the painting in inches, width by height."
+            },
+            "medium": {
+              "type": "string",
+              "description": "The medium of the painting, such as oil, acrylic, etc."
+            },
+            "dominant_color": {
+              "type": "string",
+              "description": "The dominant color of the painting. Default ''"
+            }
+          },
+          "required": [
+            "size",
+            "medium"
+          ]
+        }
+      },
+      {
+        "name": "prediction.evolution",
+        "description": "Predict the evolutionary rate for a specific species for a given timeframe.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "species": {
+              "type": "string",
+              "description": "The species that the evolution rate will be predicted for."
+            },
+            "years": {
+              "type": "integer",
+              "description": "Number of years for the prediction."
+            },
+            "model": {
+              "type": "string",
+              "description": "The model used to make the prediction, options: 'Darwin', 'Lamarck', default is 'Darwin'."
+            }
+          },
+          "required": [
+            "species",
+            "years"
+          ]
+        }
+      },
+      {
+        "name": "calculate_probability",
+        "description": "Calculate the probability of an event.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "total_outcomes": {
+              "type": "integer",
+              "description": "Total number of possible outcomes."
+            },
+            "favorable_outcomes": {
+              "type": "integer",
+              "description": "Number of outcomes considered as 'successful'."
+            },
+            "round_to": {
+              "type": "integer",
+              "description": "Number of decimal places to round the result to.",
+              "default": 2
+            }
+          },
+          "required": [
+            "total_outcomes",
+            "favorable_outcomes"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "prediction.evolution": {
+          "species": [
+            "Homo Sapiens",
+            "Homo sapiens"
+          ],
+          "years": [
+            50
+          ],
+          "model": [
+            "Darwin",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_150",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the neuronal activity based on synaptic input rate of 200 and weight 0.5 and decay rate of 0.1."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_electrostatic_potential",
+        "description": "Calculate the electrostatic potential between two charged bodies using the principle of Coulomb's Law.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "charge1": {
+              "type": "float",
+              "description": "The quantity of charge on the first body."
+            },
+            "charge2": {
+              "type": "float",
+              "description": "The quantity of charge on the second body."
+            },
+            "distance": {
+              "type": "float",
+              "description": "The distance between the two bodies."
+            },
+            "constant": {
+              "type": "float",
+              "description": "The value of the electrostatic constant. Default is 898755178.73"
+            }
+          },
+          "required": [
+            "charge1",
+            "charge2",
+            "distance"
+          ]
+        }
+      },
+      {
+        "name": "calculate_neuronal_activity",
+        "description": "Calculate the neuronal activity (rate of firing) based on a given input synaptic rate, weight of inputs, and decay rate. Higher input or weight increases firing rate and higher decay rate decreases it.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "input_synaptic_rate": {
+              "type": "integer",
+              "description": "The synaptic input rate, usually represented as number of inputs per second."
+            },
+            "weight": {
+              "type": "float",
+              "description": "The weight of the input, denoting its influence on the neuron's state. Default is 1.0."
+            },
+            "decay_rate": {
+              "type": "float",
+              "description": "The rate at which the neuron's potential decays in the absence of inputs."
+            }
+          },
+          "required": [
+            "input_synaptic_rate",
+            "decay_rate"
+          ],
+          "optional": [
+            "weight"
+          ]
+        }
+      },
+      {
+        "name": "calculate_displacement",
+        "description": "Calculates the displacement of an object in motion given initial velocity, time, and acceleration.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "initial_velocity": {
+              "type": "float",
+              "description": "The initial velocity of the object in m/s."
+            },
+            "time": {
+              "type": "integer",
+              "description": "The time in seconds that the object has been in motion."
+            },
+            "acceleration": {
+              "type": "float",
+              "description": "The acceleration of the object in m/s^2.",
+              "default": 0
+            }
+          },
+          "required": [
+            "initial_velocity",
+            "time"
+          ]
+        }
+      },
+      {
+        "name": "grocery_store.find_best",
+        "description": "Find the closest high-rated grocery stores based on certain product availability.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "my_location": {
+              "type": "string",
+              "description": "The current location of the user."
+            },
+            "rating": {
+              "type": "float",
+              "description": "The minimum required store rating. Default is 0.0."
+            },
+            "products": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Required products in a list."
+            }
+          },
+          "required": [
+            "my_location",
+            "products"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_neuronal_activity": {
+          "input_synaptic_rate": [
+            200
+          ],
+          "weight": [
+            0.5
+          ],
+          "decay_rate": [
+            0.1
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_71",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How many veterans were there in the United States in the year 1954?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_bureau_statistics",
+        "description": "Retrieve statistical data for a specific year and statistical category",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year for which to retrieve the statistical data"
+            },
+            "category": {
+              "type": "string",
+              "description": "The statistical category (e.g., employment, crime, health)"
+            }
+          },
+          "required": [
+            "year",
+            "category"
+          ]
+        }
+      },
+      {
+        "name": "get_population",
+        "description": "Retrieve population data for a specific year and population category",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year for which to retrieve the population data"
+            },
+            "category": {
+              "type": "string",
+              "description": "The population category (e.g., total, veterans, women)"
+            }
+          },
+          "required": [
+            "year",
+            "category"
+          ]
+        }
+      },
+      {
+        "name": "get_demographics",
+        "description": "Retrieve demographic data for a specific year and demographic category",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year for which to retrieve the demographic data"
+            },
+            "category": {
+              "type": "string",
+              "description": "The demographic category (e.g., gender, race, age)"
+            }
+          },
+          "required": [
+            "year",
+            "category"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_population": {
+          "year": [
+            1954
+          ],
+          "category": [
+            "veterans"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_1",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the area of a triangle, given the lengths of its three sides: 3, 4, and 5."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "math.triangle_area_heron",
+        "description": "Calculates the area of a triangle using Heron's formula, given the lengths of its three sides.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "side1": {
+              "type": "integer",
+              "description": "Length of the first side of the triangle."
+            },
+            "side2": {
+              "type": "integer",
+              "description": "Length of the second side of the triangle."
+            },
+            "side3": {
+              "type": "integer",
+              "description": "Length of the third side of the triangle."
+            }
+          },
+          "required": [
+            "side1",
+            "side2",
+            "side3"
+          ]
+        }
+      },
+      {
+        "name": "math.circle_area",
+        "description": "Calculates the area of a circle given its radius.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "radius": {
+              "type": "float",
+              "description": "The radius of the circle."
+            }
+          },
+          "required": [
+            "radius"
+          ]
+        }
+      },
+      {
+        "name": "math.triangle_area_base_height",
+        "description": "Calculates the area of a triangle using the formula (1/2)base*height.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "base": {
+              "type": "float",
+              "description": "The base length of the triangle."
+            },
+            "height": {
+              "type": "float",
+              "description": "The height of the triangle."
+            }
+          },
+          "required": [
+            "base",
+            "height"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "math.triangle_area_heron": {
+          "side1": [
+            3
+          ],
+          "side2": [
+            4
+          ],
+          "side3": [
+            5
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_194",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the opening hours of the Metropolitan Museum of Art on Saturday?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "discoverer.get",
+        "description": "Retrieve the name of the discoverer of an element based on its name.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "element_name": {
+              "type": "string",
+              "description": "The name of the element."
+            },
+            "year": {
+              "type": "integer",
+              "description": "Optional parameter that refers to the year of discovery. It could be helpful in case an element was discovered more than once. Default is 0."
+            },
+            "first": {
+              "type": "boolean",
+              "default": true,
+              "description": "Optional parameter indicating if the first discoverer's name should be retrieved."
+            }
+          },
+          "required": [
+            "element_name"
+          ]
+        }
+      },
+      {
+        "name": "lawsuit.check_case",
+        "description": "Verify the details of a lawsuit case and check its status using case ID.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "case_id": {
+              "type": "integer",
+              "description": "The identification number of the lawsuit case."
+            },
+            "closed_status": {
+              "type": "boolean",
+              "description": "The status of the lawsuit case to be verified."
+            }
+          },
+          "required": [
+            "case_id",
+            "closed_status"
+          ]
+        }
+      },
+      {
+        "name": "get_museum_hours",
+        "description": "Retrieve opening hours of a specified museum for the specified day.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "museum_name": {
+              "type": "string",
+              "description": "The name of the museum."
+            },
+            "day": {
+              "type": "string",
+              "description": "Day of the week.",
+              "enum": [
+                "Monday",
+                "Tuesday",
+                "Wednesday",
+                "Thursday",
+                "Friday",
+                "Saturday",
+                "Sunday"
+              ]
+            }
+          },
+          "required": [
+            "museum_name",
+            "day"
+          ]
+        }
+      },
+      {
+        "name": "monopoly_odds_calculator",
+        "description": "Calculates the probability of rolling a certain sum with two dice, commonly used in board game like Monopoly.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "description": "The number for which the odds are calculated."
+            },
+            "dice_number": {
+              "type": "integer",
+              "description": "The number of dice involved in the roll."
+            },
+            "dice_faces": {
+              "type": "integer",
+              "description": "The number of faces on a single die. Default is 6 for standard six-faced die."
+            }
+          },
+          "required": [
+            "number",
+            "dice_number"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_museum_hours": {
+          "museum_name": [
+            "Metropolitan Museum of Art",
+            "The Met",
+            "Met Museum"
+          ],
+          "day": [
+            "Saturday"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_40",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the strength of magnetic field given distance is 8 meters and current is 12 Amperes?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "electromagnetism.ampere_law",
+        "description": "Calculate magnetic field strength using Ampere's Circuital Law. Input the current enclosed by a circular path and the distance from the center of the circle. Can be applied to a cylindrical or spherical symmetry of consistent magnetic field. ",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "enclosed_current": {
+              "type": "float",
+              "description": "The total current enclosed by the loop. In Amperes."
+            },
+            "radius": {
+              "type": "float",
+              "description": "The radius of the circle or the distance from the center of the circular path. In meters."
+            },
+            "mu0": {
+              "type": "float",
+              "description": "Permeability of free space. Its value is default approximated to be 0.000001256 H/m. Optional"
+            }
+          },
+          "required": [
+            "enclosed_current",
+            "radius"
+          ]
+        }
+      },
+      {
+        "name": "electromagnetism.biot_savart_law",
+        "description": "Calculate magnetic field strength using Biot-Savart law. Input the current in Ampere and the distance in meters.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "current": {
+              "type": "integer",
+              "description": "The current in the conductor, in Amperes."
+            },
+            "distance": {
+              "type": "integer",
+              "description": "Distance from the current carrying conductor, in meters."
+            },
+            "mu0": {
+              "type": "float",
+              "description": "Permeability of free space. Its value is default approximated to be 0.000001256 H/m. Optional"
+            }
+          },
+          "required": [
+            "current",
+            "distance"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "electromagnetism.biot_savart_law": {
+          "current": [
+            12
+          ],
+          "distance": [
+            8
+          ],
+          "mu0": [
+            1.256e-06,
+            1.256e-06,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_178",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find a Card of rank 'Queen' and suit 'Hearts' in the deck."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "currency_exchange.convert",
+        "description": "Convert an amount from a base currency to a target currency based on the current exchange rate.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "base_currency": {
+              "type": "string",
+              "description": "The currency to convert from."
+            },
+            "target_currency": {
+              "type": "string",
+              "description": "The currency to convert to."
+            },
+            "amount": {
+              "type": "float",
+              "description": "The amount in base currency to convert"
+            }
+          },
+          "required": [
+            "base_currency",
+            "target_currency",
+            "amount"
+          ]
+        }
+      },
+      {
+        "name": "local_nursery.find",
+        "description": "Locate local nurseries based on location and plant types availability.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city or locality where the nursery needs to be located."
+            },
+            "plant_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Annual",
+                  "Perennial",
+                  "Shrub",
+                  "Tree",
+                  "Herbs",
+                  "Fruits"
+                ]
+              },
+              "description": "Type of plants the nursery should provide."
+            }
+          },
+          "required": [
+            "location",
+            "plant_types"
+          ]
+        }
+      },
+      {
+        "name": "find_card_in_deck",
+        "description": "Locate a particular card in a deck based on rank and suit.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "rank": {
+              "type": "string",
+              "description": "Rank of the card (e.g. Ace, Two, King)."
+            },
+            "suit": {
+              "type": "string",
+              "description": "Suit of the card (e.g. Hearts, Spades, Diamonds, Clubs)."
+            },
+            "deck": {
+              "type": "array",
+              "items": {
+                "type": "dict",
+                "properties": {
+                  "rank": {
+                    "type": "string"
+                  },
+                  "suit": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Deck of cards. If not provided, the deck will be a standard 52 card deck by default"
+            }
+          },
+          "required": [
+            "rank",
+            "suit"
+          ]
+        }
+      },
+      {
+        "name": "recipe.unit_conversion",
+        "description": "Convert a value from one kitchen unit to another for cooking purposes.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "value": {
+              "type": "float",
+              "description": "The value to be converted."
+            },
+            "from_unit": {
+              "type": "string",
+              "description": "The unit to convert from. Supports 'teaspoon', 'tablespoon', 'cup', etc."
+            },
+            "to_unit": {
+              "type": "string",
+              "description": "The unit to convert to. Supports 'teaspoon', 'tablespoon', 'cup', etc."
+            },
+            "precision": {
+              "type": "integer",
+              "description": "The precision to round the output to, in case of a non-integer result. Optional, default is 0."
+            }
+          },
+          "required": [
+            "value",
+            "from_unit",
+            "to_unit"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "find_card_in_deck": {
+          "rank": [
+            "Queen"
+          ],
+          "suit": [
+            "Hearts"
+          ],
+          "deck": [
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_108",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the heat capacity at constant pressure for air, given its temperature is 298K and volume is 10 m^3."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calc_heat_capacity",
+        "description": "Calculate the heat capacity at constant pressure of air using its temperature and volume.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "temp": {
+              "type": "integer",
+              "description": "The temperature of the gas in Kelvin."
+            },
+            "volume": {
+              "type": "integer",
+              "description": "The volume of the gas in m^3."
+            },
+            "gas": {
+              "type": "string",
+              "description": "Type of gas, with air as default."
+            }
+          },
+          "required": [
+            "temp",
+            "volume"
+          ]
+        }
+      },
+      {
+        "name": "calculate_discounted_cash_flow",
+        "description": "Calculate the discounted cash flow of a bond for a given annual coupon payment, time frame and discount rate.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "coupon_payment": {
+              "type": "float",
+              "description": "The annual coupon payment."
+            },
+            "period": {
+              "type": "integer",
+              "description": "The time frame in years for which coupon payment is made."
+            },
+            "discount_rate": {
+              "type": "float",
+              "description": "The discount rate."
+            },
+            "face_value": {
+              "type": "integer",
+              "description": "The face value of the bond, default is $1000."
+            }
+          },
+          "required": [
+            "coupon_payment",
+            "period",
+            "discount_rate"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calc_heat_capacity": {
+          "temp": [
+            298
+          ],
+          "volume": [
+            10
+          ],
+          "gas": [
+            "air",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_87",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find the latest update or patch for the game 'Cyberpunk 2077' on Xbox platform."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "games.reviews.find",
+        "description": "Find reviews for a specific game.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            },
+            "region": {
+              "type": "string",
+              "description": "The region where the reviews are coming from (optional, default is 'global')"
+            }
+          },
+          "required": [
+            "game"
+          ]
+        }
+      },
+      {
+        "name": "games.update.find",
+        "description": "Find the latest updates or patches for a specific game on a specified gaming platform.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            },
+            "platform": {
+              "type": "string",
+              "description": "The gaming platform, e.g. Xbox, Playstation, PC."
+            },
+            "region": {
+              "type": "string",
+              "description": "The region of the update (optional, default is 'global')"
+            }
+          },
+          "required": [
+            "game",
+            "platform"
+          ]
+        }
+      },
+      {
+        "name": "games.price.find",
+        "description": "Find the current price for a specific game on a specified gaming platform.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            },
+            "platform": {
+              "type": "string",
+              "description": "The gaming platform, e.g. Xbox, Playstation, PC."
+            }
+          },
+          "required": [
+            "game",
+            "platform"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "games.update.find": {
+          "game": [
+            "Cyberpunk 2077"
+          ],
+          "platform": [
+            "Xbox"
+          ],
+          "region": [
+            "",
+            "global"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_197",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find the type of gene mutation based on SNP (Single Nucleotide Polymorphism) ID rs6034464."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "create_player_profile",
+        "description": "Create a new player profile with character name, class and starting level.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "player_name": {
+              "type": "string",
+              "description": "The desired name of the player."
+            },
+            "_class": {
+              "type": "string",
+              "description": "The character class for the player"
+            },
+            "starting_level": {
+              "type": "integer",
+              "description": "The starting level for the player",
+              "default": 1
+            }
+          },
+          "required": [
+            "player_name",
+            "_class"
+          ]
+        }
+      },
+      {
+        "name": "walmart.purchase",
+        "description": "Retrieve information of items from Walmart including stock availability.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "loc": {
+              "type": "string",
+              "description": "Location of the nearest Walmart."
+            },
+            "product_list": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Items to be purchased listed in an array."
+            },
+            "pack_size": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "Size of the product pack if applicable. The size of the array should be equal to product_list. Default is an empty array"
+            }
+          },
+          "required": [
+            "loc",
+            "product_list"
+          ]
+        }
+      },
+      {
+        "name": "mutation_type.find",
+        "description": "Finds the type of a genetic mutation based on its SNP (Single Nucleotide Polymorphism) ID.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "snp_id": {
+              "type": "string",
+              "description": "The ID of the Single Nucleotide Polymorphism (SNP) mutation."
+            },
+            "species": {
+              "type": "string",
+              "description": "Species in which the SNP occurs, default is 'Homo sapiens' (Humans)."
+            }
+          },
+          "required": [
+            "snp_id"
+          ]
+        }
+      },
+      {
+        "name": "find_restaurants",
+        "description": "Locate nearby restaurants based on location and food preferences.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The specific location or area."
+            },
+            "food_type": {
+              "type": "string",
+              "description": "The type of food preferred."
+            },
+            "number": {
+              "type": "integer",
+              "description": "Number of results to return."
+            },
+            "dietary_requirements": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Special dietary requirements, e.g. vegan, gluten-free.",
+              "default": "None"
+            }
+          },
+          "required": [
+            "location",
+            "food_type",
+            "number"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "mutation_type.find": {
+          "snp_id": [
+            "rs6034464"
+          ],
+          "species": [
+            "",
+            "Homo sapiens"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_39",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find a ride from New York to Philadelphia with maximum cost of $50"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "grocery_delivery.order",
+        "description": "Order grocery items from a specific location with optional delivery price limit",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The location of the grocery store"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of items to order"
+            },
+            "max_delivery_cost": {
+              "type": "float",
+              "description": "The maximum delivery cost. It is optional. Default 1000000"
+            }
+          },
+          "required": [
+            "location",
+            "items"
+          ]
+        }
+      },
+      {
+        "name": "ride_hailing.get_rides",
+        "description": "Find ride from source to destination with an optional cost limit",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "The starting point of the journey"
+            },
+            "destination": {
+              "type": "string",
+              "description": "The endpoint of the journey"
+            },
+            "max_cost": {
+              "type": "integer",
+              "description": "The maximum cost of the ride. It is optional. Default is 1000000"
+            }
+          },
+          "required": [
+            "source",
+            "destination"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "ride_hailing.get_rides": {
+          "source": [
+            "New York",
+            "New York, NY",
+            "New York City",
+            "NYC",
+            "NY"
+          ],
+          "destination": [
+            "Philadelphia"
+          ],
+          "max_cost": [
+            50
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_55",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Predict the stock price for Google for the next 3 days."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "stock_forecast",
+        "description": "Predict the future stock price for a specific company and time frame.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "company": {
+              "type": "string",
+              "description": "The company that you want to get the stock price prediction for."
+            },
+            "days": {
+              "type": "integer",
+              "description": "Number of future days for which to predict the stock price."
+            },
+            "model": {
+              "type": "string",
+              "description": "The model to use for prediction. Default 'regression'"
+            }
+          },
+          "required": [
+            "company",
+            "days"
+          ]
+        }
+      },
+      {
+        "name": "weather_forecast",
+        "description": "Retrieve a weather forecast for a specific location and time frame.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city that you want to get the weather for."
+            },
+            "days": {
+              "type": "integer",
+              "description": "Number of days for the forecast."
+            }
+          },
+          "required": [
+            "location",
+            "days"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "stock_forecast": {
+          "company": [
+            "Google",
+            "GOOG"
+          ],
+          "days": [
+            3
+          ],
+          "model": [
+            "",
+            "regression"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_86",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are some recommended board games for 2 players and strategy based from store BoardGameGeek?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "BoardGameGeek.recommend",
+        "description": "Generate game recommendation from BoardGameGeek store based on number of players and category.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "numPlayers": {
+              "type": "integer",
+              "description": "The number of players who will play the game."
+            },
+            "category": {
+              "type": "string",
+              "description": "The preferred category of board game. E.g. strategy, family, party etc."
+            },
+            "difficulty": {
+              "type": "string",
+              "description": "Preferred difficulty level. E.g. beginner, intermediate, advanced etc. This is an optional parameter. Default 'beginner'"
+            }
+          },
+          "required": [
+            "numPlayers",
+            "category"
+          ]
+        }
+      },
+      {
+        "name": "AmazonGameStore.recommend",
+        "description": "Generate game recommendation from Amazon Game Store based on number of players and category.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "numOfPlayers": {
+              "type": "integer",
+              "description": "The number of players who will play the game."
+            },
+            "category": {
+              "type": "string",
+              "description": "The preferred category of board game. E.g. strategy, family, party etc."
+            },
+            "priceRange": {
+              "type": "string",
+              "description": "The price range you are willing to pay for the board game. E.g. $10-$20, $20-$30 etc. This is an optional parameter. Default ''"
+            }
+          },
+          "required": [
+            "numOfPlayers",
+            "category"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "BoardGameGeek.recommend": {
+          "numPlayers": [
+            2
+          ],
+          "category": [
+            "strategy"
+          ],
+          "difficulty": [
+            "",
+            "beginner"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_26",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find out the rewards for playing Fortnite on Playstation platform with different missions and trophies"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "game_scores.get",
+        "description": "Retrieve scores and rankings based on player\u2019s performance in a certain game.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            },
+            "platform": {
+              "type": "string",
+              "description": "The gaming platform e.g. Xbox, Playstation, PC"
+            },
+            "level": {
+              "type": "integer",
+              "description": "The level of the game for which you want to retrieve the scores."
+            },
+            "player": {
+              "type": "string",
+              "description": "The name of the player for whom you want to retrieve scores. Default ''",
+              "optional": true
+            }
+          },
+          "required": [
+            "game",
+            "platform",
+            "level"
+          ]
+        }
+      },
+      {
+        "name": "game_rewards.get",
+        "description": "Retrieve information about different types of rewards that you can receive when playing a certain game.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            },
+            "platform": {
+              "type": "string",
+              "description": "The gaming platform e.g. Xbox, Playstation, PC"
+            },
+            "mission": {
+              "type": "string",
+              "description": "The mission for which you want to know the rewards. Default to ''",
+              "optional": true
+            },
+            "trophy": {
+              "type": "string",
+              "description": "The trophy level for which you want to know the rewards. Default to ''",
+              "optional": true
+            }
+          },
+          "required": [
+            "game",
+            "platform"
+          ]
+        }
+      },
+      {
+        "name": "game_missions.list",
+        "description": "List all missions for a certain game.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game": {
+              "type": "string",
+              "description": "The name of the game."
+            }
+          },
+          "required": [
+            "game"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "game_rewards.get": {
+          "game": [
+            "Fortnite"
+          ],
+          "platform": [
+            "Playstation",
+            "PS"
+          ],
+          "mission": [
+            ""
+          ],
+          "trophy": [
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_23",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the current stats for basketball player LeBron James including points per game, assists, and minutes per game."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "basketball.player_stats.get",
+        "description": "Get current statistics for a specified basketball player",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "player_name": {
+              "type": "string",
+              "description": "The name of the player."
+            },
+            "stats_fields": {
+              "type": "array",
+              "description": "List of statistical categories to be fetched, including points, assists, rebounds, minutes.",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "player_name",
+            "stats_fields"
+          ]
+        }
+      },
+      {
+        "name": "basketball.game_stats.get",
+        "description": "Get the detailed statistical data from a specific basketball game",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team1": {
+              "type": "string",
+              "description": "One of the competing teams in the game."
+            },
+            "team2": {
+              "type": "string",
+              "description": "One of the competing teams in the game."
+            },
+            "date": {
+              "type": "string",
+              "description": "The date when the game occurred."
+            },
+            "stats_fields": {
+              "type": "array",
+              "description": "List of statistical categories to be fetched, including total points, total assists, total rebounds, turnovers. Default to empty list",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "team1",
+            "team2",
+            "date"
+          ]
+        }
+      },
+      {
+        "name": "basketball.team_stats.get",
+        "description": "Get current statistics for a specific basketball team",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_name": {
+              "type": "string",
+              "description": "The name of the team."
+            },
+            "stats_fields": {
+              "type": "array",
+              "description": "List of statistical categories to be fetched, including total points, total assists, total rebounds, win rate.",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "team_name",
+            "stats_fields"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "basketball.player_stats.get": {
+          "player_name": [
+            "LeBron James"
+          ],
+          "stats_fields": [
+            [
+              "points per game",
+              "assists",
+              "minutes per game"
+            ],
+            [
+              "points per game",
+              "minutes per game",
+              "assists"
+            ],
+            [
+              "assists",
+              "points per game",
+              "minutes per game"
+            ],
+            [
+              "assists",
+              "minutes per game",
+              "points per game"
+            ],
+            [
+              "minutes per game",
+              "points per game",
+              "assists"
+            ],
+            [
+              "minutes per game",
+              "assists",
+              "points per game"
+            ],
+            [
+              "points",
+              "assists",
+              "minutes"
+            ],
+            [
+              "points",
+              "minutes",
+              "assists"
+            ],
+            [
+              "assists",
+              "points",
+              "minutes"
+            ],
+            [
+              "assists",
+              "minutes",
+              "points"
+            ],
+            [
+              "minutes",
+              "points",
+              "assists"
+            ],
+            [
+              "minutes",
+              "assists",
+              "points"
+            ],
+            [
+              "points_per_game",
+              "assists",
+              "minutes_per_game"
+            ],
+            [
+              "points_per_game",
+              "minutes_per_game",
+              "assists"
+            ],
+            [
+              "assists",
+              "points_per_game",
+              "minutes_per_game"
+            ],
+            [
+              "assists",
+              "minutes_per_game",
+              "points_per_game"
+            ],
+            [
+              "minutes_per_game",
+              "points_per_game",
+              "assists"
+            ],
+            [
+              "minutes_per_game",
+              "assists",
+              "points_per_game"
+            ]
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_97",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What's the area of a circle with a radius of 10?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "geometry.area_circle",
+        "description": "Calculate the area of a circle given the radius.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "radius": {
+              "type": "integer",
+              "description": "The radius of the circle."
+            },
+            "units": {
+              "type": "string",
+              "description": "The units in which the radius is measured (defaults to meters).",
+              "default": "meters"
+            }
+          },
+          "required": [
+            "radius"
+          ]
+        }
+      },
+      {
+        "name": "plot_sine_wave",
+        "description": "Plot a sine wave for a given frequency in a given range.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "start_range": {
+              "type": "float",
+              "description": "Start of the range in radians."
+            },
+            "end_range": {
+              "type": "float",
+              "description": "End of the range in radians."
+            },
+            "frequency": {
+              "type": "float",
+              "description": "Frequency of the sine wave in Hz."
+            },
+            "amplitude": {
+              "type": "float",
+              "description": "Amplitude of the sine wave. Default is 1."
+            },
+            "phase_shift": {
+              "type": "float",
+              "description": "Phase shift of the sine wave in radians. Default is 0."
+            }
+          },
+          "required": [
+            "start_range",
+            "end_range",
+            "frequency"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "geometry.area_circle": {
+          "radius": [
+            10
+          ],
+          "units": [
+            "",
+            "meters"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_24",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the fastest route from London to Edinburgh for playing a chess championship? Also provide an estimate of the distance."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "route_planner.calculate_route",
+        "description": "Determines the best route between two points.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "start": {
+              "type": "string",
+              "description": "The starting point of the journey."
+            },
+            "destination": {
+              "type": "string",
+              "description": "The destination of the journey."
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "fastest",
+                "shortest",
+                "balanced"
+              ],
+              "description": "The method to use when calculating the route (default is 'fastest').",
+              "default": "fastest"
+            }
+          },
+          "required": [
+            "start",
+            "destination"
+          ]
+        }
+      },
+      {
+        "name": "chess_club_details.find",
+        "description": "Provides details about a chess club, including location.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the chess club."
+            },
+            "city": {
+              "type": "string",
+              "description": "The city in which the chess club is located."
+            },
+            "event": {
+              "type": "string",
+              "description": "The event hosted by the club.",
+              "default": "null"
+            }
+          },
+          "required": [
+            "name",
+            "city"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "route_planner.calculate_route": {
+          "start": [
+            "London"
+          ],
+          "destination": [
+            "Edinburgh"
+          ],
+          "method": [
+            "fastest",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_91",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Can I find a good cooking recipe for apple pie using less than 5 ingredients?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "restaurant.find",
+        "description": "Locate restaurants based on specific criteria such as cuisine and price range",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "cuisine": {
+              "type": "string",
+              "description": "The type of cuisine preferred."
+            },
+            "price": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Price range of the restaurant in format ['low', 'mid', 'high']. Default ['low', 'mid', 'high']"
+            }
+          },
+          "required": [
+            "cuisine"
+          ]
+        }
+      },
+      {
+        "name": "recipe.find",
+        "description": "Locate cooking recipes based on specific criteria such as main ingredient and number of ingredients",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "mainIngredient": {
+              "type": "string",
+              "description": "Main ingredient for the recipe."
+            },
+            "ingredientLimit": {
+              "type": "integer",
+              "description": "Max number of ingredients the recipe should use."
+            }
+          },
+          "required": [
+            "mainIngredient",
+            "ingredientLimit"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "recipe.find": {
+          "mainIngredient": [
+            "apple pie",
+            "apple"
+          ],
+          "ingredientLimit": [
+            4
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_88",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find me the number of active players in the game 'World of Warcraft' in 2020."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "video_games.get_player_count",
+        "description": "Retrieves the number of active players for a specified video game and year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game_title": {
+              "type": "string",
+              "description": "The title of the video game."
+            },
+            "year": {
+              "type": "integer",
+              "description": "The year in question."
+            },
+            "platform": {
+              "type": "string",
+              "optional": true,
+              "description": "The gaming platform (e.g. 'PC', 'Xbox', 'Playstation'). Default ''"
+            }
+          },
+          "required": [
+            "game_title",
+            "year"
+          ]
+        }
+      },
+      {
+        "name": "video_games.get_sales",
+        "description": "Retrieves the sales figures for a specified video game and year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "game_title": {
+              "type": "string",
+              "description": "The title of the video game."
+            },
+            "year": {
+              "type": "integer",
+              "description": "The year in question."
+            },
+            "platform": {
+              "type": "string",
+              "optional": true,
+              "description": "The gaming platform (e.g. 'PC', 'Xbox', 'Playstation'). Default ''"
+            }
+          },
+          "required": [
+            "game_title",
+            "year"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "video_games.get_player_count": {
+          "game_title": [
+            "World of Warcraft"
+          ],
+          "year": [
+            2020
+          ],
+          "platform": [
+            "",
+            "PC"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_154",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who was the full name of the president of the United States in 1861?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "US_president.in_year",
+        "description": "Retrieve the name of the U.S. president in a given year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year in question."
+            },
+            "full_name": {
+              "type": "boolean",
+              "default": true,
+              "description": "Option to return full name with middle initial, if applicable."
+            }
+          },
+          "required": [
+            "year"
+          ]
+        }
+      },
+      {
+        "name": "find_card_in_deck",
+        "description": "Locate a particular card in a deck based on rank and suit.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "rank": {
+              "type": "string",
+              "description": "Rank of the card (e.g. Ace, Two, King)."
+            },
+            "suit": {
+              "type": "string",
+              "description": "Suit of the card (e.g. Hearts, Spades, Diamonds, Clubs)."
+            },
+            "deck": {
+              "type": "array",
+              "items": {
+                "type": "dict",
+                "properties": {
+                  "rank": {
+                    "type": "string"
+                  },
+                  "suit": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Deck of cards. If not provided, the deck will be a standard 52 card deck by default"
+            }
+          },
+          "required": [
+            "rank",
+            "suit"
+          ]
+        }
+      },
+      {
+        "name": "soccer.get_last_match",
+        "description": "Retrieve the details of the last match played by a specified soccer club.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_name": {
+              "type": "string",
+              "description": "The name of the soccer club."
+            },
+            "include_stats": {
+              "type": "boolean",
+              "description": "If true, include match statistics like possession, shots on target etc. Default is false."
+            }
+          },
+          "required": [
+            "team_name"
+          ]
+        }
+      },
+      {
+        "name": "update_user_info",
+        "description": "Update user information in the database.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "user_id": {
+              "type": "integer",
+              "description": "The user ID of the customer."
+            },
+            "update_info": {
+              "type": "dict",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "The customer's updated name."
+                },
+                "email": {
+                  "type": "string",
+                  "description": "The customer's updated email."
+                }
+              },
+              "description": "The new information to update."
+            },
+            "database": {
+              "type": "string",
+              "description": "The database where the user's information is stored.",
+              "default": "CustomerInfo"
+            }
+          },
+          "required": [
+            "user_id",
+            "update_info"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "US_president.in_year": {
+          "year": [
+            1861
+          ],
+          "full_name": [
+            true,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_67",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Translate Hello, how are you? from English to French."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "translate",
+        "description": "Translate text from a specified source language to a specified target language.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text to be translated."
+            },
+            "source_language": {
+              "type": "string",
+              "description": "The language the text is currently in."
+            },
+            "target_language": {
+              "type": "string",
+              "description": "The language the text will be translated to."
+            }
+          },
+          "required": [
+            "text",
+            "source_language",
+            "target_language"
+          ]
+        }
+      },
+      {
+        "name": "sentiment_analysis",
+        "description": "Analyze the sentiment of a specified text.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text whose sentiment is to be analyzed."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      },
+      {
+        "name": "word_count",
+        "description": "Count the number of words in the given text.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "The text that the number of words is to be calculated."
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "translate": {
+          "text": [
+            "Hello, how are you?"
+          ],
+          "source_language": [
+            "English"
+          ],
+          "target_language": [
+            "French"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_11",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the roots of a quadratic equation with coefficients 5, 20, and -25"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "math_roots.quadratic",
+        "description": "Calculate the roots of a quadratic equation.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "a": {
+              "type": "integer",
+              "description": "Coefficient of the second-degree term."
+            },
+            "b": {
+              "type": "integer",
+              "description": "Coefficient of the first-degree term."
+            },
+            "c": {
+              "type": "integer",
+              "description": "Constant term."
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c"
+          ]
+        }
+      },
+      {
+        "name": "math.roots.cubic",
+        "description": "Calculate the roots of a cubic equation.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "a": {
+              "type": "float",
+              "description": "Coefficient of the third-degree term."
+            },
+            "b": {
+              "type": "float",
+              "description": "Coefficient of the second-degree term."
+            },
+            "c": {
+              "type": "float",
+              "description": "Coefficient of the first-degree term."
+            },
+            "d": {
+              "type": "float",
+              "description": "Constant term."
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ]
+        }
+      },
+      {
+        "name": "math.roots.polynomial",
+        "description": "Calculate the roots of a polynomial equation.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "coefficients": {
+              "type": "array",
+              "items": {
+                "type": "float"
+              },
+              "description": "Array of coefficients of the polynomial equation starting from highest degree term."
+            },
+            "degree": {
+              "type": "integer",
+              "description": "Degree of the polynomial equation. Default 0"
+            }
+          },
+          "required": [
+            "coefficients"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "math_roots.quadratic": {
+          "a": [
+            5
+          ],
+          "b": [
+            20
+          ],
+          "c": [
+            -25
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_117",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the BMI (Body Mass Index) of a person who weighs 70kg and is 1.75m tall."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_BMI",
+        "description": "Calculate the Body Mass Index (BMI) given a person's weight and height.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "weight_kg": {
+              "type": "integer",
+              "description": "The weight of the person in kilograms."
+            },
+            "height_m": {
+              "type": "float",
+              "description": "The height of the person in meters."
+            }
+          },
+          "required": [
+            "weight_kg",
+            "height_m"
+          ]
+        }
+      },
+      {
+        "name": "soccer.get_last_match",
+        "description": "Retrieve the details of the last match played by a specified soccer club.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_name": {
+              "type": "string",
+              "description": "The name of the soccer club."
+            },
+            "include_stats": {
+              "type": "boolean",
+              "description": "If true, include match statistics like possession, shots on target etc. Default is false."
+            }
+          },
+          "required": [
+            "team_name"
+          ]
+        }
+      },
+      {
+        "name": "hotel_booking",
+        "description": "Books a hotel room given the location, room type, stay duration and any additional preferences.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city where you want to book the hotel."
+            },
+            "room_type": {
+              "type": "string",
+              "description": "Type of the room required. Options: 'single', 'double', 'deluxe', etc."
+            },
+            "duration": {
+              "type": "integer",
+              "description": "The number of nights you want to book the hotel for."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "The date when your stay begins."
+            },
+            "preferences": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "pet_friendly",
+                  "gym",
+                  "swimming_pool",
+                  "free_breakfast",
+                  "parking"
+                ]
+              },
+              "description": "Optional preferences of stay at the hotel. Default is empty array."
+            }
+          },
+          "required": [
+            "location",
+            "room_type",
+            "duration",
+            "start_date"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_BMI": {
+          "weight_kg": [
+            70
+          ],
+          "height_m": [
+            1.75
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_137",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Search for ongoing lawsuits related to the company 'Google' filed after January 1, 2021 in California."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "lawsuit_search",
+        "description": "Search for lawsuits related to a specific company within a specific date range and location.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "company": {
+              "type": "string",
+              "description": "The company related to the lawsuit."
+            },
+            "start_date": {
+              "type": "string",
+              "description": "Start of the date range for when the lawsuit was filed."
+            },
+            "location": {
+              "type": "string",
+              "description": "Location where the lawsuit was filed."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "ongoing",
+                "settled",
+                "dismissed"
+              ],
+              "description": "The status of the lawsuit. Default is 'ongoing'."
+            }
+          },
+          "required": [
+            "company",
+            "start_date",
+            "location"
+          ]
+        }
+      },
+      {
+        "name": "walmart.check_price",
+        "description": "Calculate total price for given items and their quantities at Walmart.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of items to be priced."
+            },
+            "quantities": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "description": "Quantity of each item corresponding to the items list."
+            },
+            "store_location": {
+              "type": "string",
+              "description": "The store location for specific pricing (optional). Default is 'USA'."
+            }
+          },
+          "required": [
+            "items",
+            "quantities"
+          ]
+        }
+      },
+      {
+        "name": "event_finder.find_upcoming",
+        "description": "Find upcoming events of a specific genre in a given location.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state where the search will take place, e.g. New York, NY."
+            },
+            "genre": {
+              "type": "string",
+              "description": "The genre of events."
+            },
+            "days_ahead": {
+              "type": "integer",
+              "description": "The number of days from now to include in the search.",
+              "default": 7
+            }
+          },
+          "required": [
+            "location",
+            "genre"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "lawsuit_search": {
+          "company": [
+            "Google"
+          ],
+          "start_date": [
+            "2021-01-01",
+            "01/01/2021",
+            "Jan.1,2021",
+            "January 1, 2021"
+          ],
+          "location": [
+            "California",
+            "CA"
+          ],
+          "status": [
+            "ongoing",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_31",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the area and perimeter of a rectangle with width of 7 units and length of 10 units?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "geometry_square.calculate",
+        "description": "Calculates the area and perimeter of a square given the side length.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "side": {
+              "type": "integer",
+              "description": "The length of a side of the square."
+            }
+          },
+          "required": [
+            "side"
+          ]
+        }
+      },
+      {
+        "name": "geometry_circle.calculate",
+        "description": "Calculates the area and circumference of a circle given the radius.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "radius": {
+              "type": "integer",
+              "description": "The radius of the circle."
+            }
+          },
+          "required": [
+            "radius"
+          ]
+        }
+      },
+      {
+        "name": "geometry_rectangle.calculate",
+        "description": "Calculates the area and perimeter of a rectangle given the width and length.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "description": "The width of the rectangle."
+            },
+            "length": {
+              "type": "integer",
+              "description": "The length of the rectangle."
+            }
+          },
+          "required": [
+            "width",
+            "length"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "geometry_rectangle.calculate": {
+          "width": [
+            7
+          ],
+          "length": [
+            10
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_96",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Solve a quadratic equation where a=2, b=6, and c=5"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_stock_info",
+        "description": "Retrieves information about a specific stock based on company's name.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "company_name": {
+              "type": "string",
+              "description": "The name of the company."
+            },
+            "detail_level": {
+              "type": "string",
+              "description": "Level of detail for stock information. Can be 'summary' or 'detailed'."
+            },
+            "market": {
+              "type": "string",
+              "description": "The stock market of interest. Default is 'NASDAQ'"
+            }
+          },
+          "required": [
+            "company_name",
+            "detail_level"
+          ]
+        }
+      },
+      {
+        "name": "portfolio_future_value",
+        "description": "Calculate the future value of an investment in a specific stock based on the invested amount, expected annual return and number of years.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "stock": {
+              "type": "string",
+              "description": "The ticker symbol of the stock."
+            },
+            "invested_amount": {
+              "type": "float",
+              "description": "The invested amount in USD."
+            },
+            "expected_annual_return": {
+              "type": "float",
+              "description": "The expected annual return on investment as a decimal. E.g. 5% = 0.05"
+            },
+            "years": {
+              "type": "integer",
+              "description": "The number of years for which the investment is made."
+            }
+          },
+          "required": [
+            "stock",
+            "invested_amount",
+            "expected_annual_return",
+            "years"
+          ]
+        }
+      },
+      {
+        "name": "solve_quadratic_equation",
+        "description": "Function solves the quadratic equation and returns its roots.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "a": {
+              "type": "integer",
+              "description": "Coefficient of x squared"
+            },
+            "b": {
+              "type": "integer",
+              "description": "Coefficient of x"
+            },
+            "c": {
+              "type": "integer",
+              "description": "Constant term in the quadratic equation"
+            }
+          },
+          "required": [
+            "a",
+            "b",
+            "c"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "solve_quadratic_equation": {
+          "a": [
+            2
+          ],
+          "b": [
+            6
+          ],
+          "c": [
+            5
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_20",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the price to commission a sculpture made of marble with a size of 3 feet?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "sculptor_info.get",
+        "description": "Get information about a specific sculptor.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the sculptor."
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "sculpture_price.calculate",
+        "description": "Calculate the estimated price to commission a sculpture based on the material and size.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "material": {
+              "type": "string",
+              "description": "The material used for the sculpture."
+            },
+            "size": {
+              "type": "integer",
+              "description": "The size of the sculpture in feet."
+            },
+            "complexity": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "description": "The complexity level of the sculpture. Default is 'medium'.",
+              "default": "medium"
+            }
+          },
+          "required": [
+            "material",
+            "size"
+          ]
+        }
+      },
+      {
+        "name": "sculpture_availability.check",
+        "description": "Check the availability of a specific sculpture in the inventory.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "sculpture_name": {
+              "type": "string",
+              "description": "The name of the sculpture."
+            },
+            "material": {
+              "type": "string",
+              "description": "The material of the sculpture."
+            }
+          },
+          "required": [
+            "sculpture_name",
+            "material"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "sculpture_price.calculate": {
+          "material": [
+            "marble"
+          ],
+          "size": [
+            3
+          ],
+          "complexity": [
+            "medium",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_141",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "I need the details of the lawsuit case with case ID of 1234 and verify if it's already closed."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_protein_sequence",
+        "description": "Retrieve the protein sequence encoded by a human gene.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "gene": {
+              "type": "string",
+              "description": "The human gene of interest."
+            },
+            "species": {
+              "type": "string",
+              "description": "The species for which the gene is to be analyzed.",
+              "default": "Homo sapiens"
+            }
+          },
+          "required": [
+            "gene"
+          ]
+        }
+      },
+      {
+        "name": "route.estimate_time",
+        "description": "Estimate the travel time for a specific route with optional stops.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "start_location": {
+              "type": "string",
+              "description": "The starting point for the journey."
+            },
+            "end_location": {
+              "type": "string",
+              "description": "The destination for the journey."
+            },
+            "stops": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional cities or points of interest to stop at during the journey. Default is an empty array."
+            }
+          },
+          "required": [
+            "start_location",
+            "end_location"
+          ]
+        }
+      },
+      {
+        "name": "lawsuit.check_case",
+        "description": "Verify the details of a lawsuit case and check its status using case ID.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "case_id": {
+              "type": "integer",
+              "description": "The identification number of the lawsuit case."
+            },
+            "closed_status": {
+              "type": "boolean",
+              "description": "The status of the lawsuit case to be verified."
+            }
+          },
+          "required": [
+            "case_id",
+            "closed_status"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "lawsuit.check_case": {
+          "case_id": [
+            1234
+          ],
+          "closed_status": [
+            true
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_75",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Which paint color is currently most popular for living rooms?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "weather_forecast",
+        "description": "Retrieve a weather forecast for a specific location and time frame.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city that you want to get the weather for."
+            },
+            "days": {
+              "type": "integer",
+              "description": "Number of days for the forecast."
+            }
+          },
+          "required": [
+            "location",
+            "days"
+          ]
+        }
+      },
+      {
+        "name": "paint_color.trends",
+        "description": "Find the most popular paint color for a specific area in the home.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "room": {
+              "type": "string",
+              "description": "Type of the room e.g. Living room, Bathroom etc."
+            },
+            "period": {
+              "type": "string",
+              "enum": [
+                "Daily",
+                "Weekly",
+                "Monthly",
+                "Yearly"
+              ],
+              "description": "The period over which to check the paint color trend. Default 'Daily'"
+            }
+          },
+          "required": [
+            "room"
+          ]
+        }
+      },
+      {
+        "name": "house_price_trends",
+        "description": "Find the average house price in a specific area.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "City and state, e.g. New York, NY."
+            },
+            "period": {
+              "type": "string",
+              "enum": [
+                "Daily",
+                "Weekly",
+                "Monthly",
+                "Yearly"
+              ],
+              "description": "The period over which to check the price trend. Default 'Yearly'"
+            }
+          },
+          "required": [
+            "location"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "paint_color.trends": {
+          "room": [
+            "living room",
+            "Living room"
+          ],
+          "period": [
+            "",
+            "Daily"
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "multiple_160",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find me the most recent art sculpture by James Plensa with detailed description."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_zodiac_compatibility",
+        "description": "Retrieve the compatibility score between two Zodiac signs.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "sign1": {
+              "type": "string",
+              "description": "The first Zodiac sign."
+            },
+            "sign2": {
+              "type": "string",
+              "description": "The second Zodiac sign."
+            },
+            "scale": {
+              "type": "string",
+              "enum": [
+                "percentage",
+                "0-10 scale"
+              ],
+              "description": "The scale on which compatibility should be shown. Default is 'percentage'."
+            }
+          },
+          "required": [
+            "sign1",
+            "sign2"
+          ]
+        }
+      },
+      {
+        "name": "local_nursery.find",
+        "description": "Locate local nurseries based on location and plant types availability.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city or locality where the nursery needs to be located."
+            },
+            "plant_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "Annual",
+                  "Perennial",
+                  "Shrub",
+                  "Tree",
+                  "Herbs",
+                  "Fruits"
+                ]
+              },
+              "description": "Type of plants the nursery should provide."
+            }
+          },
+          "required": [
+            "location",
+            "plant_types"
+          ]
+        }
+      },
+      {
+        "name": "get_sculpture_info",
+        "description": "Retrieves the most recent artwork by a specified artist with its detailed description.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "artist_name": {
+              "type": "string",
+              "description": "The name of the artist."
+            },
+            "detail": {
+              "type": "boolean",
+              "description": "If True, it provides detailed description of the sculpture. Defaults to False."
+            }
+          },
+          "required": [
+            "artist_name"
+          ]
+        }
+      },
+      {
+        "name": "monarch.getMonarchOfYear",
+        "description": "Retrieve the monarch of a specific location during a specified year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The location (e.g., country) whose monarch needs to be found."
+            },
+            "year": {
+              "type": "integer",
+              "description": "The year to search the monarch."
+            },
+            "fullName": {
+              "type": "boolean",
+              "default": "false",
+              "description": "If true, returns the full name and title of the monarch."
+            }
+          },
+          "required": [
+            "location",
+            "year"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_sculpture_info": {
+          "artist_name": [
+            "James Plensa"
+          ],
+          "detail": [
+            true
+          ]
+        }
+      }
+    ],
+    "category": "multiple"
+  },
+  {
+    "id": "parallel_158",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "You are a data scientist working on a project that requires you to generate random numbers from a normal distribution. You need to generate four random numbers: two from a normal distribution with a mean of 5 and a standard deviation of 2, and two from a normal distribution with a mean of 10 and a standard deviation of 3. How can you use the 'random.normalvariate' function to achieve this?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "random.normalvariate",
+        "description": "Generates a random number from a normal distribution given the mean and standard deviation.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "mu": {
+              "type": "integer",
+              "description": "Mean of the normal distribution."
+            },
+            "sigma": {
+              "type": "integer",
+              "description": "Standard deviation of the normal distribution."
+            }
+          },
+          "required": [
+            "mu",
+            "sigma"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "random.normalvariate": {
+          "mu": [
+            5
+          ],
+          "sigma": [
+            2
+          ]
+        }
+      },
+      {
+        "random.normalvariate": {
+          "mu": [
+            10
+          ],
+          "sigma": [
+            3
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_92",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the shortest driving distance in miles from New York City to Los Angeles and then from Los Angeles to Miami, considering that you have to return to New York City from Miami?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_shortest_driving_distance",
+        "description": "Calculate the shortest driving distance between two locations.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "origin": {
+              "type": "string",
+              "description": "Starting point of the journey."
+            },
+            "destination": {
+              "type": "string",
+              "description": "End point of the journey."
+            },
+            "unit": {
+              "type": "string",
+              "description": "Preferred unit of distance (optional, default is kilometers)."
+            }
+          },
+          "required": [
+            "origin",
+            "destination"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_shortest_driving_distance": {
+          "origin": [
+            "New York City",
+            "NYC"
+          ],
+          "destination": [
+            "Los Angeles",
+            "Los Angeles, CA",
+            "LA"
+          ],
+          "unit": [
+            "miles",
+            "mile"
+          ]
+        }
+      },
+      {
+        "get_shortest_driving_distance": {
+          "origin": [
+            "Los Angeles",
+            "Los Angeles, CA",
+            "LA"
+          ],
+          "destination": [
+            "Miami"
+          ],
+          "unit": [
+            "miles",
+            "mile"
+          ]
+        }
+      },
+      {
+        "get_shortest_driving_distance": {
+          "origin": [
+            "Miami"
+          ],
+          "destination": [
+            "New York City",
+            "NYC"
+          ],
+          "unit": [
+            "miles",
+            "mile"
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_147",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"Can you calculate the time it would take for light to travel from Earth to a newly discovered exoplanet that is 4.22 light years away, then to another exoplanet that is 6.1 light years from the first one, and finally back to Earth which is 5.88 light years from the second exoplanet? Assume the speed of light in vacuum is 299792458 m/s.\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "light_travel_time",
+        "description": "Calculate the time taken for light to travel from a celestial body to another.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "distance_in_light_years": {
+              "type": "float",
+              "description": "The distance between the two celestial bodies in light years."
+            },
+            "speed_of_light": {
+              "type": "integer",
+              "description": "The speed of light in vacuum, in m/s. Default value is 299792458 m/s."
+            }
+          },
+          "required": [
+            "distance_in_light_years"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "light_travel_time": {
+          "distance_in_light_years": [
+            4.22
+          ],
+          "speed_of_light": [
+            299792458,
+            ""
+          ]
+        }
+      },
+      {
+        "light_travel_time": {
+          "distance_in_light_years": [
+            6.1
+          ],
+          "speed_of_light": [
+            299792458,
+            ""
+          ]
+        }
+      },
+      {
+        "light_travel_time": {
+          "distance_in_light_years": [
+            5.88
+          ],
+          "speed_of_light": [
+            299792458,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_49",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Check if the player with id 3142 in team RocketLeague has achieved top scorer status in seasons 2017, 2018 and 2019."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "player_status.check",
+        "description": "Check a player's status in a team for a particular season.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team": {
+              "type": "string",
+              "description": "The team where the player plays."
+            },
+            "player_id": {
+              "type": "integer",
+              "description": "The id of the player."
+            },
+            "season": {
+              "type": "integer",
+              "description": "The season for which player's status need to be checked. Optional. Default is season 2023."
+            }
+          },
+          "required": [
+            "team",
+            "player_id"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "player_status.check": {
+          "team": [
+            "RocketLeague"
+          ],
+          "player_id": [
+            3142
+          ],
+          "season": [
+            2017
+          ]
+        }
+      },
+      {
+        "player_status.check": {
+          "team": [
+            "RocketLeague"
+          ],
+          "player_id": [
+            3142
+          ],
+          "season": [
+            2018
+          ]
+        }
+      },
+      {
+        "player_status.check": {
+          "team": [
+            "RocketLeague"
+          ],
+          "player_id": [
+            3142
+          ],
+          "season": [
+            2019
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_180",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What were the 'Open', 'Close', 'High', and 'Low' stock prices for Microsoft and Apple over the past 30 days?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "stock_price",
+        "description": "Get stock price data for a given company over a specified number of days.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "company": {
+              "type": "string",
+              "description": "The company name."
+            },
+            "days": {
+              "type": "integer",
+              "description": "The number of previous days to retrieve data for."
+            },
+            "data_type": {
+              "type": "string",
+              "description": "The type of price data to retrieve (e.g., 'Open', 'Close', 'High', 'Low'). Default is 'Close'."
+            }
+          },
+          "required": [
+            "company",
+            "days"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "stock_price": {
+          "company": [
+            "Microsoft"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Open",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Microsoft"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Close",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Microsoft"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "High",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Microsoft"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Low",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Apple"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Open",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Apple"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Close",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Apple"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "High",
+            ""
+          ]
+        }
+      },
+      {
+        "stock_price": {
+          "company": [
+            "Apple"
+          ],
+          "days": [
+            30
+          ],
+          "data_type": [
+            "Low",
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_17",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Get the latest closing prices and volumes for Apple Inc., Google LLC., and Microsoft Corporation in the New York Stock Exchange"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_stock_data",
+        "description": "Retrieve the most recent trading day's closing price and volume for a specified stock.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "The stock symbol of the company."
+            },
+            "data_points": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "price",
+                  "volume"
+                ]
+              },
+              "description": "The type of data you want to retrieve for the stock. This can include closing price, opening price, volume, etc."
+            }
+          },
+          "required": [
+            "symbol",
+            "data_points"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_stock_data": {
+          "symbol": [
+            "AAPL"
+          ],
+          "data_points": [
+            [
+              "price",
+              "volume"
+            ],
+            [
+              "volume",
+              "price"
+            ]
+          ]
+        }
+      },
+      {
+        "get_stock_data": {
+          "symbol": [
+            "GOOG",
+            "GOOGL"
+          ],
+          "data_points": [
+            [
+              "price",
+              "volume"
+            ],
+            [
+              "volume",
+              "price"
+            ]
+          ]
+        }
+      },
+      {
+        "get_stock_data": {
+          "symbol": [
+            "MSFT"
+          ],
+          "data_points": [
+            [
+              "price",
+              "volume"
+            ],
+            [
+              "volume",
+              "price"
+            ]
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_11",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Predict house price for a house of size 3000 sq ft. in location New York and 4000 sq ft. in Los Angeles using Machine Learning Model."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "ml.predict_house_price",
+        "description": "Predict house price using Machine Learning model given the house size and location",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "Location of the house"
+            },
+            "size": {
+              "type": "integer",
+              "description": "Size of the house in square feet"
+            }
+          },
+          "required": [
+            "location",
+            "size"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "ml.predict_house_price": {
+          "location": [
+            "New York",
+            "New York, NY",
+            "NYC"
+          ],
+          "size": [
+            3000
+          ]
+        }
+      },
+      {
+        "ml.predict_house_price": {
+          "location": [
+            "Los Angeles",
+            "Los Angeles, CA",
+            "LA"
+          ],
+          "size": [
+            4000
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_169",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"Can you help me calculate the discounted cash flow of a bond? I have a bond with an annual coupon payment of $50, a time frame of 5 years, and a discount rate of 5%. Also, the face value of the bond is $1000. I would like to know the discounted cash flow for this bond. After that, I want to compare it with another bond that has an annual coupon payment of $60, a time frame of 7 years, and a discount rate of 4%, with the same face value of $1000. Can you calculate the discounted cash flow for this second bond as well?\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_discounted_cash_flow",
+        "description": "Calculate the discounted cash flow of a bond for a given annual coupon payment, time frame and discount rate.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "coupon_payment": {
+              "type": "integer",
+              "description": "The annual coupon payment."
+            },
+            "period": {
+              "type": "integer",
+              "description": "The time frame in years for which coupon payment is made."
+            },
+            "discount_rate": {
+              "type": "float",
+              "description": "The discount rate."
+            },
+            "face_value": {
+              "type": "integer",
+              "description": "The face value of the bond, default is $1000."
+            }
+          },
+          "required": [
+            "coupon_payment",
+            "period",
+            "discount_rate"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_discounted_cash_flow": {
+          "coupon_payment": [
+            50
+          ],
+          "period": [
+            5
+          ],
+          "discount_rate": [
+            0.05
+          ],
+          "face_value": [
+            1000,
+            ""
+          ]
+        }
+      },
+      {
+        "calculate_discounted_cash_flow": {
+          "coupon_payment": [
+            60
+          ],
+          "period": [
+            7
+          ],
+          "discount_rate": [
+            0.04
+          ],
+          "face_value": [
+            1000,
+            ""
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_58",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Get me the currency exchange rates of the following pairs: USD to AUD and USD to CAD?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_exchange_rate",
+        "description": "Fetch the current exchange rate for the provided currency pairs.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "base_currency": {
+              "type": "string",
+              "description": "The base currency in the pair."
+            },
+            "target_currency": {
+              "type": "string",
+              "description": "The currency to which the base currency needs to be converted."
+            }
+          },
+          "required": [
+            "base_currency",
+            "target_currency"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_exchange_rate": {
+          "base_currency": [
+            "USD"
+          ],
+          "target_currency": [
+            "AUD"
+          ]
+        }
+      },
+      {
+        "get_exchange_rate": {
+          "base_currency": [
+            "USD"
+          ],
+          "target_currency": [
+            "CAD"
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_197",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"Can you provide me with the details of the lawsuit case with the case number '12345ABC', which was initiated in the year 2018 and filed in the New York court jurisdiction? Also, can you retrieve the same information for another lawsuit case with the case number '67890XYZ', initiated in the year 2019 and filed in the California court jurisdiction?\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "lawsuit_info",
+        "description": "Retrieves details of a lawsuit given a case number",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "case_number": {
+              "type": "string",
+              "description": "The unique identifier of the lawsuit case"
+            },
+            "year": {
+              "type": "integer",
+              "description": "The year in which the lawsuit case was initiated",
+              "optional": true,
+              "default": 2000
+            },
+            "location": {
+              "type": "string",
+              "description": "The location or court jurisdiction where the case was filed.",
+              "optional": true,
+              "default": "New York"
+            }
+          },
+          "required": [
+            "case_number"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "lawsuit_info": {
+          "case_number": [
+            "12345ABC"
+          ],
+          "year": [
+            2018
+          ],
+          "location": [
+            "New York",
+            "New York, NY",
+            "NY",
+            ""
+          ]
+        }
+      },
+      {
+        "lawsuit_info": {
+          "case_number": [
+            "67890XYZ"
+          ],
+          "year": [
+            2019
+          ],
+          "location": [
+            "California",
+            "CA"
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_74",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the prime factors of the number 4567 and 7890, and can you provide these in a formatted string as well as an array?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_prime_factors",
+        "description": "Function to retrieve prime factors of a number.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "number": {
+              "type": "integer",
+              "description": "Number for which prime factors need to be calculated"
+            },
+            "formatted": {
+              "type": "boolean",
+              "description": "Return formatted string if true, array if false"
+            }
+          },
+          "required": [
+            "number",
+            "formatted"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_prime_factors": {
+          "number": [
+            4567
+          ],
+          "formatted": [
+            true
+          ]
+        }
+      },
+      {
+        "get_prime_factors": {
+          "number": [
+            4567
+          ],
+          "formatted": [
+            false
+          ]
+        }
+      },
+      {
+        "get_prime_factors": {
+          "number": [
+            7890
+          ],
+          "formatted": [
+            true
+          ]
+        }
+      },
+      {
+        "get_prime_factors": {
+          "number": [
+            7890
+          ],
+          "formatted": [
+            false
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_20",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Can you check my loan eligibility for a home loan of amount $500,000 from HSBC with annual income $100,000 and for Wells Fargo for a amount of $700,000 with annual income of $120,000?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "loan_eligibility_check",
+        "description": "Check for eligibility for a loan given income and loan amount",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "financial_institution": {
+              "type": "string",
+              "description": "The name of the financial institution e.g. HSBC"
+            },
+            "loan_amount": {
+              "type": "integer",
+              "description": "The loan amount that is requested"
+            },
+            "annual_income": {
+              "type": "integer",
+              "description": "Annual income of the applicant"
+            }
+          },
+          "required": [
+            "financial_institution",
+            "loan_amount",
+            "annual_income"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "loan_eligibility_check": {
+          "financial_institution": [
+            "HSBC"
+          ],
+          "loan_amount": [
+            500000
+          ],
+          "annual_income": [
+            100000
+          ]
+        }
+      },
+      {
+        "loan_eligibility_check": {
+          "financial_institution": [
+            "Wells Fargo"
+          ],
+          "loan_amount": [
+            700000
+          ],
+          "annual_income": [
+            120000
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_59",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How much will it cost in dollars if I transfer 15000 Euro to dollars? and how much if I convert 200 pounds to dollars?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_conversion_cost",
+        "description": "Convert a value from one currency to another including conversion charges.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "amount": {
+              "type": "integer",
+              "description": "The amount of money to be converted."
+            },
+            "from_currency": {
+              "type": "string",
+              "description": "The current currency of the amount."
+            },
+            "to_currency": {
+              "type": "string",
+              "description": "The target currency."
+            }
+          },
+          "required": [
+            "amount",
+            "from_currency",
+            "to_currency"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "get_conversion_cost": {
+          "amount": [
+            15000
+          ],
+          "from_currency": [
+            "Euro",
+            "EUR"
+          ],
+          "to_currency": [
+            "dollars",
+            "USD",
+            "Dollar"
+          ]
+        }
+      },
+      {
+        "get_conversion_cost": {
+          "amount": [
+            200
+          ],
+          "from_currency": [
+            "pounds",
+            "GBP"
+          ],
+          "to_currency": [
+            "dollars",
+            "USD"
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_25",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "List all cases against a company named 'Dara Inc' filed in 2019, Also list cases filed in the year 2018 against the same company."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "lawsuit.lookup",
+        "description": "Look up lawsuit cases against a company by year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "company_name": {
+              "type": "string",
+              "description": "The name of the company."
+            },
+            "year": {
+              "type": "integer",
+              "description": "The year in which the lawsuit was filed."
+            }
+          },
+          "required": [
+            "company_name",
+            "year"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "lawsuit.lookup": {
+          "company_name": [
+            "Dara Inc"
+          ],
+          "year": [
+            2019
+          ]
+        }
+      },
+      {
+        "lawsuit.lookup": {
+          "company_name": [
+            "Dara Inc"
+          ],
+          "year": [
+            2018
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_97",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"Can you calculate the resonant frequency of an LC circuit with an inductance of 0.005 henries and a capacitance of 0.0000001 farads, and then round off the result to 3 decimal places? After that, can you calculate it again with an inductance of 0.007 henries and a capacitance of 0.0000002 farads, rounding off the result to 4 decimal places?\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_resonant_frequency",
+        "description": "Calculate the resonant frequency of an LC (inductor-capacitor) circuit.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "inductance": {
+              "type": "float",
+              "description": "The inductance (L) in henries (H)."
+            },
+            "capacitance": {
+              "type": "float",
+              "description": "The capacitance (C) in farads (F)."
+            },
+            "round_off": {
+              "type": "integer",
+              "description": "Rounding off the result to a certain decimal places, default is 2."
+            }
+          },
+          "required": [
+            "inductance",
+            "capacitance"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_resonant_frequency": {
+          "inductance": [
+            0.005
+          ],
+          "capacitance": [
+            1e-07
+          ],
+          "round_off": [
+            3
+          ]
+        }
+      },
+      {
+        "calculate_resonant_frequency": {
+          "inductance": [
+            0.007
+          ],
+          "capacitance": [
+            2e-07
+          ],
+          "round_off": [
+            4
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_71",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"Could you calculate the derivative of the polynomial function '3x^3 - 2x^2 + 5x - 7' and then evaluate this derivative at x=4? After that, could you also calculate the derivative of the resulting function and evaluate it at x=2?\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_derivative",
+        "description": "Calculate the derivative of a polynomial function.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "function": {
+              "type": "string",
+              "description": "The polynomial function."
+            },
+            "x_value": {
+              "type": "integer",
+              "description": "The x-value at which the derivative is calculated. Optional, if not given, the function will return a function of the derivative instead of a specific value. default is 0."
+            }
+          },
+          "required": [
+            "function"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_derivative": {
+          "function": [
+            "3x**3 - 2x**2 + 5x - 7",
+            "lambda x: 3x**3 - 2x**2 + 5x - 7"
+          ],
+          "x_value": [
+            4
+          ]
+        }
+      },
+      {
+        "calculate_derivative": {
+          "function": [
+            "9x**2 - 4x + 5",
+            "lambda x: 9x**2 - 4x + 5"
+          ],
+          "x_value": [
+            2
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_116",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "\"In a population of butterflies, the frequency of the dominant allele for wing color is 0.7. Can you calculate the frequency of the homozygous dominant genotype (AA), heterozygous genotype (Aa), and homozygous recessive genotype (aa) using the Hardy Weinberg Principle?\""
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_genotype_frequency",
+        "description": "Calculate the frequency of homozygous dominant genotype based on the allele frequency using Hardy Weinberg Principle.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "allele_frequency": {
+              "type": "float",
+              "description": "The frequency of the dominant allele in the population."
+            },
+            "genotype": {
+              "type": "string",
+              "description": "The genotype which frequency is needed, default is homozygous dominant. ",
+              "enum": [
+                "AA",
+                "Aa",
+                "aa"
+              ]
+            }
+          },
+          "required": [
+            "allele_frequency",
+            "genotype"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "calculate_genotype_frequency": {
+          "allele_frequency": [
+            0.7
+          ],
+          "genotype": [
+            "AA"
+          ]
+        }
+      },
+      {
+        "calculate_genotype_frequency": {
+          "allele_frequency": [
+            0.7
+          ],
+          "genotype": [
+            "Aa"
+          ]
+        }
+      },
+      {
+        "calculate_genotype_frequency": {
+          "allele_frequency": [
+            0.7
+          ],
+          "genotype": [
+            "aa"
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_162",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "You are a teacher preparing a probability lesson for your students. You have a deck of 52 playing cards and you want to explain the probability of drawing certain cards. \n\n1. What is the probability of drawing an Ace (4 successful outcomes) from the deck (52 total outcomes)? Please provide this as a decimal. \n\n2. Then, what is the probability of drawing a heart (13 successful outcomes) from the deck (52 total outcomes)? Please provide this as a decimal. \n\n3. Finally, what is the probability of drawing a red card (26 successful outcomes) from the deck (52 total outcomes)? But this time, please provide the answer as a ratio."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "probability_of_event",
+        "description": "Calculates the probability of an event.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "success_outcomes": {
+              "type": "integer",
+              "description": "The number of successful outcomes."
+            },
+            "total_outcomes": {
+              "type": "integer",
+              "description": "The total number of possible outcomes."
+            },
+            "format_as_ratio": {
+              "type": "boolean",
+              "description": "When true, formats the output as a ratio instead of a decimal. Default is false."
+            }
+          },
+          "required": [
+            "success_outcomes",
+            "total_outcomes"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "probability_of_event": {
+          "success_outcomes": [
+            4
+          ],
+          "total_outcomes": [
+            52
+          ],
+          "format_as_ratio": [
+            false,
+            ""
+          ]
+        }
+      },
+      {
+        "probability_of_event": {
+          "success_outcomes": [
+            13
+          ],
+          "total_outcomes": [
+            52
+          ],
+          "format_as_ratio": [
+            false,
+            ""
+          ]
+        }
+      },
+      {
+        "probability_of_event": {
+          "success_outcomes": [
+            26
+          ],
+          "total_outcomes": [
+            52
+          ],
+          "format_as_ratio": [
+            true
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_93",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What would be the estimated travel time if I start my journey from New York, make stops at Philadelphia, Washington D.C., and Atlanta, and finally reach Miami? Also, what if I skip the stop at Atlanta and directly go to Miami from Washington D.C.? And lastly, what if I start from Philadelphia instead of New York, stop at Washington D.C., and then reach Miami?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "route.estimate_time",
+        "description": "Estimate the travel time for a specific route with optional stops.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "start_location": {
+              "type": "string",
+              "description": "The starting point for the journey."
+            },
+            "end_location": {
+              "type": "string",
+              "description": "The destination for the journey."
+            },
+            "stops": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional cities or points of interest to stop at during the journey ordered.",
+              "default": [
+                "NYC"
+              ]
+            }
+          },
+          "required": [
+            "start_location",
+            "end_location"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "route.estimate_time": {
+          "start_location": [
+            "New York",
+            "New York, NY",
+            "NYC"
+          ],
+          "end_location": [
+            "Miami"
+          ],
+          "stops": [
+            [
+              "Philadelphia",
+              "Washington D.C.",
+              "Atlanta"
+            ],
+            [
+              "Philadelphia",
+              "Washington D.C.",
+              "Atlanta"
+            ],
+            [
+              "Philadelphia",
+              "Washington D.C.",
+              "Atlanta"
+            ],
+            [
+              "Atlanta",
+              "Philadelphia",
+              "Washington D.C."
+            ],
+            [
+              "Atlanta",
+              "Philadelphia",
+              "Washington D.C."
+            ],
+            [
+              "Atlanta",
+              "Philadelphia",
+              "Washington D.C."
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia",
+              "Atlanta"
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia",
+              "Atlanta"
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia",
+              "Atlanta"
+            ]
+          ]
+        }
+      },
+      {
+        "route.estimate_time": {
+          "start_location": [
+            "New York",
+            "New York, NY",
+            "NYC"
+          ],
+          "end_location": [
+            "Miami"
+          ],
+          "stops": [
+            [
+              "Washington D.C."
+            ],
+            [
+              "Philadelphia",
+              "Washington D.C."
+            ],
+            [
+              "Philadelphia",
+              "Washington D.C.",
+              "New York"
+            ],
+            [
+              "Philadelphia",
+              "Washington D.C.",
+              "NYC"
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia"
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia",
+              "New York"
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia",
+              "NYC"
+            ]
+          ]
+        }
+      },
+      {
+        "route.estimate_time": {
+          "start_location": [
+            "Philadelphia"
+          ],
+          "end_location": [
+            "Miami"
+          ],
+          "stops": [
+            [
+              "Washington D.C."
+            ],
+            [
+              "Washington D.C.",
+              "Philadelphia"
+            ]
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "parallel_41",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Show me the closest music shop where I can purchase a Yamaha acoustic guitar and a Kawai piano in San Francisco, California, and Chicago, Illinois."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "find_music_instrument_store",
+        "description": "Locate nearby music instrument stores that sell specific brands or instruments",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state e.g. San Francisco, CA."
+            },
+            "instruments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "A list of specific instruments or brands you are looking for."
+            }
+          },
+          "required": [
+            "location",
+            "instruments"
+          ]
+        }
+      }
+    ],
+    "ground_truth": [
+      {
+        "find_music_instrument_store": {
+          "location": [
+            "San Francisco, CA",
+            "San Francisco, CA",
+            "San Francisco, California"
+          ],
+          "instruments": [
+            [
+              "Yamaha Acoustic Guitar",
+              "Kawai Piano"
+            ],
+            [
+              "Kawai Piano",
+              "Yamaha Acoustic Guitar"
+            ],
+            [
+              "Yamaha acoustic guitar",
+              "Kawai piano"
+            ],
+            [
+              "Kawai piano",
+              "Yamaha acoustic guitar"
+            ]
+          ]
+        }
+      },
+      {
+        "find_music_instrument_store": {
+          "location": [
+            "Chicago, IL",
+            "Chicago, Illinois",
+            "Chicago, IL."
+          ],
+          "instruments": [
+            [
+              "Yamaha Acoustic Guitar",
+              "Kawai Piano"
+            ],
+            [
+              "Kawai Piano",
+              "Yamaha Acoustic Guitar"
+            ],
+            [
+              "Yamaha acoustic guitar",
+              "Kawai piano"
+            ],
+            [
+              "Kawai piano",
+              "Yamaha acoustic guitar"
+            ]
+          ]
+        }
+      }
+    ],
+    "category": "parallel"
+  },
+  {
+    "id": "irrelevance_94",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What were the most impactful cases handled by law firm ABC in the year 2020?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "case_info.get",
+        "description": "Retrieve case details including the judgement from a case id.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "case_id": {
+              "type": "string",
+              "description": "The unique id for the case."
+            },
+            "case_year": {
+              "type": "string",
+              "description": "The year when the case was conducted."
+            },
+            "judge_name": {
+              "type": "string",
+              "description": "The judge's name in the case.",
+              "default": "Andrew"
+            }
+          },
+          "required": [
+            "case_id",
+            "case_year"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_90",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the components of Civil Law?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "file_complaint",
+        "description": "File a complaint for noise to the local council in a specified city.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "complaint_type": {
+              "type": "string",
+              "description": "The type of complaint, such as noise, litter, etc."
+            },
+            "location": {
+              "type": "string",
+              "description": "The city where the complaint is to be filed."
+            },
+            "details": {
+              "type": "string",
+              "description": "Detailed information about the complaint.",
+              "optional": true,
+              "default": "bug"
+            }
+          },
+          "required": [
+            "complaint_type",
+            "location"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_53",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who won the world series in 2018?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "database_query.run",
+        "description": "Run a query on a SQL database.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "database": {
+              "type": "string",
+              "description": "The name of the database."
+            },
+            "query": {
+              "type": "string",
+              "description": "The SQL query to run."
+            },
+            "connect_credentials": {
+              "type": "dict",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "description": "username to connect the databse"
+                },
+                "password": {
+                  "type": "string",
+                  "description": "password to connect the database."
+                }
+              },
+              "description": "Optional field. A dictionary of credentials to connect to the database if needed.",
+              "default": {}
+            }
+          },
+          "required": [
+            "database",
+            "query"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_171",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who establish laws and orders in Ancient Greek."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "music.search_composer",
+        "description": "Search the composer of a specific musical piece",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "The title of the musical piece."
+            },
+            "epoch": {
+              "type": "string",
+              "description": "The historical period or style of the musical piece."
+            },
+            "performer": {
+              "type": "string",
+              "description": "The performer of the musical piece, Default: 'vivian'"
+            }
+          },
+          "required": [
+            "title",
+            "epoch"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_68",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Calculate the standard deviation of the null hypothesis test with a sample mean of 98.2, standard deviation of 1.4, and sample size of 40 for a population mean of 98.6."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "statistics.calculate_p_value",
+        "description": "Calculate the p-value for a t-test on a single sample from a population.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "sample_mean": {
+              "type": "float",
+              "description": "The mean of the sample data."
+            },
+            "population_mean": {
+              "type": "float",
+              "description": "The mean of the population data."
+            },
+            "sample_std_dev": {
+              "type": "float",
+              "description": "The standard deviation of the sample data."
+            },
+            "sample_size": {
+              "type": "integer",
+              "description": "The size of the sample data."
+            },
+            "two_tailed": {
+              "type": "boolean",
+              "description": "Whether the test is two-tailed. If not provided, default is true."
+            }
+          },
+          "required": [
+            "sample_mean",
+            "population_mean",
+            "sample_std_dev",
+            "sample_size"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_179",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who played for Clippers in NBA"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_game_results",
+        "description": "Retrieve game results between two teams on a specific date.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "team_1": {
+              "type": "string",
+              "description": "The first team's name."
+            },
+            "team_2": {
+              "type": "string",
+              "description": "The second team's name."
+            },
+            "date": {
+              "type": "string",
+              "description": "The date of the game in the format YYYY-MM-DD."
+            },
+            "venue": {
+              "type": "string",
+              "description": "The venue of the match.",
+              "default": "basketball"
+            }
+          },
+          "required": [
+            "team_1",
+            "team_2",
+            "date"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_239",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Find the distance in kilometers from San Francisco to Los Angeles."
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_date",
+        "description": "Get the time difference between two geographical locations.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "location_1": {
+              "type": "string",
+              "description": "location for first city."
+            },
+            "location_2": {
+              "type": "string",
+              "description": "location for first city."
+            },
+            "unit": {
+              "type": "string",
+              "enum": [
+                "miles",
+                "kilometers"
+              ],
+              "description": "The unit of measure for the distance. Default is miles."
+            }
+          },
+          "required": [
+            "location_1",
+            "location_2"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_174",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What are the most common chords in a pop song?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "music_theory.primary_triads",
+        "description": "Get the primary triads for a given key signature.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "key_signature": {
+              "type": "string",
+              "description": "The key signature to calculate the primary triads for."
+            },
+            "include_inversions": {
+              "type": "boolean",
+              "description": "Whether or not to include inversions in the returned triads."
+            }
+          },
+          "required": [
+            "key_signature",
+            "include_inversions"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_165",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What type of instrument is a cello?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_instrument_info",
+        "description": "Retrieves the details of a specific musical instrument including its type and origin.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "instrument_name": {
+              "type": "string",
+              "description": "The name of the instrument."
+            },
+            "detail": {
+              "type": "string",
+              "enum": [
+                "type",
+                "origin",
+                "range",
+                "family"
+              ],
+              "description": "The specific information requested about the instrument.",
+              "default": "type"
+            }
+          },
+          "required": [
+            "instrument_name"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_18",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How do I find the angle of the force for a given momentum?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_vector_angle",
+        "description": "Calculate the angle of a vector based on its X and Y components.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "X_component": {
+              "type": "float",
+              "description": "The X component of the vector."
+            },
+            "Y_component": {
+              "type": "float",
+              "description": "The Y component of the vector."
+            },
+            "use_degrees": {
+              "type": "boolean",
+              "description": "If true, the result will be in degrees. If false, the result will be in radians. Default is false."
+            }
+          },
+          "required": [
+            "X_component",
+            "Y_component"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_155",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who created the sculpture 'The Thinker'?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "architecture_capacity.evaluate_capacity",
+        "description": "Calculate the maximum seating capacity of a certain architectural structure.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "structure_name": {
+              "type": "string",
+              "description": "The name of the architectural structure."
+            },
+            "area_per_person": {
+              "type": "integer",
+              "description": "The average space a person takes up in sq ft. This value differs based on the use-case, eg: standing concert, football match etc.",
+              "default": 6
+            }
+          },
+          "required": [
+            "structure_name",
+            "area_per_person"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_162",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who are the famous dancers of the 19th Century?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "get_museum_artists",
+        "description": "Retrieves a list of all artists whose works are present in a museum during a particular period.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "museum_name": {
+              "type": "string",
+              "description": "The name of the museum."
+            },
+            "period": {
+              "type": "string",
+              "description": "The time period for which to retrieve the artists, e.g., 19th Century."
+            },
+            "country": {
+              "type": "string",
+              "description": "The country where the museum is located, optional parameter. Default: 'USA'"
+            }
+          },
+          "required": [
+            "museum_name",
+            "period"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_43",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How can I apply Evolutionary Algorithm in game Artificial Intelligence?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "evolve_creatures",
+        "description": "Apply the Evolutionary Algorithm to improve the creatures in a simulation over generations.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "population_size": {
+              "type": "integer",
+              "description": "The initial size of the creature population."
+            },
+            "mutation_rate": {
+              "type": "float",
+              "description": "The probability of mutation in each generation."
+            },
+            "generations": {
+              "type": "integer",
+              "description": "The number of generations to run the simulation."
+            },
+            "fitness_goal": {
+              "type": "integer",
+              "description": "The fitness goal that the creatures should strive for. This is an optional parameter. Default: 1"
+            }
+          },
+          "required": [
+            "population_size",
+            "mutation_rate",
+            "generations"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_136",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who is the Vice President of United States?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "us_president_in_year",
+        "description": "Find out who was the president of United States in a given year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year to lookup for."
+            },
+            "state": {
+              "type": "string",
+              "description": "Optional. State to lookup for governor. Default is all US."
+            }
+          },
+          "required": [
+            "year"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_186",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the ranking of a football team?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "sports_ranking.get_MVP",
+        "description": "Retrieve the most valuable player of a particular sport season",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "season": {
+              "type": "string",
+              "description": "The season to look for MVP."
+            },
+            "sport_type": {
+              "type": "string",
+              "description": "The type of sport to look for MVP."
+            },
+            "team": {
+              "type": "string",
+              "description": "Specific team to look for MVP, Default is all teams"
+            }
+          },
+          "required": [
+            "season",
+            "sport_type"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_62",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "How to build a frontend interface for my e-commerce website?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "create_Recommender_Model",
+        "description": "This function is used to create a recommendation model using a given user data and an algorithm type",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "user_data": {
+              "type": "string",
+              "description": "A data frame of user ratings. Rows represent users, columns represent items, and entries represent user ratings for items"
+            },
+            "algorithm": {
+              "type": "string",
+              "enum": [
+                "Collaborative",
+                "Content Based",
+                "Hybrid"
+              ],
+              "description": "The algorithm to be used for creating the recommendation model. Collaborative filtering, content-based filtering and hybrid filtering."
+            },
+            "matrix_factorization": {
+              "type": "boolean",
+              "description": "Optional parameter to indicate whether matrix factorization should be used. Default is False."
+            }
+          },
+          "required": [
+            "user_data",
+            "algorithm"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_41",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "What is the common ancestor of lion and zebra?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "calculate_fibonacci_sequence",
+        "description": "Calculates fibonacci sequence up to a specified limit.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "The upper limit of the fibonacci sequence to be calculated."
+            },
+            "show_sequence": {
+              "type": "boolean",
+              "description": "Optional parameter to decide whether to print the fibonacci sequence or not. Default is False."
+            }
+          },
+          "required": [
+            "limit"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_118",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Who won the 1996 NBA championships?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "playoff.brackets",
+        "description": "Display NBA playoff brackets for a specified year.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "description": "The year for the desired NBA playoffs."
+            },
+            "round": {
+              "type": "string",
+              "description": "Specific round of the playoffs.",
+              "enum": [
+                "First Round",
+                "Conference Semifinals",
+                "Conference Finals",
+                "Finals"
+              ]
+            }
+          },
+          "required": [
+            "year",
+            "round"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_97",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Can you recommend a good Chinese restaurant in New York?"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "file_lawsuit",
+        "description": "File a lawsuit against a party.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "defendant": {
+              "type": "string",
+              "description": "The party being sued."
+            },
+            "plaintiff": {
+              "type": "string",
+              "description": "The party filing the lawsuit."
+            },
+            "jurisdiction": {
+              "type": "string",
+              "description": "The legal jurisdiction in which the lawsuit is being filed, e.g. New York, NY",
+              "default": "Your local jurisdiction"
+            }
+          },
+          "required": [
+            "defendant",
+            "plaintiff"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  },
+  {
+    "id": "irrelevance_69",
+    "question": [
+      [
+        {
+          "role": "user",
+          "content": "Retrieve the average house price in california"
+        }
+      ]
+    ],
+    "function": [
+      {
+        "name": "regression_model.predict",
+        "description": "Predict the target variable based on input features using a trained regression model.",
+        "parameters": {
+          "type": "dict",
+          "properties": {
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "float"
+              },
+              "description": "Input features to make predictions with."
+            },
+            "model": {
+              "type": "dict",
+              "description": "Trained regression model object."
+            },
+            "scaler": {
+              "type": "float",
+              "description": "Fitted Scaler object for input features scaling.",
+              "default": "1.2"
+            }
+          },
+          "required": [
+            "features",
+            "model"
+          ]
+        }
+      }
+    ],
+    "ground_truth": null,
+    "category": "irrelevance"
+  }
+]
