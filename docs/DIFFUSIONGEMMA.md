@@ -156,22 +156,38 @@ pour les limites observées sur des UIs denses.
 
 ---
 
-## Test Wikipedia "Les Molières (Essonne)"
+## Test Wikipedia "Population de Montcuq"
 
-Démo headless du pipeline grounding via la CLI :
-[docs/examples/ui-grounding-bench/run_ss.py](examples/ui-grounding-bench/run_ss.py).
+Démo end-to-end dans la GUI `gemma4-bench-ui` → onglet **Agent** → preset URL Wikipedia
+→ goal libre. Toggle "Grille de coords" activé (overlay magenta sur le screenshot envoyé
+au modèle).
 
 Goal donné au modèle :
 
-> *"Sur Wikipedia, trouve la population de ma commune Les Molières en Essonne."*
+> *"Va sur wikipedia et trouve moi le nombre d'habitant de la ville de Montcuq"*
 
 URL de départ : `https://fr.wikipedia.org/wiki/Wikipédia:Accueil_principal`
 
-![Wikipedia demo](examples/ui-grounding-bench/wikipedia-search-bar-demo.gif)
+![Wikipedia Montcuq demo](examples/ui-grounding-bench/wikipedia-search-bar-demo.gif)
 
-*4 frames : Step 1 plein écran (rate), Step 1bis crop top (réussit), Step 1ter grille de
-coords (réussit), Step 2 page de résultats (hallucination). Temps réel cumulé sur M3 Max
-96 Go en bas à droite.*
+*3 steps en 30 secondes cumulées, sur M3 Max 96 Go (DiffusionGemma 26B-A4B bf16). La
+barre de progression en haut indique le step courant (violet) et les steps réussis
+(vert). Temps cumulé en haut à droite.*
+
+| # | Action | Coord/Texte | Latence | Résultat |
+|---|---|---|---|---|
+| 1 | `click_and_type` | `(0.43, 0.44)` + texte `Montcuq` | 11.2 s, 7 forwards | OK — ouvre la page Wikipédia de Montcuq |
+| 2 | `scroll_down` | — | 9.2 s | OK — révèle l'infobox démographie à droite |
+| 3 | `done` | summary | 9.6 s | **"1,241 habitants au recensement de 2013, département du Lot, région Occitanie"** |
+
+Logs complets dans `/tmp/web-agent-runs/run-1781890620/` (manifest, prompts, raw outputs,
+screenshots avec et sans grille). Génération du GIF reproductible via
+`/tmp/make_agent_gif.py`.
+
+### Test antérieur "Les Molières (Essonne)" (échec)
+
+Pour mémoire, un test plus difficile sur une commune sans page Wikipédia directe avait
+montré les limites du grounding visuel sur une page de résultats textuelle dense :
 
 ### Step 1 — Page d'accueil Wikipedia FR
 

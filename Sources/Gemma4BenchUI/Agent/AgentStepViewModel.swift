@@ -102,6 +102,43 @@ final class AgentStepViewModel: ObservableObject {
     /// interruptible). L'user reprend la main pour relancer manuellement.
     @Published var stopRequested: Bool = false
 
+    /// Dossier de logs de la session courante. Cree au 1er step et reutilise
+    /// par les steps suivants. Permet d'analyser offline ce que le modele a
+    /// recu / produit. Pareil que IOSAgentStepViewModel mais pour le web.
+    @Published private(set) var sessionLogDir: URL? = nil
+
+    private func ensureLogDir() -> URL {
+        if let d = sessionLogDir { return d }
+        let ts = Int(Date().timeIntervalSince1970)
+        let dir = URL(fileURLWithPath: "/tmp/web-agent-runs/run-\(ts)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let manifest = """
+        # Web Agent run — \(Date())
+        Goal:
+        \(goal)
+
+        Start URL:
+        \(startURL)
+        """
+        try? manifest.write(to: dir.appendingPathComponent("manifest.md"), atomically: true, encoding: .utf8)
+        sessionLogDir = dir
+        print("[WebAgent] session log dir: \(dir.path)")
+        return dir
+    }
+    private func writeLog(_ relativePath: String, content: String) {
+        let dir = ensureLogDir()
+        try? content.write(to: dir.appendingPathComponent(relativePath), atomically: true, encoding: .utf8)
+    }
+    private func writePNG(_ relativePath: String, image: NSImage) {
+        let dir = ensureLogDir()
+        if let tiff = image.tiffRepresentation,
+           let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:])
+        {
+            try? png.write(to: dir.appendingPathComponent(relativePath))
+        }
+    }
+
     private var attemptSeed: UInt64 = 0  // change a chaque rejet
 
     /// Le ViewModel ne tient plus les modeles — il les recoit du registry
@@ -147,6 +184,7 @@ final class AgentStepViewModel: ObservableObject {
         selectedStepIndex = nil
         attemptSeed = 0
         stopRequested = false
+        sessionLogDir = nil
     }
 
     // MARK: - Propose / validate / reject
@@ -325,6 +363,27 @@ final class AgentStepViewModel: ObservableObject {
             }
             step.state = .awaiting
             replaceLast(step)
+            // Log de la generation (prompt + raw + parsed + screenshot)
+            writeLog("step-\(n)-prompt.md", content: """
+            # Step \(n) — prompt envoyé au modèle
+
+            URL: \(browser.currentURL)
+            Title: \(browser.pageTitle)
+            Image: \(imgW)x\(imgH), grid=\(useCoordGrid)
+            Diffusion: \(String(format: "%.2f", totalElapsed))s, \(lastForwards ?? 0) forwards
+
+            ---
+
+            \(prompt)
+            """)
+            writeLog("step-\(n)-raw.txt", content: lastRawOut)
+            let parsedDump: String = {
+                guard let a = parsedAction else { return "(no action parsed)" }
+                return "kind: \(a.kind)\nnotes: \(parsedNotes)\nreason: \(parsedReason)\nfull action: \(a)"
+            }()
+            writeLog("step-\(n)-parsed.txt", content: parsedDump)
+            writePNG("step-\(n)-screenshot.png", image: shotBefore)
+            if let g = step.screenshotGrid { writePNG("step-\(n)-screenshot-grid.png", image: g) }
         } catch {
             step.state = .errored
             step.error = "Diffusion: \(error.localizedDescription)"

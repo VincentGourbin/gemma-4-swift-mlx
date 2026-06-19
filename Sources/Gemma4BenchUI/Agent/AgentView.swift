@@ -198,6 +198,18 @@ struct AgentView: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .frame(width: 20)
 
+                if let logDir = vm.sessionLogDir {
+                    Button {
+                        NSWorkspace.shared.open(logDir)
+                    } label: {
+                        Label("Voir les logs", systemImage: "folder")
+                            .font(.system(size: 9))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    .help("Ouvre le dossier contenant les prompts envoyés et sorties brutes du modèle pour chaque step.")
+                }
+
                 Spacer()
 
                 Text("\(vm.steps.count) / \(vm.maxAutoSteps) steps")
