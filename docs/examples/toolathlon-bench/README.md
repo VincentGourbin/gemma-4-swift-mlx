@@ -188,7 +188,12 @@ HTTP server via SwiftNIO ou `Network.NWListener` autour de `DiffusionGemmaPipeli
 
 ## Fichiers
 
-- `proxy.py` — proxy HTTP minimal (203 lignes), seul fichier dans ce POC
+- `proxy.py` — proxy HTTP OpenAI ↔ `gemma4-cli diffusion` (~280 lignes)
+- `harness.py` — bypass Toolathlon : pilote arxiv + filesystem + scholarly
+  MCP servers en local, applique le grader copié de
+  `tasks/finalpool/find-alita-paper/evaluation/main.py`
+- `run_with_retry.sh` — wrapper bash qui retente la soumission Toolathlon
+  jusqu'à attraper une fenêtre serveur libre
 
 ## Reproduction
 
@@ -223,15 +228,94 @@ python eval_client.py run \
 Si le serveur public n'est pas disponible, contacter les auteurs Toolathlon
 pour un serveur dédié ou setup local Docker.
 
+## Bypass : end-to-end sans Toolathlon (`harness.py`)
+
+Faute d'accès au serveur public, on a écrit `harness.py` qui pilote
+**localement** les 3 MCP servers nécessaires à `find-alita-paper` et boucle
+DiffusionGemma → tool_call → exec → next, puis applique le grader copié
+de `tasks/finalpool/find-alita-paper/evaluation/main.py`.
+
+```bash
+# 1. Proxy en marche (cf. plus haut)
+python3 docs/examples/toolathlon-bench/proxy.py --port 8001 \
+    --max-blocks 4 --raw-log-dir /tmp/proxy-raw
+
+# 2. Harness
+python3 docs/examples/toolathlon-bench/harness.py --max-iters 20
+```
+
+Le harness lance via stdio :
+
+- `uvx --from arxiv-mcp-server[pdf] --with "arxiv<4" arxiv-mcp-server`
+  (on pin arxiv <4 car la 4.0 a supprimé `Result.download_pdf`)
+- `npx -y @modelcontextprotocol/server-filesystem <workspace>`
+- `uvx mcp-scholarly`
+
+Plus deux tools « locaux » :
+- `local__http_download(url, output_path)` — download HTTP brut. Nécessaire
+  car `arxiv_local__download_paper` convertit le PDF en markdown et
+  **supprime le PDF brut** ; le grader Toolathlon compare le MD5 du PDF
+  attendu vs le PDF présent dans le workspace.
+- `local__claim_done()` — termine la boucle.
+
+### Résultat (run 6)
+
+```
+iter 1 : arxiv_local__search_papers({"query":"\"Alita\" AND \"agentic reasoning\"",
+                                      "max_results":5, "date_to":"2025-06-30",
+                                      "sort_by":"date"})
+         → 1 paper : 2505.20286 (titre exact + auteurs + URL pdf)
+iter 2 : local__http_download({"url":"https://arxiv.org/pdf/2505.20286",
+                               "output_path":"alita_2505.20286.pdf"})
+         → saved 1113373 bytes
+iter 3 : final answer (no tool_call) :
+         title: Alita: Generalist Agent Enabling Scalable Agentic Reasoning…
+         arxiv_abs_url: https://arxiv.org/abs/2505.20286
+         code_url: https://github.com/CharlesQ9/Alita
+
+==== GRADING ====
+reference MD5  : bf5193e8606a7796f217d69cc5d72d6e (1113373 bytes)
+candidate MD5  : bf5193e8606a7796f217d69cc5d72d6e (1113373 bytes)
+✅ PDF match — verdict: PASS
+```
+
+Le grader copie exactement la logique de
+`evaluation/main.py` : download du PDF de référence depuis arxiv, MD5
+match contre le fichier `alita_<id>*.pdf` présent dans le workspace.
+
+**Coût total** : 3 itérations, ~65 s d'exécution agent (hors chargement
+modèle qui se répète à chaque requête vu l'architecture du proxy POC).
+
+### Limites du bypass
+
+- Les MCP servers sont upstream PyPI/npm, pas la version Toolathlon
+  patchée. Le wrapper Toolathlon de `arxiv_local` préserve probablement le
+  PDF brut (le YAML mentionne « retry every arxiv-touching handler »),
+  auquel cas `local__http_download` ne serait pas nécessaire dans le
+  vrai run.
+- Le grader local ignore la vérification du format de réponse (`title:`,
+  `arxiv_abs_url:`, `code_url:`) — `main.py` côté Toolathlon a un
+  `check_content` mais il n'est pas appelé. Le format est cependant
+  bien produit par DiffusionGemma (visible dans le transcript).
+- Pas d'eval de l'autre 250+ tasks Toolathlon — chacune aurait son set
+  de MCP servers, certains avec authentification (Gmail, GitHub,
+  Canvas…). Le harness scalerait mal au-delà de tasks « pures lecture
+  + écriture fichier ».
+
 ## Conclusion
 
 ✅ **Pipeline OpenAI ChatCompletion fonctionnel** pour DiffusionGemma sur
 Apple Silicon, validé sur un round-trip de tool calling complet.
 
-⏸️  **Full eval bloqué** par le rate limit du service public Toolathlon —
-non lié à notre stack. À relancer dès qu'une fenêtre serveur s'ouvre, ou avec
-un serveur Toolathlon local Docker.
+✅ **Task `find-alita-paper` PASS end-to-end** via `harness.py` : recherche
+arxiv → download PDF → réponse formatée, 3 tool calls, MD5 match avec la
+référence (`bf5193e8606a7796f217d69cc5d72d6e`).
 
-⚠️ **Optimisation requise pour le full run** : passer du mode "rechargement
-modèle par requête" à un serveur HTTP Swift natif persistant (× 6-12 plus
-rapide).
+⏸️  **Full eval Toolathlon officiel bloqué** par le rate limit du service
+public (14 tentatives consécutives « Server is busy »), à relancer plus
+tard ou avec un serveur Toolathlon local (~25 GB Docker, cf. README
+amont).
+
+⚠️ **Optimisation pour le full run** : passer du mode « rechargement
+modèle par requête » à un serveur HTTP Swift natif persistant (× 6-12
+plus rapide).

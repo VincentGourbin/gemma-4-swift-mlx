@@ -32,6 +32,7 @@ DEFAULT_CLI = "/Users/vincent/Developpements/gemma-4-swift-mlx/.build/xcode/Buil
 DEFAULT_PORT = 8000
 DEFAULT_MAX_BLOCKS = 3   # 3 × 256 = 768 tokens output max — suffisant pour tool_call JSON
 DEFAULT_TIMEOUT = 600    # 10 min par requête (modele bf16 + chargement)
+DEFAULT_RAW_LOG_DIR = None  # si set, on dump chaque (prompt, raw_stdout) sous <DIR>/req-<N>.txt
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("toolathlon-proxy")
@@ -49,9 +50,13 @@ def build_prompt(messages: list, tools: list | None) -> str:
     parts.append(
         "You are an agent that completes user tasks by calling tools.\n"
         "Respond with EITHER:\n"
-        "  a) A natural-language answer to the user, OR\n"
-        "  b) Exactly one tool call on its own line, formatted as:\n"
-        '     TOOL_CALL: {"name": "tool_name", "arguments": {...}}\n'
+        "  a) A natural-language answer to the user (final answer), OR\n"
+        "  b) Exactly one tool call on its own line, formatted as a function "
+        "call:\n"
+        '     TOOL_CALL: tool_name({"arg1": "value", "arg2": 42})\n'
+        "Example:\n"
+        '     TOOL_CALL: arxiv_local__search_papers({"query": "diffusion models", '
+        '"max_results": 5})\n'
         "Pick one. Do not mix prose and TOOL_CALL on the same answer.\n"
     )
     if tools:
@@ -116,41 +121,70 @@ def _extract_balanced_json(raw: str, from_idx: int) -> str | None:
     return None
 
 
+def _build_tool_call(name: str, args) -> dict:
+    if isinstance(args, dict):
+        args = json.dumps(args, ensure_ascii=False)
+    return {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": f"call_{uuid.uuid4().hex[:16]}",
+                "type": "function",
+                "function": {"name": name, "arguments": args or "{}"},
+            }
+        ],
+    }
+
+
 def parse_response(raw: str) -> dict:
-    """Convertit la sortie texte du modèle en réponse OpenAI ChatCompletion."""
+    """Convertit la sortie texte du modele en reponse OpenAI ChatCompletion.
+
+    Reconnait deux formats produits par DiffusionGemma :
+      a) TOOL_CALL: {"name": "...", "arguments": {...}}
+      b) TOOL_CALL: name_with__underscores({"arg": "..."})
+    """
     raw = raw.strip()
     raw = re.sub(r"<\s*eos\s*>", "", raw, flags=re.IGNORECASE)
     raw = re.sub(r"<\s*\|?turn\|?\s*>", "", raw)
     raw = raw.strip()
 
-    # Cherche le DERNIER TOOL_CALL: dans la sortie (apres --- Output complete ---
-    # le modele republie souvent la meme TOOL_CALL en clair, on prend celle-la
-    # pour eviter les troncatures).
-    matches = list(re.finditer(r"TOOL_CALL\s*:", raw, re.IGNORECASE))
+    # DiffusionGemma tronque parfois le canvas en debut de generation,
+    # produisant `_CALL:` au lieu de `TOOL_CALL:` (les premiers tokens "TOOL"
+    # ont ete ecrases pendant la diffusion). On accepte les deux variantes.
+    matches = list(re.finditer(r"(?:TOOL)?_CALL\s*:", raw, re.IGNORECASE))
     for m in reversed(matches):
+        after = raw[m.end():].lstrip()
+
+        # Format (b) — TOOL_CALL: name(<json>)
+        nm = re.match(r"([A-Za-z_][\w]*)\s*\(", after)
+        if nm:
+            name = nm.group(1)
+            args_str = _extract_balanced_json(after, nm.end() - 1)  # nm.end()-1 = pos du '('
+            # _extract_balanced_json cherche le 1er '{' apres from_idx donc OK,
+            # mais ici il faut chercher apres le '('
+            args_str = _extract_balanced_json(after, nm.end())
+            if args_str:
+                try:
+                    args = json.loads(args_str)
+                    return _build_tool_call(name, args)
+                except json.JSONDecodeError as e:
+                    log.debug(f"format-b parse failed for {name}: {e}")
+            # Cas args vides : TOOL_CALL: name() ou name({})
+            after_paren = after[nm.end():].lstrip()
+            if after_paren.startswith(")"):
+                return _build_tool_call(name, {})
+
+        # Format (a) — TOOL_CALL: {"name": "...", "arguments": {...}}
         json_str = _extract_balanced_json(raw, m.end())
-        if not json_str:
-            continue
-        try:
-            call = json.loads(json_str)
-        except json.JSONDecodeError as e:
-            log.debug(f"TOOL_CALL parse failed at offset {m.end()}: {e}")
-            continue
-        name = call.get("name", "unknown")
-        args = call.get("arguments", {})
-        if isinstance(args, dict):
-            args = json.dumps(args, ensure_ascii=False)
-        return {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [
-                {
-                    "id": f"call_{uuid.uuid4().hex[:16]}",
-                    "type": "function",
-                    "function": {"name": name, "arguments": args},
-                }
-            ],
-        }
+        if json_str:
+            try:
+                call = json.loads(json_str)
+                name = call.get("name")
+                if name:
+                    return _build_tool_call(name, call.get("arguments", {}))
+            except json.JSONDecodeError as e:
+                log.debug(f"format-a parse failed at offset {m.end()}: {e}")
 
     return {"role": "assistant", "content": raw}
 
@@ -159,6 +193,8 @@ class Handler(BaseHTTPRequestHandler):
     cli_path = DEFAULT_CLI
     max_blocks = DEFAULT_MAX_BLOCKS
     timeout = DEFAULT_TIMEOUT
+    raw_log_dir = DEFAULT_RAW_LOG_DIR
+    req_counter = 0
 
     def log_message(self, fmt, *args):
         log.info(fmt % args)
@@ -242,6 +278,27 @@ class Handler(BaseHTTPRequestHandler):
                  f"has_tool_call={'tool_calls' in message}")
         log.debug(f"Raw body (first 300 chars): {body[:300]}")
 
+        # Dump raw I/O if requested (debug)
+        if Handler.raw_log_dir:
+            try:
+                import os as _os
+                _os.makedirs(Handler.raw_log_dir, exist_ok=True)
+                Handler.req_counter += 1
+                fname = _os.path.join(Handler.raw_log_dir,
+                                      f"req-{Handler.req_counter:04d}.txt")
+                with open(fname, "w") as f:
+                    f.write("=== PROMPT ===\n")
+                    f.write(prompt)
+                    f.write("\n\n=== RAW STDOUT ===\n")
+                    f.write(res.stdout)
+                    f.write("\n\n=== EXTRACTED BODY ===\n")
+                    f.write(body)
+                    f.write("\n\n=== PARSED MESSAGE ===\n")
+                    f.write(json.dumps(message, indent=2, ensure_ascii=False))
+                log.info(f"raw dump → {fname}")
+            except Exception as e:
+                log.warning(f"raw log failed: {e}")
+
         reply = {
             "id": f"chatcmpl-{uuid.uuid4().hex[:16]}",
             "object": "chat.completion",
@@ -268,11 +325,14 @@ def main():
     p.add_argument("--max-blocks", type=int, default=DEFAULT_MAX_BLOCKS,
                    help="Diffusion max canvas blocks (256 tokens each)")
     p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT)
+    p.add_argument("--raw-log-dir", default=None,
+                   help="If set, dump (prompt, raw stdout, parsed message) of each request to this dir")
     args = p.parse_args()
 
     Handler.cli_path = args.cli
     Handler.max_blocks = args.max_blocks
     Handler.timeout = args.timeout
+    Handler.raw_log_dir = args.raw_log_dir
 
     log.info(f"DiffusionGemma OpenAI proxy listening on http://localhost:{args.port}")
     log.info(f"  CLI: {args.cli}")
