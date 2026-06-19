@@ -1,10 +1,27 @@
-// ContentView : 2 panneaux côte à côte (AR + Diffusion) + prompt + stats
-// Style sombre, glow autour des panneaux actifs.
+// ContentView : TabView avec 2 onglets — BenchTab (compare AR vs Diffusion)
+// et AgentTab (agent web E4B planning + Diffusion grounding).
 
 import SwiftUI
 
 struct ContentView: View {
+    var body: some View {
+        TabView {
+            BenchTab()
+                .tabItem { Label("Bench", systemImage: "chart.bar.xaxis") }
+            AgentView()
+                .tabItem { Label("Agent", systemImage: "globe.americas.fill") }
+            VQAGameView()
+                .tabItem { Label("Akinator VQA", systemImage: "eye.fill") }
+            IOSSimulatorView()
+                .tabItem { Label("iOS Sim", systemImage: "iphone.gen3") }
+        }
+        .padding(.top, 2)
+    }
+}
+
+struct BenchTab: View {
     @StateObject private var vm = BenchViewModel()
+    @EnvironmentObject private var registry: ModelRegistry
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,6 +44,19 @@ struct ContentView: View {
             )
             .ignoresSafeArea()
         )
+        .onAppear {
+            // Injection du registry partage (les load/run du VM y delegueront)
+            vm.registry = registry
+            // Sync initial du loadState avec ce qui est deja en RAM
+            if registry.isARLoaded { vm.loadState = .arReady }
+            else if registry.isDiffusionLoaded { vm.loadState = .diffusionReady }
+        }
+        .onChange(of: registry.isARLoaded) { _, loaded in
+            if loaded { vm.loadState = .arReady } else if vm.loadState == .arReady { vm.loadState = .idle }
+        }
+        .onChange(of: registry.isDiffusionLoaded) { _, loaded in
+            if loaded { vm.loadState = .diffusionReady } else if vm.loadState == .diffusionReady { vm.loadState = .idle }
+        }
     }
 
     // MARK: - Sections
@@ -257,6 +287,7 @@ struct ContentView: View {
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.7))
             Spacer()
+            ModelRegistrySummary()
             Text("AR : \(String(format: "%.1f", vm.arPanel.tokPerSec)) tok/s   •   Diffusion : \(String(format: "%.1f", vm.diffusionPanel.tokPerSec)) tok/s")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.7))

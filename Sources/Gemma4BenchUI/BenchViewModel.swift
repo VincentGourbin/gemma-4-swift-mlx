@@ -250,53 +250,27 @@ final class BenchViewModel: ObservableObject {
 
     func clearImage() { imageURL = nil }
 
-    // MARK: - Modèles
+    // MARK: - Modèles (delegues au registry partage)
 
-    private var arPipeline: Gemma4Pipeline?
-    private var diffusionModel: DiffusionGemmaForBlockDiffusion?
-    private var diffusionConfig: DiffusionGemmaConfig?
-    private var diffusionGenConfig: DiffusionGenerationConfig?
-    private var diffusionTokenizer: Tokenizer?
+    /// Le BenchViewModel ne tient PAS lui-meme les pipelines : il les lit
+    /// depuis le registry partage par les 3 onglets. Ainsi, charger Diffusion
+    /// dans l'onglet Akinator VQA ou Agent rend automatiquement le panel
+    /// Diffusion du Bench fonctionnel, sans double chargement.
+    weak var registry: ModelRegistry?
 
-    // MARK: - Paths
-
-    let arModelID = "mlx-community/gemma-4-26b-a4b-it-bf16"
-    let diffusionModelID = "google/diffusiongemma-26B-A4B-it"
-
-    var arPath: URL {
-        var p = Gemma4ModelCache.modelsDirectory
-        for part in arModelID.split(separator: "/") {
-            p = p.appendingPathComponent(String(part))
-        }
-        return p
-    }
-
-    var diffusionPath: URL {
-        var p = Gemma4ModelCache.modelsDirectory
-        for part in diffusionModelID.split(separator: "/") {
-            p = p.appendingPathComponent(String(part))
-        }
-        return p
-    }
+    private var arPipeline: Gemma4Pipeline? { registry?.arPipeline }
+    private var diffusionModel: DiffusionGemmaForBlockDiffusion? { registry?.diffModel }
+    private var diffusionConfig: DiffusionGemmaConfig? { registry?.diffConfig }
+    private var diffusionGenConfig: DiffusionGenerationConfig? { registry?.diffGenConfig }
+    private var diffusionTokenizer: Tokenizer? { registry?.diffTokenizer }
 
     // MARK: - Déchargement
 
     /// Décharge tout, libère la RAM / GPU cache.
     private func unloadAll() async {
-        if arPipeline != nil {
-            loadState = .unloading("AR…")
-            arPipeline?.unload()
-            arPipeline = nil
-        }
-        if diffusionModel != nil {
-            loadState = .unloading("Diffusion…")
-            diffusionModel = nil
-            diffusionConfig = nil
-            diffusionGenConfig = nil
-            diffusionTokenizer = nil
-            MLX.GPU.clearCache()
-        }
-        // Petit délai pour laisser ARC + GPU free les ressources
+        guard let registry = registry else { return }
+        loadState = .unloading("tous les modeles…")
+        registry.unloadAll()
         try? await Task.sleep(nanoseconds: 300_000_000)
         loadState = .idle
     }
@@ -304,66 +278,37 @@ final class BenchViewModel: ObservableObject {
     // MARK: - Chargement individuel (un modèle à la fois)
 
     func loadAR() async {
-        await unloadAll()
-        loadState = .loadingAR("\(arModelID)…")
-        arPanel.phase = .loading(detail: "Chargement \(arModelID) (~48 Go bf16 + vision_tower)…")
+        guard let registry = registry else { return }
+        loadState = .loadingAR(registry.arModelID)
+        arPanel.phase = .loading(detail: "Chargement \(registry.arModelID) (~48 Go bf16 + vision_tower)…")
         arPanel.status = "Chargement…"
-        do {
-            // Multimodal: true — le 26B-A4B bf16 a un vision_config (~600 MB additionnels)
-            // qui permet d'accepter une image en entree via chatStreamMultimodal.
-            await Gemma4Registration.register(multimodal: true)
-            let pipeline = Gemma4Pipeline()
-            try await pipeline.load(from: arPath, multimodal: true)
-            arPipeline = pipeline
+        let ok = await registry.loadAR()
+        if ok {
             loadState = .arReady
             arPanel.phase = .idle
             arPanel.status = "Modele charge, pret (vision OK)"
-        } catch {
-            loadState = .error("AR : \(error.localizedDescription)")
-            arPanel.phase = .error(error.localizedDescription)
+        } else {
+            let err = registry.lastError ?? "erreur inconnue"
+            loadState = .error("AR : \(err)")
+            arPanel.phase = .error(err)
             arPanel.status = "Erreur chargement"
         }
     }
 
     func loadDiffusion() async {
-        await unloadAll()
-        loadState = .loadingDiffusion("\(diffusionModelID)…")
-        diffusionPanel.phase = .loading(detail: "Chargement \(diffusionModelID) (~48 Go bf16)…")
+        guard let registry = registry else { return }
+        loadState = .loadingDiffusion(registry.diffModelID)
+        diffusionPanel.phase = .loading(detail: "Chargement \(registry.diffModelID) (~48 Go bf16)…")
         diffusionPanel.status = "Chargement…"
-        do {
-            // includeVision: true car le checkpoint a vision_config != nil,
-            // donc DiffusionGemmaEncoderModel instancie quand meme vision_tower
-            // qui attend ses poids (~600 MB additionnels).
-            let (model, config) = try DiffusionGemmaLoader.load(
-                from: diffusionPath, includeVision: true
-            )
-            diffusionModel = model
-            diffusionConfig = config
-
-            // Appliquer la quantization mixed precision si demande (Q-DiT)
-            if let mpConfig = quantPreset.mixedConfig {
-                diffusionPanel.phase = .loading(detail: "Quantization \(quantPreset.rawValue)…")
-                let stats = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: model, config: mpConfig)
-                print("Quantization \(quantPreset.rawValue): \(stats.quantizedHigh) en 8-bit, \(stats.quantizedLow) en 4-bit, \(stats.skipped.count) skipped")
-            }
-
-            let genConfigURL = diffusionPath.appendingPathComponent("generation_config.json")
-            if FileManager.default.fileExists(atPath: genConfigURL.path),
-               let data = try? Data(contentsOf: genConfigURL),
-               let parsed = try? JSONDecoder().decode(DiffusionGenerationConfig.self, from: data)
-            {
-                diffusionGenConfig = parsed
-            } else {
-                diffusionGenConfig = DiffusionGenerationConfig()
-            }
-
-            diffusionTokenizer = try await AutoTokenizer.from(modelFolder: diffusionPath)
+        let ok = await registry.loadDiffusion(mixedPrecision: quantPreset.mixedConfig)
+        if ok {
             loadState = .diffusionReady
             diffusionPanel.phase = .idle
             diffusionPanel.status = "Modele charge, pret"
-        } catch {
-            loadState = .error("Diffusion : \(error.localizedDescription)")
-            diffusionPanel.phase = .error(error.localizedDescription)
+        } else {
+            let err = registry.lastError ?? "erreur inconnue"
+            loadState = .error("Diffusion : \(err)")
+            diffusionPanel.phase = .error(err)
             diffusionPanel.status = "Erreur chargement"
         }
     }
