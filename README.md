@@ -18,6 +18,8 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
 | Model download | ✅ **Working** | Direct HTTPS from HuggingFace (no HF SDK dependency) |
+| **DiffusionGemma 26B-A4B** | ✅ **Ported** | Block-AR text diffusion + vision. **80.8% OCRBench**, **79% ScreenSpot v1**, 95% BFCL. Voir [docs/DIFFUSIONGEMMA.md](docs/DIFFUSIONGEMMA.md) |
+| `gemma4-bench-ui` GUI | ✅ **Working** | 4 onglets (Bench AR vs Diffusion, Web agent step-by-step, Akinator VQA, iOS Sim agent) |
 
 ## Requirements
 
