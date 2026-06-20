@@ -1,0 +1,29 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_137.png
+  Image preprocessee: [1, 3, 144, 672]
+  Total: 1 image(s), batch: [1, 3, 144, 672]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [682, 682, 642, 236743, 236778, 682, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 350
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+S_\Delta = \frac { \sqrt2 \cdot \sqrt7 } { 2 } = \frac { \sqrt { 1 4 } } { 2 }
+---
+Based on the image provided, here is the expression written in LaTeX format:
+
+```latex
+S_{\Delta} = \frac{\sqrt{2} \cdot \sqrt{7}}{2} = \frac{\sqrt{14}}{2}
+```
+
+**Rendered output:**
+
+
+--- Stats ---
+Tokens: 60
+Temps: 5.25s, Vitesse: 11.4 t/s
+GPU pic: 16305 Mo

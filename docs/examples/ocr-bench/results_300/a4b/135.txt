@@ -1,0 +1,25 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_135.png
+  Image preprocessee: [1, 3, 96, 336]
+  Total: 1 image(s), batch: [1, 3, 96, 336]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236743, 236771, 783, 236743, 236825, 562, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 350
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+I _2= \frac { u } { R_2} = \frac { 6 V } { 1 0 \Omega } = 0 . 6 A
+---
+Based on the image provided, here is the expression written in LaTeX format:
+
+```latex
+I_2 = \frac{U}{R_2} = \frac{6\text{ V}}{10\text{ }\Omega} = 0.6\text{ A}
+
+--- Stats ---
+Tokens: 60
+Temps: 5.29s, Vitesse: 11.3 t/s
+GPU pic: 16310 Mo

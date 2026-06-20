@@ -1,0 +1,1948 @@
+{
+  "kind": "diff",
+  "overall": "79/100",
+  "total_time_s": 2583.307101249695,
+  "by_source": {
+    "windows": {
+      "c": 27,
+      "t": 33
+    },
+    "macos": {
+      "c": 25,
+      "t": 34
+    },
+    "ios": {
+      "c": 27,
+      "t": 33
+    }
+  },
+  "by_type": {
+    "text": {
+      "c": 58,
+      "t": 62
+    },
+    "icon": {
+      "c": 21,
+      "t": 38
+    }
+  },
+  "by_source_type": {
+    "windows/text": {
+      "c": 18,
+      "t": 19
+    },
+    "windows/icon": {
+      "c": 9,
+      "t": 14
+    },
+    "macos/text": {
+      "c": 21,
+      "t": 24
+    },
+    "macos/icon": {
+      "c": 4,
+      "t": 10
+    },
+    "ios/text": {
+      "c": 19,
+      "t": 19
+    },
+    "ios/icon": {
+      "c": 8,
+      "t": 14
+    }
+  },
+  "details": [
+    {
+      "idx": 0,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "sign in",
+      "bbox": [
+        0.2902418682235196,
+        0.677384780278671,
+        0.9532944120100083,
+        0.834941050375134
+      ],
+      "click": [
+        0.47,
+        0.81
+      ],
+      "correct": true,
+      "elapsed": 21.800681352615356,
+      "output": "CLICK: (x=0.47, y=0.81)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 1,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "windows settings",
+      "bbox": [
+        0.0,
+        0.7537037037037037,
+        0.052083333333333336,
+        0.837037037037037
+      ],
+      "click": [
+        0.26,
+        0.79
+      ],
+      "correct": false,
+      "elapsed": 21.869755029678345,
+      "output": "CLICK: (x=0.26, y=0.79)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 2,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "advanced setup",
+      "bbox": [
+        0.019736842105263157,
+        0.8065173116089613,
+        0.9736842105263158,
+        0.9022403258655805
+      ],
+      "click": [
+        0.26,
+        0.85
+      ],
+      "correct": true,
+      "elapsed": 19.433207035064697,
+      "output": "CLICK: (x=0.26, y=0.85)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 3,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "open the playlist",
+      "bbox": [
+        0.0,
+        0.45740740740740743,
+        0.33125,
+        0.5425925925925926
+      ],
+      "click": [
+        0.17,
+        0.5
+      ],
+      "correct": true,
+      "elapsed": 21.112586975097656,
+      "output": "CLICK: (x=0.17, y=0.50)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 4,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "choose wechat",
+      "bbox": [
+        0.058333333333333334,
+        0.7277777777777777,
+        0.5145833333333333,
+        0.9444444444444444
+      ],
+      "click": [
+        0.28,
+        0.83
+      ],
+      "correct": true,
+      "elapsed": 20.50356101989746,
+      "output": "CLICK: (x=0.28, y=0.83)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 5,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "add a new file",
+      "bbox": [
+        0.559375,
+        0.2351851851851852,
+        0.85,
+        0.2814814814814815
+      ],
+      "click": [
+        0.7,
+        0.21
+      ],
+      "correct": false,
+      "elapsed": 23.933286905288696,
+      "output": "CLICK: (x=0.70, y=0.21)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 6,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "add a language",
+      "bbox": [
+        0.578125,
+        0.44074074074074077,
+        0.7458333333333333,
+        0.5333333333333333
+      ],
+      "click": [
+        0.6,
+        0.48
+      ],
+      "correct": true,
+      "elapsed": 21.359661102294922,
+      "output": "CLICK: (x=0.60, y=0.48)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 7,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "open the menu of windows",
+      "bbox": [
+        0.0,
+        0.9222222222222223,
+        0.05,
+        1.0
+      ],
+      "click": [
+        0.02,
+        0.96
+      ],
+      "correct": true,
+      "elapsed": 18.94538402557373,
+      "output": "CLICK: (x=0.02, y=0.96)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 8,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "set the second photo as wallpaper",
+      "bbox": [
+        0.32083333333333336,
+        0.37592592592592594,
+        0.40520833333333334,
+        0.5314814814814814
+      ],
+      "click": [
+        0.36,
+        0.45
+      ],
+      "correct": true,
+      "elapsed": 20.531214237213135,
+      "output": "CLICK (x=0.36, y=0.45)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "idx": 9,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "view world clock",
+      "bbox": [
+        0.004188481675392671,
+        0.30060422960725075,
+        0.28900523560209423,
+        0.35347432024169184
+      ],
+      "click": [
+        0.14,
+        0.33
+      ],
+      "correct": true,
+      "elapsed": 19.16992211341858,
+      "output": "CLICK: (x=0.14, y=0.33)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 10,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "copy the file",
+      "bbox": [
+        0.184375,
+        0.12777777777777777,
+        0.478125,
+        0.17962962962962964
+      ],
+      "click": [
+        0.34,
+        0.14
+      ],
+      "correct": true,
+      "elapsed": 18.711775064468384,
+      "output": "CLICK: (x=0.34, y=0.14)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 11,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "multiplicate",
+      "bbox": [
+        0.15104166666666666,
+        0.024074074074074074,
+        0.23541666666666666,
+        0.12777777777777777
+      ],
+      "click": [
+        0.19,
+        0.07
+      ],
+      "correct": true,
+      "elapsed": 20.33794665336609,
+      "output": "CLICK: (x=0.19, y=0.07)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 12,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "open a new tab",
+      "bbox": [
+        0.846875,
+        0.0,
+        0.8822916666666667,
+        0.05925925925925926
+      ],
+      "click": null,
+      "correct": false,
+      "elapsed": 186.04657888412476,
+      "output": "TIMEOUT"
+    },
+    {
+      "idx": 13,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "show in folder",
+      "bbox": [
+        0.9416666666666667,
+        0.4648148148148148,
+        0.984375,
+        0.562962962962963
+      ],
+      "click": [
+        0.73,
+        0.13
+      ],
+      "correct": false,
+      "elapsed": 42.77130484580994,
+      "output": "CLICK: (x=0.73, y=0.13)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 14,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "settings and more",
+      "bbox": [
+        0.9541666666666667,
+        0.024074074074074074,
+        1.0,
+        0.0962962962962963
+      ],
+      "click": [
+        0.96,
+        0.54
+      ],
+      "correct": false,
+      "elapsed": 25.2688410282135,
+      "output": "CLICK: (x=0.96, y=0.54)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 15,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "open player settings",
+      "bbox": [
+        0.00625,
+        0.8703703703703703,
+        0.11458333333333333,
+        0.9462962962962963
+      ],
+      "click": [
+        0.06,
+        0.91
+      ],
+      "correct": true,
+      "elapsed": 20.926881074905396,
+      "output": "CLICK: (x=0.06, y=0.91)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 16,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "get start",
+      "bbox": [
+        0.5863874345549738,
+        0.8383685800604229,
+        0.7120418848167539,
+        0.8836858006042296
+      ],
+      "click": [
+        0.65,
+        0.85
+      ],
+      "correct": true,
+      "elapsed": 21.67621922492981,
+      "output": "CLICK: (x=0.65, y=0.85)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 17,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "paste option",
+      "bbox": [
+        0.11354166666666667,
+        0.26666666666666666,
+        0.16666666666666666,
+        0.40185185185185185
+      ],
+      "click": [
+        0.14,
+        0.31
+      ],
+      "correct": true,
+      "elapsed": 22.205667972564697,
+      "output": "CLICK: (x=0.14, y=0.31)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 18,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "open the file",
+      "bbox": [
+        0.33541666666666664,
+        0.12407407407407407,
+        0.6260416666666667,
+        0.17222222222222222
+      ],
+      "click": [
+        0.48,
+        0.14
+      ],
+      "correct": true,
+      "elapsed": 21.135859966278076,
+      "output": "CLICK: (x=0.48, y=0.14)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 19,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "file processing",
+      "bbox": [
+        0.010416666666666666,
+        0.15555555555555556,
+        0.0625,
+        0.22777777777777777
+      ],
+      "click": [
+        0.04,
+        0.18
+      ],
+      "correct": true,
+      "elapsed": 21.27981996536255,
+      "output": "CLICK: (x=0.04, y=0.18)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 20,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "send current page",
+      "bbox": [
+        0.9541666666666667,
+        0.8425925925925926,
+        1.0,
+        0.9185185185185185
+      ],
+      "click": [
+        0.98,
+        0.82
+      ],
+      "correct": false,
+      "elapsed": 24.33718705177307,
+      "output": "CLICK: (x=0.98, y=0.82)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 21,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "open the music library",
+      "bbox": [
+        0.0020833333333333333,
+        0.08888888888888889,
+        0.334375,
+        0.16296296296296298
+      ],
+      "click": [
+        0.16,
+        0.13
+      ],
+      "correct": true,
+      "elapsed": 22.61167001724243,
+      "output": "CLICK: (x=0.16, y=0.13)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 22,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "input method toolbar",
+      "bbox": [
+        0.9197916666666667,
+        0.9185185185185185,
+        0.984375,
+        1.0
+      ],
+      "click": [
+        0.93,
+        0.96
+      ],
+      "correct": true,
+      "elapsed": 21.94265604019165,
+      "output": "CLICK: (x=0.93, y=0.96)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 23,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "search for software ",
+      "bbox": [
+        0.32916666666666666,
+        0.0,
+        0.9552083333333333,
+        0.07037037037037037
+      ],
+      "click": [
+        0.64,
+        0.04
+      ],
+      "correct": true,
+      "elapsed": 20.0929057598114,
+      "output": "CLICK: (x=0.64, y=0.04)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 24,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "set up onedrive",
+      "bbox": [
+        0.30833333333333335,
+        0.29074074074074074,
+        0.4375,
+        0.3592592592592593
+      ],
+      "click": [
+        0.37,
+        0.32
+      ],
+      "correct": true,
+      "elapsed": 15.967713117599487,
+      "output": "CLICK: (x=0.37, y=0.32)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 25,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "check microphone",
+      "bbox": [
+        0.0033250207813798837,
+        0.48283261802575106,
+        0.2601828761429759,
+        0.51931330472103
+      ],
+      "click": [
+        0.06,
+        0.5
+      ],
+      "correct": true,
+      "elapsed": 16.005051136016846,
+      "output": "CLICK: (x=0.06, y=0.50)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 26,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "microsoft edge",
+      "bbox": [
+        0.0020833333333333333,
+        0.18518518518518517,
+        0.08333333333333333,
+        0.35555555555555557
+      ],
+      "click": [
+        0.04,
+        0.26
+      ],
+      "correct": true,
+      "elapsed": 14.572376251220703,
+      "output": "CLICK: (x=0.04, y=0.26)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 27,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "search bar",
+      "bbox": [
+        0.0,
+        0.9222222222222223,
+        0.3625,
+        1.0
+      ],
+      "click": [
+        0.1,
+        0.96
+      ],
+      "correct": true,
+      "elapsed": 14.863017082214355,
+      "output": "CLICK: (x=0.10, y=0.96)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 28,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "see full forecast",
+      "bbox": [
+        0.519134775374376,
+        0.2812834224598931,
+        0.6264559068219634,
+        0.31122994652406416
+      ],
+      "click": [
+        0.56,
+        0.29
+      ],
+      "correct": true,
+      "elapsed": 14.938812971115112,
+      "output": "CLICK: (x=0.56, y=0.29)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 29,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "back to the previous page",
+      "bbox": [
+        0.0,
+        0.03888888888888889,
+        0.052083333333333336,
+        0.1111111111111111
+      ],
+      "click": [
+        0.04,
+        0.08
+      ],
+      "correct": true,
+      "elapsed": 18.254914045333862,
+      "output": "CLICK: (x=0.04, y=0.08)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 30,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "choose standard mode",
+      "bbox": [
+        0.004166666666666667,
+        0.22598870056497175,
+        0.51875,
+        0.2919020715630885
+      ],
+      "click": [
+        0.27,
+        0.25
+      ],
+      "correct": true,
+      "elapsed": 13.795405149459839,
+      "output": "CLICK: (x=0.27, y=0.25)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 31,
+      "data_source": "windows",
+      "data_type": "text",
+      "instruction": "search for files on disk e:",
+      "bbox": [
+        0.6395833333333333,
+        0.08333333333333333,
+        0.9989583333333333,
+        0.14444444444444443
+      ],
+      "click": [
+        0.82,
+        0.11
+      ],
+      "correct": true,
+      "elapsed": 14.688251972198486,
+      "output": "CLICK: (x=0.82, y=0.11)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 32,
+      "data_source": "windows",
+      "data_type": "icon",
+      "instruction": "delete the downloaded file",
+      "bbox": [
+        0.93125,
+        0.23333333333333334,
+        0.9760416666666667,
+        0.3296296296296296
+      ],
+      "click": [
+        0.95,
+        0.27
+      ],
+      "correct": true,
+      "elapsed": 14.408360958099365,
+      "output": "CLICK: (x=0.95, y=0.27)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 33,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "view the always allowed apps",
+      "bbox": [
+        0.0007473841554559044,
+        0.7145135566188198,
+        0.29596412556053814,
+        0.7639553429027113
+      ],
+      "click": [
+        0.15,
+        0.74
+      ],
+      "correct": true,
+      "elapsed": 14.256673097610474,
+      "output": "CLICK: (x=0.15, y=0.74)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 34,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "run the code",
+      "bbox": [
+        0.6343478260869565,
+        0.03647798742138365,
+        0.6582608695652173,
+        0.06729559748427673
+      ],
+      "click": [
+        0.96,
+        0.62
+      ],
+      "correct": false,
+      "elapsed": 15.084269046783447,
+      "output": "CLICK: (x=0.96, y=0.62)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 35,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "adjust the brightness",
+      "bbox": [
+        0.04563492063492063,
+        0.1552,
+        0.9444444444444444,
+        0.2
+      ],
+      "click": [
+        0.73,
+        0.16
+      ],
+      "correct": true,
+      "elapsed": 15.166451930999756,
+      "output": "CLICK: (x=0.73, y=0.16)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 36,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "create the new service",
+      "bbox": [
+        0.6763826606875935,
+        0.5607255520504731,
+        0.7862481315396114,
+        0.5985804416403786
+      ],
+      "click": [
+        0.72,
+        0.57
+      ],
+      "correct": true,
+      "elapsed": 13.940171957015991,
+      "output": "CLICK: (x=0.72, y=0.57)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 37,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "buy betterdisplay pro",
+      "bbox": [
+        0.24008207934336526,
+        0.8323615160349854,
+        0.4883720930232558,
+        0.8965014577259475
+      ],
+      "click": [
+        0.36,
+        0.86
+      ],
+      "correct": true,
+      "elapsed": 14.467628002166748,
+      "output": "CLICK: (x=0.36, y=0.86)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 38,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "add a send message action",
+      "bbox": [
+        0.706081081081081,
+        0.4511494252873563,
+        0.982545045045045,
+        0.492816091954023
+      ],
+      "click": [
+        0.85,
+        0.47
+      ],
+      "correct": true,
+      "elapsed": 13.604443073272705,
+      "output": "CLICK: (x=0.85, y=0.47)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 39,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "search in emails",
+      "bbox": [
+        0.8989690721649485,
+        0.0,
+        1.0,
+        0.0791044776119403
+      ],
+      "click": [
+        0.94,
+        0.42
+      ],
+      "correct": false,
+      "elapsed": 16.324666023254395,
+      "output": "CLICK: (x=0.94, y=0.42)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 40,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "check python interpreter",
+      "bbox": [
+        0.0,
+        0.3028571428571429,
+        0.2594444444444444,
+        0.33714285714285713
+      ],
+      "click": [
+        0.13,
+        0.31
+      ],
+      "correct": true,
+      "elapsed": 14.122302293777466,
+      "output": "CLICK: (x=0.13, y=0.31)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 41,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "save file",
+      "bbox": [
+        0.256140350877193,
+        0.001287001287001287,
+        0.291812865497076,
+        0.04054054054054054
+      ],
+      "click": [
+        0.34,
+        0.65
+      ],
+      "correct": false,
+      "elapsed": 13.984787940979004,
+      "output": "CLICK: (x=0.34, y=0.65)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 42,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "open maps app",
+      "bbox": [
+        0.3544973544973545,
+        0.26629327902240324,
+        0.4150132275132275,
+        0.38238289205702647
+      ],
+      "click": [
+        0.38,
+        0.33
+      ],
+      "correct": true,
+      "elapsed": 14.340881824493408,
+      "output": "CLICK: (x=0.38, y=0.33)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 43,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "add a sunburst chart",
+      "bbox": [
+        0.5140350877192983,
+        0.5115532734274711,
+        0.6380116959064327,
+        0.6546854942233633
+      ],
+      "click": [
+        0.57,
+        0.57
+      ],
+      "correct": true,
+      "elapsed": 15.184427738189697,
+      "output": "CLICK: (x=0.57, y=0.57)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 44,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "create a new document",
+      "bbox": [
+        0.22152690863579474,
+        0.9008908685968819,
+        0.3723404255319149,
+        0.955456570155902
+      ],
+      "click": [
+        0.29,
+        0.93
+      ],
+      "correct": true,
+      "elapsed": 13.968036890029907,
+      "output": "CLICK: (x=0.29, y=0.93)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 45,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "use the screen mirroring",
+      "bbox": [
+        0.7541254125412541,
+        0.2217741935483871,
+        0.9603960396039604,
+        0.3924731182795699
+      ],
+      "click": [
+        0.85,
+        0.31
+      ],
+      "correct": true,
+      "elapsed": 14.378369092941284,
+      "output": "CLICK: (x=0.85, y=0.31)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 46,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "check junk emails",
+      "bbox": [
+        0.0010471204188481676,
+        0.6843283582089552,
+        0.1968586387434555,
+        0.7313432835820896
+      ],
+      "click": [
+        0.09,
+        0.71
+      ],
+      "correct": true,
+      "elapsed": 15.429908990859985,
+      "output": "CLICK: (x=0.09, y=0.71)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 47,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "cancel showing plots in tool windows",
+      "bbox": [
+        0.28801331853496115,
+        0.0994277539341917,
+        0.5099889012208657,
+        0.148068669527897
+      ],
+      "click": [
+        0.3,
+        0.12
+      ],
+      "correct": true,
+      "elapsed": 13.95270299911499,
+      "output": "CLICK: (x=0.30, y=0.12)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 48,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "translation languages setting",
+      "bbox": [
+        0.25037369207772797,
+        0.9229323308270677,
+        0.5029895366218237,
+        0.9633458646616542
+      ],
+      "click": [
+        0.38,
+        0.94
+      ],
+      "correct": true,
+      "elapsed": 14.065467119216919,
+      "output": "CLICK: (x=0.38, y=0.94)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 49,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "sign in",
+      "bbox": [
+        0.3393782383419689,
+        0.8366619115549215,
+        0.6658031088082902,
+        0.8801711840228246
+      ],
+      "click": [
+        0.5,
+        0.86
+      ],
+      "correct": true,
+      "elapsed": 14.184101819992065,
+      "output": "CLICK: (x=0.50, y=0.86)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 50,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "view files from airdrop",
+      "bbox": [
+        0.0125,
+        0.13440860215053763,
+        0.148125,
+        0.17652329749103943
+      ],
+      "click": [
+        0.08,
+        0.16
+      ],
+      "correct": true,
+      "elapsed": 14.869786739349365,
+      "output": "CLICK: (x=0.08, y=0.16)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 51,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "check app limits",
+      "bbox": [
+        0.0007473841554559044,
+        0.6108452950558214,
+        0.296711509715994,
+        0.664274322169059
+      ],
+      "click": [
+        0.15,
+        0.63
+      ],
+      "correct": true,
+      "elapsed": 14.923322677612305,
+      "output": "CLICK: (x=0.15, y=0.63)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 52,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "add a new package",
+      "bbox": [
+        0.2824639289678135,
+        0.1825962910128388,
+        0.3102108768035516,
+        0.21897289586305277
+      ],
+      "click": [
+        0.96,
+        0.2
+      ],
+      "correct": false,
+      "elapsed": 17.87853503227234,
+      "output": "CLICK: (x=0.96, y=0.20)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 53,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "switch to device",
+      "bbox": [
+        0.09649122807017543,
+        0.06333739342265529,
+        0.18762183235867447,
+        0.0907429963459196
+      ],
+      "click": [
+        0.14,
+        0.67
+      ],
+      "correct": false,
+      "elapsed": 15.472035884857178,
+      "output": "CLICK: (x=0.14, y=0.67)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 54,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "share my location",
+      "bbox": [
+        0.01608187134502924,
+        0.9518879415347138,
+        0.1539961013645224,
+        0.9859926918392204
+      ],
+      "click": null,
+      "correct": false,
+      "elapsed": 181.7108199596405,
+      "output": "TIMEOUT"
+    },
+    {
+      "idx": 55,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "turn wifi off",
+      "bbox": [
+        0.746996996996997,
+        0.20031545741324921,
+        0.9136636636636637,
+        0.23501577287066247
+      ],
+      "click": [
+        0.83,
+        0.22
+      ],
+      "correct": true,
+      "elapsed": 32.28721213340759,
+      "output": "CLICK: (x=0.83, y=0.22)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 56,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "enlarge font size",
+      "bbox": [
+        0.3,
+        0.08622908622908623,
+        0.3368421052631579,
+        0.12290862290862291
+      ],
+      "click": [
+        0.35,
+        101.0
+      ],
+      "correct": false,
+      "elapsed": 26.90182590484619,
+      "output": "CLICK: (x=0.35, y=101)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "idx": 57,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "open paper named flamingo",
+      "bbox": [
+        0.328740157480315,
+        0.13191489361702127,
+        0.4678477690288714,
+        0.39361702127659576
+      ],
+      "click": [
+        0.41,
+        0.27
+      ],
+      "correct": true,
+      "elapsed": 23.633389949798584,
+      "output": "CLICK: (x=0.41, y=0.27)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 58,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "open mind2web folder\u00df",
+      "bbox": [
+        0.39969604863221886,
+        0.26095238095238094,
+        0.5091185410334347,
+        0.41619047619047617
+      ],
+      "click": [
+        0.45,
+        0.31
+      ],
+      "correct": true,
+      "elapsed": 24.641284227371216,
+      "output": "CLICK: (x=0.45, y=0.31)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 59,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "advanced setting",
+      "bbox": [
+        0.7832585949177877,
+        0.9229323308270677,
+        0.92152466367713,
+        0.9642857142857143
+      ],
+      "click": [
+        0.86,
+        0.94
+      ],
+      "correct": true,
+      "elapsed": 22.192709922790527,
+      "output": "CLICK: (x=0.86, y=0.94)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 60,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "download fantastical from icloud",
+      "bbox": [
+        0.8983983983983984,
+        0.897080291970803,
+        0.9494494494494494,
+        0.9693430656934306
+      ],
+      "click": [
+        0.94,
+        0.93
+      ],
+      "correct": true,
+      "elapsed": 24.836582899093628,
+      "output": "CLICK: (x=0.94, y=0.93)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 61,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "siri",
+      "bbox": [
+        0.75,
+        0.012380952380952381,
+        0.7955927051671733,
+        0.058095238095238096
+      ],
+      "click": [
+        0.8,
+        33.0
+      ],
+      "correct": false,
+      "elapsed": 26.32140803337097,
+      "output": "CLICK: (x=0.80, y=33)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 62,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "jump to the spot that's clicked",
+      "bbox": [
+        0.3746268656716418,
+        0.5575842696629213,
+        0.6902985074626866,
+        0.586376404494382
+      ],
+      "click": [
+        0.39,
+        0.57
+      ],
+      "correct": true,
+      "elapsed": 22.640780210494995,
+      "output": "CLICK: (x=0.39, y=0.57)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 63,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "check file colors",
+      "bbox": [
+        0.2885682574916759,
+        0.24964234620886983,
+        0.390677025527192,
+        0.2854077253218884
+      ],
+      "click": [
+        0.34,
+        0.26
+      ],
+      "correct": true,
+      "elapsed": 26.70103907585144,
+      "output": "CLICK: (x=0.34, y=0.26)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 64,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "switch to dark mode",
+      "bbox": [
+        0.5014925373134328,
+        0.10182584269662921,
+        0.6074626865671642,
+        0.19592696629213482
+      ],
+      "click": [
+        0.55,
+        0.14
+      ],
+      "correct": true,
+      "elapsed": 23.53523302078247,
+      "output": "CLICK: (x=0.55, y=0.14)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 65,
+      "data_source": "macos",
+      "data_type": "icon",
+      "instruction": "check the date and time",
+      "bbox": [
+        0.75,
+        0.0030864197530864196,
+        0.9982078853046595,
+        0.09104938271604938
+      ],
+      "click": [
+        0.86,
+        0.04
+      ],
+      "correct": true,
+      "elapsed": 23.922433614730835,
+      "output": "CLICK: (x=0.86, y=0.04)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 66,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "check the new ios 17.2.1",
+      "bbox": [
+        0.03504273504273504,
+        0.3542654028436019,
+        0.9615384615384616,
+        0.4099526066350711
+      ],
+      "click": [
+        0.5,
+        0.38
+      ],
+      "correct": true,
+      "elapsed": 24.57297372817993,
+      "output": "CLICK: (x=0.50, y=0.38)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 67,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "open result file",
+      "bbox": [
+        0.326271186440678,
+        0.18536585365853658,
+        0.4076271186440678,
+        0.35304878048780486
+      ],
+      "click": [
+        0.37,
+        0.25
+      ],
+      "correct": true,
+      "elapsed": 23.95136594772339,
+      "output": "CLICK: (x=0.37, y=0.25)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 68,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "carplay",
+      "bbox": [
+        0.040170940170940174,
+        0.4514218009478673,
+        0.9598290598290599,
+        0.5027646129541864
+      ],
+      "click": [
+        0.5,
+        0.47
+      ],
+      "correct": true,
+      "elapsed": 24.350940942764282,
+      "output": "CLICK: (x=0.50, y=0.47)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 69,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "search",
+      "bbox": [
+        0.7495726495726496,
+        0.06635071090047394,
+        0.8247863247863247,
+        0.09794628751974724
+      ],
+      "click": [
+        0.76,
+        0.08
+      ],
+      "correct": true,
+      "elapsed": 22.833122968673706,
+      "output": "CLICK: (x=0.76, y=0.08)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 70,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "check the weather",
+      "bbox": [
+        0.09449152542372881,
+        0.0475609756097561,
+        0.34915254237288135,
+        0.4091463414634146
+      ],
+      "click": [
+        0.23,
+        0.12
+      ],
+      "correct": true,
+      "elapsed": 25.845502853393555,
+      "output": "CLICK: (x=0.23, y=0.12)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 71,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "search",
+      "bbox": [
+        0.07627118644067797,
+        0.04085365853658537,
+        0.10889830508474577,
+        0.08109756097560976
+      ],
+      "click": [
+        0.1,
+        0.06
+      ],
+      "correct": true,
+      "elapsed": 23.530213117599487,
+      "output": "CLICK: (x=0.10, y=0.06)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 72,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "iphone settings",
+      "bbox": [
+        0.7658119658119659,
+        0.5525276461295419,
+        0.9256410256410257,
+        0.6512638230647709
+      ],
+      "click": [
+        0.84,
+        0.6
+      ],
+      "correct": true,
+      "elapsed": 29.1584529876709,
+      "output": "CLICK: (x=0.84, y=0.6)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "idx": 73,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "switch to 0.5x",
+      "bbox": [
+        0.3974358974358974,
+        0.6970774091627172,
+        0.4982905982905983,
+        0.7401263823064771
+      ],
+      "click": [
+        0.45,
+        0.72
+      ],
+      "correct": true,
+      "elapsed": 23.246506929397583,
+      "output": "CLICK: (x=0.45, y=0.72)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 74,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "settings",
+      "bbox": [
+        0.009745762711864408,
+        0.9189024390243903,
+        0.04364406779661017,
+        0.9658536585365853
+      ],
+      "click": [
+        0.28,
+        0.93
+      ],
+      "correct": false,
+      "elapsed": 24.6612229347229,
+      "output": "CLICK: (x=0.28, y=0.93)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 75,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "view icloud",
+      "bbox": [
+        0.040170940170940174,
+        0.5703001579778831,
+        0.9581196581196582,
+        0.6232227488151659
+      ],
+      "click": [
+        0.5,
+        0.6
+      ],
+      "correct": true,
+      "elapsed": 23.89657211303711,
+      "output": "CLICK: (x=0.50, y=0.60)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 76,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "add funds to apple id",
+      "bbox": [
+        0.002564102564102564,
+        0.4332543443917852,
+        0.9957264957264957,
+        0.4861769352290679
+      ],
+      "click": [
+        0.5,
+        0.46
+      ],
+      "correct": true,
+      "elapsed": 24.55991220474243,
+      "output": "CLICK: (x=0.50, y=0.46)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 77,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "focus mode",
+      "bbox": [
+        0.07264957264957266,
+        0.45813586097946285,
+        0.48205128205128206,
+        0.5462085308056872
+      ],
+      "click": [
+        0.28,
+        0.5
+      ],
+      "correct": true,
+      "elapsed": 23.848480701446533,
+      "output": "CLICK: (x=0.28, y=0.50)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 78,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "view iphone storage",
+      "bbox": [
+        0.04188034188034188,
+        0.5983412322274881,
+        0.9581196581196582,
+        0.6481042654028436
+      ],
+      "click": [
+        0.5,
+        0.62
+      ],
+      "correct": true,
+      "elapsed": 24.123358011245728,
+      "output": "CLICK: (x=0.50, y=0.62)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 79,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "my account",
+      "bbox": [
+        0.8555555555555555,
+        0.11611374407582939,
+        0.947008547008547,
+        0.15600315955766192
+      ],
+      "click": [
+        0.9,
+        0.13
+      ],
+      "correct": true,
+      "elapsed": 25.48962092399597,
+      "output": "CLICK: (x=0.90, y=0.13)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 80,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "add an event",
+      "bbox": [
+        0.1444915254237288,
+        0.042682926829268296,
+        0.175,
+        0.08475609756097562
+      ],
+      "click": [
+        0.16,
+        0.07
+      ],
+      "correct": true,
+      "elapsed": 28.303942918777466,
+      "output": "CLICK: (x=0.16, y=0.07)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 81,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "menu",
+      "bbox": [
+        0.01694915254237288,
+        0.03902439024390244,
+        0.05084745762711865,
+        0.07926829268292683
+      ],
+      "click": [
+        0.5,
+        0.02
+      ],
+      "correct": false,
+      "elapsed": 25.975173950195312,
+      "output": "CLICK: (x=0.50, y=0.02)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 82,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "adjust the voice",
+      "bbox": [
+        0.9042372881355932,
+        0.2676829268292683,
+        0.9635593220338983,
+        0.4420731707317073
+      ],
+      "click": [
+        0.9,
+        0.22
+      ],
+      "correct": false,
+      "elapsed": 31.928499221801758,
+      "output": "CLICK: (x=0.90, y=0.22)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 83,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "more information",
+      "bbox": [
+        0.9635593220338983,
+        0.03536585365853658,
+        0.9961864406779661,
+        0.08231707317073171
+      ],
+      "click": [
+        0.5,
+        0.06
+      ],
+      "correct": false,
+      "elapsed": 30.108792781829834,
+      "output": "CLICK: (x=0.50, y=0.06)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 84,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "choose the pjlab-guest",
+      "bbox": [
+        0.038461538461538464,
+        0.3909952606635071,
+        0.9598290598290599,
+        0.44826224328593994
+      ],
+      "click": [
+        0.52,
+        0.42
+      ],
+      "correct": true,
+      "elapsed": 31.119808197021484,
+      "output": "CLICK: (x=0.52, y=0.42)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 85,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "last 10 days data",
+      "bbox": [
+        0.4931623931623932,
+        0.4537914691943128,
+        0.917094017094017,
+        0.48854660347551343
+      ],
+      "click": [
+        0.71,
+        0.47
+      ],
+      "correct": true,
+      "elapsed": 22.970454931259155,
+      "output": "CLICK: (x=0.71, y=0.47)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 86,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "cancel the event",
+      "bbox": [
+        0.02735042735042735,
+        0.08293838862559241,
+        0.18888888888888888,
+        0.11848341232227488
+      ],
+      "click": [
+        0.1,
+        0.09
+      ],
+      "correct": true,
+      "elapsed": 21.505030870437622,
+      "output": "CLICK: (x=0.10, y=0.09)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 87,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "back to 2023",
+      "bbox": [
+        0.009401709401709401,
+        0.06477093206951026,
+        0.18717948717948718,
+        0.0971563981042654
+      ],
+      "click": [
+        0.12,
+        0.08
+      ],
+      "correct": true,
+      "elapsed": 21.715873956680298,
+      "output": "CLICK: (x=0.12, y=0.08)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 88,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "set the repeat mode",
+      "bbox": [
+        0.04188034188034188,
+        0.5509478672985783,
+        0.9581196581196582,
+        0.6038704581358609
+      ],
+      "click": [
+        0.83,
+        0.57
+      ],
+      "correct": true,
+      "elapsed": 21.46697497367859,
+      "output": "CLICK: (x=0.83, y=0.57)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 89,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "check the pinned files",
+      "bbox": [
+        0.2584745762711864,
+        0.12073170731707317,
+        0.31440677966101693,
+        0.1975609756097561
+      ],
+      "click": [
+        0.29,
+        0.16
+      ],
+      "correct": true,
+      "elapsed": 19.993667125701904,
+      "output": "CLICK: (x=0.29, y=0.16)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 90,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "calculator",
+      "bbox": [
+        0.5145299145299145,
+        0.5608214849921012,
+        0.7034188034188035,
+        0.6453396524486572
+      ],
+      "click": [
+        0.61,
+        0.61
+      ],
+      "correct": true,
+      "elapsed": 22.349353075027466,
+      "output": "CLICK: (x=0.61, y=0.61)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 91,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "check shared files",
+      "bbox": [
+        0.13220338983050847,
+        0.12073170731707317,
+        0.186864406779661,
+        0.19939024390243903
+      ],
+      "click": [
+        0.16,
+        0.16
+      ],
+      "correct": true,
+      "elapsed": 21.18925905227661,
+      "output": "CLICK: (x=0.16, y=0.16)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 92,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "invert the lens",
+      "bbox": [
+        0.8247863247863247,
+        0.8313586097946287,
+        0.9487179487179487,
+        0.891785150078989
+      ],
+      "click": [
+        0.05,
+        0.56
+      ],
+      "correct": false,
+      "elapsed": 32.63753294944763,
+      "output": "CLICK: (x=0.05, y=0.56)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 93,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "switch to portrait mode",
+      "bbox": [
+        0.6145299145299146,
+        0.7657977883096366,
+        0.8051282051282052,
+        0.8088467614533965
+      ],
+      "click": [
+        0.71,
+        0.79
+      ],
+      "correct": true,
+      "elapsed": 22.801006078720093,
+      "output": "CLICK: (x=0.71, y=0.79)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 94,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "sign in",
+      "bbox": [
+        0.936864406779661,
+        0.8914634146341464,
+        0.9927966101694915,
+        0.947560975609756
+      ],
+      "click": [
+        0.96,
+        0.91
+      ],
+      "correct": true,
+      "elapsed": 17.1195809841156,
+      "output": "CLICK: (x=0.96, y=0.91)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "idx": 95,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "adjust end time",
+      "bbox": [
+        0.7333333333333333,
+        0.4107424960505529,
+        0.9222222222222223,
+        0.45458135860979465
+      ],
+      "click": [
+        0.82,
+        0.43
+      ],
+      "correct": true,
+      "elapsed": 19.50241208076477,
+      "output": "CLICK: (x=0.82, y=0.43)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 96,
+      "data_source": "ios",
+      "data_type": "text",
+      "instruction": "search bar",
+      "bbox": [
+        0.3495762711864407,
+        0.04390243902439024,
+        0.7088983050847457,
+        0.09085365853658536
+      ],
+      "click": [
+        0.53,
+        0.07
+      ],
+      "correct": true,
+      "elapsed": 18.11042881011963,
+      "output": "CLICK: (x=0.53, y=0.07)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 97,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "add an event",
+      "bbox": [
+        0.8948717948717949,
+        0.0679304897314376,
+        0.9615384615384616,
+        0.09518167456556083
+      ],
+      "click": [
+        0.92,
+        0.08
+      ],
+      "correct": true,
+      "elapsed": 23.283312797546387,
+      "output": "CLICK: (x=0.92, y=0.08)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 98,
+      "data_source": "ios",
+      "data_type": "icon",
+      "instruction": "select source language",
+      "bbox": [
+        0.4563559322033898,
+        0.0475609756097561,
+        0.49533898305084745,
+        0.11768292682926829
+      ],
+      "click": [
+        0.36,
+        0.08
+      ],
+      "correct": false,
+      "elapsed": 19.112842798233032,
+      "output": "CLICK: (x=0.36, y=0.08)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "idx": 99,
+      "data_source": "macos",
+      "data_type": "text",
+      "instruction": "choose apple chancery",
+      "bbox": [
+        0.11960326721120186,
+        0.8624678663239075,
+        0.5945157526254375,
+        0.9048843187660668
+      ],
+      "click": null,
+      "correct": false,
+      "elapsed": 183.6227421760559,
+      "output": "TIMEOUT"
+    }
+  ]
+}

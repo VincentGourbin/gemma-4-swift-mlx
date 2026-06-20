@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_295.png
+  Image preprocessee: [1, 3, 624, 912]
+  Total: 1 image(s), batch: [1, 3, 624, 912]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258880, 258880, 258882, 107, 14070, 32579, 563, 672, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 298
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what airline is this?
+---
+This is a **Lufthansa** aircraft.
+
+You can see the name "Lufthansa" clearly on the fuselage, and the tail fin features the Lufthansa logo.<turn|>
+
+--- Stats ---
+Tokens: 34
+Temps: 3.03s, Vitesse: 11.2 t/s
+GPU pic: 6033 Mo

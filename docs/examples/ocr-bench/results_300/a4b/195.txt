@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_195.png
+  Image preprocessee: [1, 3, 480, 720]
+  Total: 1 image(s), batch: [1, 3, 480, 720]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [1816, 528, 506, 2471, 5467, 236761, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 325
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is the value for Total Fat of per 100g/ml? Answer this question using the text in the image directly.
+---
+The value for Fat per 100g is 11.5g.<turn|>
+
+--- Stats ---
+Tokens: 19
+Temps: 2.59s, Vitesse: 7.3 t/s
+GPU pic: 16308 Mo

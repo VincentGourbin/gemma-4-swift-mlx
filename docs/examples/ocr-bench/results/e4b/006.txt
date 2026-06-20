@@ -1,0 +1,26 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample/img_006.png
+  Image preprocessee: [1, 3, 672, 960]
+  Total: 1 image(s), batch: [1, 3, 672, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [1855, 7488, 1548, 529, 7767, 236772, 236770, 236819, 3636, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 307
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Which region had the second largest number of COVID-19 cases?
+---
+Based on the bar chart, the regions and their corresponding number of cases are:
+
+1. **Minsk:** 4,090
+2. **Vitebsk Oblast:** 1,935
+3. **Minsk Oblast:** 1,206
+
+
+--- Stats ---
+Tokens: 60
+Temps: 4.81s, Vitesse: 12.5 t/s
+GPU pic: 6058 Mo

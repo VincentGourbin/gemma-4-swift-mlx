@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_071.png
+  Image preprocessee: [1, 3, 960, 672]
+  Total: 1 image(s), batch: [1, 3, 960, 672]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258882, 107, 4420, 1602, 6486, 9410, 529, 28460, 195458, 7499, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 301
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: When did Surrender of Burgoyne happen
+---
+Based on the image provided, the "Surrender of Burgoyne" happened on **Oct. 17**.<turn|>
+
+--- Stats ---
+Tokens: 24
+Temps: 2.35s, Vitesse: 10.2 t/s
+GPU pic: 6043 Mo

@@ -1,0 +1,22 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_123.png
+  Image preprocessee: [1, 3, 144, 240]
+  Total: 1 image(s), batch: [1, 3, 144, 240]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [529, 506, 6581, 528, 506, 2471, 1699, 115226, 6518, 236761, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 308
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+---
+The expression in the image is:
+$$x = -\frac{2}{7}$$<turn|>
+
+--- Stats ---
+Tokens: 19
+Temps: 1.96s, Vitesse: 9.7 t/s
+GPU pic: 6054 Mo

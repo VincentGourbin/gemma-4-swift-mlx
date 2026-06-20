@@ -1,0 +1,47 @@
+--- DiffusionGemma loader (Phase 4 experimental) ---
+Repertoire : /Users/vincent/Library/Caches/models/google/diffusiongemma-26B-A4B-it
+Modele charge en 7.7s
+Config: hidden=2816, layers=30, canvas=256, vocab=262144
+GPU: 49255 Mo actifs, 49255 Mo pic
+Image preprocessee : [1, 3, 624, 816]
+Prompt tokens : 315
+Premiers tokens : [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880]
+
+--- Generation ---
+max_blocks=1, canvas_length=256, max_denoising_steps=48
+temperature schedule : 0.4 -> 0.8, seed=0
+---
+[canvas 0] To find the average of the last three values in the green graph, we first identify the values for the last three years on the x-axis:
+
+1.  **2013:** 29
+2.  **2014:** 30
+3.  **2015:** 27
+
+Now, calculate the average:
+$\text{Average} = \frac{29 + 30 + 27}{3}$
+$\text{Average} = \frac{86}{3}$
+$\text{Average} \approx 28.666...$
+
+Rounding to one decimal place, the average is **28.7**.<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Output complete ---
+To find the average of the last three values in the green graph, we first identify the values for the last three years on the x-axis:
+
+1.  **2013:** 29
+2.  **2014:** 30
+3.  **2015:** 27
+
+Now, calculate the average:
+$\text{Average} = \frac{29 + 30 + 27}{3}$
+$\text{Average} = \frac{86}{3}$
+$\text{Average} \approx 28.666...$
+
+Rounding to one decimal place, the average is **28.7**.<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>
+
+--- Stats ---
+Tokens generes : 256
+Canvases : 1
+Decoder forwards : 7
+Temps : 8.61s
+Vitesse : 29.7 tok/s (1.23s/step)
+GPU pic : 50870 Mo

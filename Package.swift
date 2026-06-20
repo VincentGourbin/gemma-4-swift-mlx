@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "Gemma4Swift", targets: ["Gemma4Swift"]),
         .executable(name: "gemma4-cli", targets: ["Gemma4CLI"]),
+        .executable(name: "gemma4-bench-ui", targets: ["Gemma4BenchUI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
@@ -40,6 +41,16 @@ let package = Package(
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "MLXProfiler", package: "swift-mlx-profiler"),
+            ]
+        ),
+        .executableTarget(
+            name: "Gemma4BenchUI",
+            dependencies: [
+                "Gemma4Swift",
+                .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
+                .product(name: "MLXLLM", package: "mlx-swift-lm"),
+                .product(name: "Tokenizers", package: "swift-transformers"),
             ]
         ),
         .testTarget(

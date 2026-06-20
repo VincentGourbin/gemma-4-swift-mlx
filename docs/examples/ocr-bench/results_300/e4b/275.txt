@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_275.png
+  Image preprocessee: [1, 3, 672, 912]
+  Total: 1 image(s), batch: [1, 3, 672, 912]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [107, 3689, 563, 5267, 1534, 506, 1156, 2604, 38397, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 302
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What is written between the two red triangles?
+---
+The word written between the two red triangles is **CARLING**.<turn|>
+
+--- Stats ---
+Tokens: 14
+Temps: 1.62s, Vitesse: 8.6 t/s
+GPU pic: 6044 Mo

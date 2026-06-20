@@ -1,0 +1,829 @@
+{
+  "kind": "a4b",
+  "overall": "95/100",
+  "total_time_s": 526.5705387592316,
+  "by_category": {
+    "simple": {
+      "c": 29,
+      "t": 30,
+      "time": 144.26178812980652
+    },
+    "multiple": {
+      "c": 30,
+      "t": 30,
+      "time": 153.6124885082245
+    },
+    "parallel": {
+      "c": 20,
+      "t": 20,
+      "time": 132.48977184295654
+    },
+    "irrelevance": {
+      "c": 16,
+      "t": 20,
+      "time": 96.20649027824402
+    }
+  },
+  "details": [
+    {
+      "id": "simple_327",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.380429267883301,
+      "output_snippet": "FUNCTION_CALL: sports_team.get_schedule(team_name='Manchester United', num_of_games=6, league='Premier League')"
+    },
+    {
+      "id": "simple_57",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.596611976623535,
+      "output_snippet": "FUNCTION_CALL: calculate_cell_density(optical_density=0.6, dilution=5)"
+    },
+    {
+      "id": "simple_12",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.113530874252319,
+      "output_snippet": "FUNCTION_CALL: geometry.circumference(radius=3)"
+    },
+    {
+      "id": "simple_379",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.347101926803589,
+      "output_snippet": "FUNCTION_CALL: get_current_time(location='Sydney', country='Australia')"
+    },
+    {
+      "id": "simple_140",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.029172897338867,
+      "output_snippet": "FUNCTION_CALL: calculate_cagr(initial_value=2000, final_value=3000, period_in_years=4)"
+    },
+    {
+      "id": "simple_125",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.975287914276123,
+      "output_snippet": "FUNCTION_CALL: predict_house_price(area=2500, rooms=5, year=1990, location='San Francisco')"
+    },
+    {
+      "id": "simple_114",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.6048760414123535,
+      "output_snippet": "FUNCTION_CALL: prob_dist.binomial(trials=10, successes=5, p=0.5)"
+    },
+    {
+      "id": "simple_71",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.610228061676025,
+      "output_snippet": "FUNCTION_CALL: generate_DNA_sequence(length=100, preferences=['G', 'C'])"
+    },
+    {
+      "id": "simple_377",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.38935399055481,
+      "output_snippet": "FUNCTION_CALL: get_current_time(city='Sydney', country='Australia')"
+    },
+    {
+      "id": "simple_52",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.724416017532349,
+      "output_snippet": "FUNCTION_CALL: calc_heat_capacity(temp=298, volume=10, gas='air')"
+    },
+    {
+      "id": "simple_346",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.947986125946045,
+      "output_snippet": "FUNCTION_CALL: get_collectables_in_season(game_name='Animal Crossing: New Horizons', season='Spring', item_type='all')"
+    },
+    {
+      "id": "simple_279",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.877017974853516,
+      "output_snippet": "FUNCTION_CALL: instrument_price.get(brand='Fender', model='American Professional II Stratocaster', finish='Rosewood Fini"
+    },
+    {
+      "id": "simple_44",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.016780853271484,
+      "output_snippet": "FUNCTION_CALL: calculate_electric_field_strength(charge=0.01, distance=4)"
+    },
+    {
+      "id": "simple_302",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.068886756896973,
+      "output_snippet": "FUNCTION_CALL: calculate_batting_average(hits=180, at_bats=600, decimal_places=3)"
+    },
+    {
+      "id": "simple_216",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.7411582469940186,
+      "output_snippet": "FUNCTION_CALL: sentiment_analysis(text=\"I love the food here! It's always fresh and delicious.\", language=\"English\")"
+    },
+    {
+      "id": "simple_16",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.760191917419434,
+      "output_snippet": "FUNCTION_CALL: calculus.derivative(function=\"2x^2\", value=1, function_variable=\"x\")"
+    },
+    {
+      "id": "simple_15",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.972465753555298,
+      "output_snippet": "FUNCTION_CALL: integrate(function='x^3', start_x=-2, end_x=3, method='simpson')"
+    },
+    {
+      "id": "simple_47",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.7345757484436035,
+      "output_snippet": "FUNCTION_CALL: get_boiling_melting_points(substance='water', sea_level=5000)"
+    },
+    {
+      "id": "simple_111",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.485328912734985,
+      "output_snippet": "FUNCTION_CALL: random.normalvariate(mu=0, sigma=1)"
+    },
+    {
+      "id": "simple_119",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 6.2537620067596436,
+      "output_snippet": "FUNCTION_CALL: hypothesis_testing.ttest_ind(sample1=[22, 33, 42, 12, 34], sample2=[23, 45, 44, 14, 38], significance_lev"
+    },
+    {
+      "id": "simple_258",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.788363933563232,
+      "output_snippet": "FUNCTION_CALL: mix_paint_color(color1='yellow', color2='blue', lightness=60)"
+    },
+    {
+      "id": "simple_308",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.839909791946411,
+      "output_snippet": "FUNCTION_CALL: sports.match_schedule(team_name='Manchester United', num_matches=5, league='English Premier League')"
+    },
+    {
+      "id": "simple_13",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 4.783926963806152,
+      "output_snippet": "FUNCTION_CALL: calculate_area_under_curve(function=\"y=x^2\", interval=[1, 3])"
+    },
+    {
+      "id": "simple_287",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.912557125091553,
+      "output_snippet": "FUNCTION_CALL: concert.search(genre='classical', location='Los Angeles', date='this weekend', price_range='cheap')"
+    },
+    {
+      "id": "simple_101",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.814472913742065,
+      "output_snippet": "FUNCTION_CALL: calculate_speed(distance=450, time=20, to_unit='km/h')"
+    },
+    {
+      "id": "simple_366",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.899067163467407,
+      "output_snippet": "FUNCTION_CALL: recipe.unit_conversion(value=2, from_unit='tablespoon', to_unit='teaspoon')"
+    },
+    {
+      "id": "simple_332",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.465070009231567,
+      "output_snippet": "FUNCTION_CALL: chess.rating(player_name='Magnus Carlsen', variant='classical')"
+    },
+    {
+      "id": "simple_359",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.729639768600464,
+      "output_snippet": "FUNCTION_CALL: recipe_search(dietary_restriction='Vegetarian', ingredients=['pasta', 'cheese'], servings=2)"
+    },
+    {
+      "id": "simple_214",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.847523212432861,
+      "output_snippet": "FUNCTION_CALL: event_finder.find_upcoming(location='New York, NY', genre='rock', days_ahead=30)"
+    },
+    {
+      "id": "simple_112",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.552093982696533,
+      "output_snippet": "FUNCTION_CALL: calculate_probability(total_outcomes=52, favorable_outcomes=4)"
+    },
+    {
+      "id": "multiple_114",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.229146957397461,
+      "output_snippet": "FUNCTION_CALL: prediction.evolution(species='Homo Sapiens', years=50, model='Darwin')"
+    },
+    {
+      "id": "multiple_150",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 6.116910219192505,
+      "output_snippet": "FUNCTION_CALL: calculate_neuronal_activity(input_synaptic_rate=200, weight=0.5, decay_rate=0.1)"
+    },
+    {
+      "id": "multiple_71",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.807377099990845,
+      "output_snippet": "FUNCTION_CALL: get_population(year=1954, category='veterans')"
+    },
+    {
+      "id": "multiple_1",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.076043128967285,
+      "output_snippet": "FUNCTION_CALL: math.triangle_area_heron(side1=3, side2=4, side3=5)"
+    },
+    {
+      "id": "multiple_194",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.502732753753662,
+      "output_snippet": "FUNCTION_CALL: get_museum_hours(museum_name='Metropolitan Museum of Art', day='Saturday')"
+    },
+    {
+      "id": "multiple_40",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.045880079269409,
+      "output_snippet": "FUNCTION_CALL: electromagnetism.biot_savart_law(current=12, distance=8)"
+    },
+    {
+      "id": "multiple_178",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.608867168426514,
+      "output_snippet": "FUNCTION_CALL: find_card_in_deck(rank='Queen', suit='Hearts')"
+    },
+    {
+      "id": "multiple_108",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.843152046203613,
+      "output_snippet": "FUNCTION_CALL: calc_heat_capacity(temp=298, volume=10)"
+    },
+    {
+      "id": "multiple_87",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.0303428173065186,
+      "output_snippet": "FUNCTION_CALL: games.update.find(game='Cyberpunk 2077', platform='Xbox')"
+    },
+    {
+      "id": "multiple_197",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.5544140338897705,
+      "output_snippet": "FUNCTION_CALL: mutation_type.find(snp_id='rs6034464')"
+    },
+    {
+      "id": "multiple_39",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.056724309921265,
+      "output_snippet": "FUNCTION_CALL: ride_hailing.get_rides(source='New York', destination='Philadelphia', max_cost=50)"
+    },
+    {
+      "id": "multiple_55",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.52670693397522,
+      "output_snippet": "FUNCTION_CALL: stock_forecast(company='Google', days=3)"
+    },
+    {
+      "id": "multiple_86",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.841549873352051,
+      "output_snippet": "FUNCTION_CALL: BoardGameGeek.recommend(numPlayers=2, category='strategy')"
+    },
+    {
+      "id": "multiple_26",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.014872074127197,
+      "output_snippet": "FUNCTION_CALL: game_rewards.get(game='Fortnite', platform='Playstation')"
+    },
+    {
+      "id": "multiple_23",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.476335048675537,
+      "output_snippet": "FUNCTION_CALL: basketball.player_stats.get(player_name='LeBron James', stats_fields=['points', 'assists', 'inutes'])"
+    },
+    {
+      "id": "multiple_97",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.582579851150513,
+      "output_snippet": "FUNCTION_CALL: geometry.area_circle(radius=10)"
+    },
+    {
+      "id": "multiple_24",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.96285605430603,
+      "output_snippet": "FUNCTION_CALL: route_planner.calculate_route(start='London', destination='Edinburgh', method='fastest')"
+    },
+    {
+      "id": "multiple_91",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.645145893096924,
+      "output_snippet": "FUNCTION_CALL: recipe.find(mainIngredient='apple pie', ingredientLimit=5)"
+    },
+    {
+      "id": "multiple_88",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.033365964889526,
+      "output_snippet": "FUNCTION_CALL: video_games.get_player_count(game_title='World of Warcraft', year=2020)"
+    },
+    {
+      "id": "multiple_154",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.605719089508057,
+      "output_snippet": "FUNCTION_CALL: US_president.in_year(year=1861, full_name=True)"
+    },
+    {
+      "id": "multiple_67",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.915238857269287,
+      "output_snippet": "FUNCTION_CALL: translate(text=\"Hello, how are you?\", source_language=\"English\", target_language=\"French\")"
+    },
+    {
+      "id": "multiple_11",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.0517730712890625,
+      "output_snippet": "FUNCTION_CALL: math_roots.quadratic(a=5, b=20, c=-25)"
+    },
+    {
+      "id": "multiple_117",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.332552194595337,
+      "output_snippet": "FUNCTION_CALL: calculate_BMI(weight_kg=70, height_m=1.75)"
+    },
+    {
+      "id": "multiple_137",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.7437379360198975,
+      "output_snippet": "FUNCTION_CALL: lawsuit_search(company='Google', start_date='2021-01-01', location='California', status='ongoing')"
+    },
+    {
+      "id": "multiple_31",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.7119669914245605,
+      "output_snippet": "FUNCTION_CALL: geometry_rectangle.calculate(width=7, length=10)"
+    },
+    {
+      "id": "multiple_96",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.1633899211883545,
+      "output_snippet": "FUNCTION_CALL: solve_quadratic_equation(a=2, b=6, c=5)"
+    },
+    {
+      "id": "multiple_20",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.78550910949707,
+      "output_snippet": "FUNCTION_CALL: sculpture_price.calculate(material='marble', size=3)"
+    },
+    {
+      "id": "multiple_141",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.11779522895813,
+      "output_snippet": "FUNCTION_CALL: lawsuit.check_case(case_id=1234, closed_status=True)"
+    },
+    {
+      "id": "multiple_75",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 4.753881931304932,
+      "output_snippet": "FUNCTION_CALL: paint_color.trends(room='Living room')"
+    },
+    {
+      "id": "multiple_160",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 5.475921869277954,
+      "output_snippet": "FUNCTION_CALL: get_sculpture_info(artist_name='James Plensa', detail=True)"
+    },
+    {
+      "id": "parallel_158",
+      "category": "parallel",
+      "n_calls": 4,
+      "correct": true,
+      "elapsed": 6.45911979675293,
+      "output_snippet": "FUNCTION_CALL: random.normalvariate(mu=5, sigma=2) AND FUNCTION_CALL: random.normalvariate(mu=5, sigma=2) AND FUNCTION_C"
+    },
+    {
+      "id": "parallel_92",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 6.558531761169434,
+      "output_snippet": "FUNCTION_CALL: get_shortest_driving_distance(origin=\"New York City\", destination=\"Los Angeles\", unit=\"miles\") AND FUNCTI"
+    },
+    {
+      "id": "parallel_147",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 7.9593939781188965,
+      "output_snippet": "FUNCTION_CALL: light_travel_time(distance_in_light_years=4.22, speed_of_light=299792458) AND FUNCTION_CALL: light_travel"
+    },
+    {
+      "id": "parallel_49",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 7.06221604347229,
+      "output_snippet": "FUNCTION_CALL: player_status.check(team='RocketLeague', player_id=3142, season=2017) AND FUNCTION_CALL: player_status.ch"
+    },
+    {
+      "id": "parallel_180",
+      "category": "parallel",
+      "n_calls": 8,
+      "correct": true,
+      "elapsed": 10.402554035186768,
+      "output_snippet": "FUNCTION_CALL: stock_price(company='Microsoft', days=30, data_type='Open') AND FUNCTION_CALL: stock_price(company='Micro"
+    },
+    {
+      "id": "parallel_17",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 6.37674617767334,
+      "output_snippet": "FUNCTION_CALL: get_stock_data(symbol='AAPL', data_points=['price', 'volume']) AND FUNCTION_CALL: get_stock_data(symbol='"
+    },
+    {
+      "id": "parallel_11",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.394240617752075,
+      "output_snippet": "FUNCTION_CALL: ml.predict_house_price(location='New York', size=3000) AND FUNCTION_CALL: ml.predict_house_price(location"
+    },
+    {
+      "id": "parallel_169",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 6.93669319152832,
+      "output_snippet": "FUNCTION_CALL: calculate_discounted_cash_flow(coupon_payment=50, period=5, discount_rate=0.05, face_value=1000) AND FUNC"
+    },
+    {
+      "id": "parallel_58",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.274022102355957,
+      "output_snippet": "FUNCTION_CALL: get_exchange_rate(base_currency='USD', target_currency='AUD') AND FUNCTION_CALL: get_exchange_rate(base_c"
+    },
+    {
+      "id": "parallel_197",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 6.018001079559326,
+      "output_snippet": "FUNCTION_CALL: lawsuit_info(case_number='12345ABC', year=2018, location='New York') AND FUNCTION_CALL: lawsuit_info(case"
+    },
+    {
+      "id": "parallel_74",
+      "category": "parallel",
+      "n_calls": 4,
+      "correct": true,
+      "elapsed": 6.676133155822754,
+      "output_snippet": "FUNCTION_CALL: get_prime_factors(number=4567, formatted=True) AND FUNCTION_CALL: get_prime_factors(number=7890, formatte"
+    },
+    {
+      "id": "parallel_20",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 6.648074150085449,
+      "output_snippet": "FUNCTION_CALL: loan_eligibility_check(financial_institution='HSBC', loan_amount=500000, annual_income=100000) AND FUNCTI"
+    },
+    {
+      "id": "parallel_59",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.835835218429565,
+      "output_snippet": "FUNCTION_CALL: get_conversion_cost(amount=15000, from_currency='Euro', to_currency='dollars') AND FUNCTION_CALL: get_con"
+    },
+    {
+      "id": "parallel_25",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.341809988021851,
+      "output_snippet": "FUNCTION_CALL: lawsuit.lookup(company_name='Dara Inc', year=2019) AND FUNCTION_CALL: lawsuit.lookup(company_name='Dara I"
+    },
+    {
+      "id": "parallel_97",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 6.4594690799713135,
+      "output_snippet": "FUNCTION_CALL: calculate_resonant_frequency(inductance=0.005, capacitance=0.0000001, round_off=3) AND FUNCTION_CALL: cal"
+    },
+    {
+      "id": "parallel_71",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.954373836517334,
+      "output_snippet": "FUNCTION_CALL: calculate_derivative(function='3x^3 - 2x^2 + 5x - 7', x_value=4) AND FUNCTION_CALL: calculate_derivative("
+    },
+    {
+      "id": "parallel_116",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 6.2977330684661865,
+      "output_snippet": "FUNCTION_CALL: calculate_genotype_frequency(allele_frequency=0.7, genotype='AA') AND FUNCTION_CALL: calculate_genotype_f"
+    },
+    {
+      "id": "parallel_162",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 7.54595422744751,
+      "output_snippet": "FUNCTION_CALL: probability_of_event(success_outcomes=4, total_outcomes=52, format_as_ratio=false) AND FUNCTION_CALL: pro"
+    },
+    {
+      "id": "parallel_93",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 7.4123289585113525,
+      "output_snippet": "FUNCTION_CALL: route.estimate_time(start_location='New York', end_location='Miami', stops=['Philadelphia', 'Washington D"
+    },
+    {
+      "id": "parallel_41",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 5.876541376113892,
+      "output_snippet": "FUNCTION_CALL: find_music_instrument_store(location='San Francisco, CA', instruments=['Yamaha acoustic guitar', 'Kawai p"
+    },
+    {
+      "id": "irrelevance_94",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 5.445486068725586,
+      "output_snippet": "NO_CALL: The available tool requires a specific case_id to retrieve information, and the user's question is a general in"
+    },
+    {
+      "id": "irrelevance_90",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.709215879440308,
+      "output_snippet": "NO_CALL: The user's question is a general knowledge inquiry about law and does not relate to filing a noise complaint."
+    },
+    {
+      "id": "irrelevance_53",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.480257034301758,
+      "output_snippet": "NO_CALL: The question is a general knowledge question that does not require a database query."
+    },
+    {
+      "id": "irrelevance_171",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.703958988189697,
+      "output_snippet": "NO_CALL: The user's question is about historical governance in Ancient Greece, which is unrelated to searching for music"
+    },
+    {
+      "id": "irrelevance_68",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 5.551043748855591,
+      "output_snippet": "FUNCTION_CALL: statistics.calculate_p_value(sample_mean=98.2, population_mean=98.6, sample_std_dev=1.4, sample_size=40)"
+    },
+    {
+      "id": "irrelevance_179",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 5.35495400428772,
+      "output_snippet": "NO_CALL: The user's question is a general inquiry about team roster history and does not provide specific teams, dates, "
+    },
+    {
+      "id": "irrelevance_239",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 4.784505128860474,
+      "output_snippet": "FUNCTION_CALL: get_date(location_1='San Francisco', location_2='Los Angeles', unit='kilometers')"
+    },
+    {
+      "id": "irrelevance_174",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 5.10270094871521,
+      "output_snippet": "NO_CALL: The user is asking for general music knowledge about common chords in pop music, which is not a specific reques"
+    },
+    {
+      "id": "irrelevance_165",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 4.4982750415802,
+      "output_snippet": "FUNCTION_CALL: get_instrument_info(instrument_name='cello', detail='type')"
+    },
+    {
+      "id": "irrelevance_18",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.955810785293579,
+      "output_snippet": "NO_CALL: The question is a general physics inquiry and does not provide specific X and Y components required to use the "
+    },
+    {
+      "id": "irrelevance_155",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.668521881103516,
+      "output_snippet": "NO_CALL: The user is asking a general knowledge question about an artist, which does not require the available architect"
+    },
+    {
+      "id": "irrelevance_162",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.6631200313568115,
+      "output_snippet": "NO_CALL: The available function is designed to retrieve artists in a museum, not to list famous dancers globally."
+    },
+    {
+      "id": "irrelevance_43",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 5.220779895782471,
+      "output_snippet": "NO_CALL: I can explain the theoretical concepts of applying Evolutionary Algorithms to game AI, but I cannot execute the"
+    },
+    {
+      "id": "irrelevance_136",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.390937089920044,
+      "output_snippet": "NO_CALL: The available function only provides information about the President, not the Vice President."
+    },
+    {
+      "id": "irrelevance_186",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.583913803100586,
+      "output_snippet": "NO_CALL: The available function is for retrieving the MVP of a sport season, which does not provide team rankings."
+    },
+    {
+      "id": "irrelevance_62",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.831096172332764,
+      "output_snippet": "NO_CALL: The user is asking for advice on web development, which is outside the scope of the available recommendation mo"
+    },
+    {
+      "id": "irrelevance_41",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.5595479011535645,
+      "output_snippet": "NO_CALL: The user's question is about biological ancestry, which cannot be answered using the provided Fibonacci sequenc"
+    },
+    {
+      "id": "irrelevance_118",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 4.441524028778076,
+      "output_snippet": "FUNCTION_CALL: playoff.brackets(year=1996, round='Finals')"
+    },
+    {
+      "id": "irrelevance_97",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.502488851547241,
+      "output_snippet": "NO_CALL: The available function is for filing a lawsuit, which is not relevant to recommending a restaurant."
+    },
+    {
+      "id": "irrelevance_69",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 4.758352994918823,
+      "output_snippet": "NO_CALL: The available functions are for making predictions using a regression model, not for retrieving historical or s"
+    }
+  ]
+}

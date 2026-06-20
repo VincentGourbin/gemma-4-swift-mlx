@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_277.png
+  Image preprocessee: [1, 3, 960, 624]
+  Total: 1 image(s), batch: [1, 3, 960, 624]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258882, 107, 3689, 563, 506, 18355, 529, 672, 2260, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 301
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What is the genre of this book?
+---
+Based on the title page, the book is a **Kindergarten Theme Calendar**.
+
+Therefore, the genre of the book is **Educational Material** or **Teaching Aid** (specifically for early childhood education/kindergarten).<turn|>
+
+--- Stats ---
+Tokens: 45
+Temps: 3.76s, Vitesse: 12.0 t/s
+GPU pic: 6042 Mo

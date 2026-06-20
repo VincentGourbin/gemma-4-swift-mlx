@@ -1,0 +1,25 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_286.png
+  Image preprocessee: [1, 3, 576, 960]
+  Total: 1 image(s), batch: [1, 3, 576, 960]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258880, 258880, 258882, 107, 14070, 4762, 563, 672, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 298
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what store is this?
+---
+Based on the image, this is a **Microsoft** store.
+
+The most obvious clues are:
+1.  The large branding featuring the **Microsoft logo** and the Windows-like colorful blocks.
+2.  The presence of the text "**Microsoft**" visible on the glass display.
+
+--- Stats ---
+Tokens: 60
+Temps: 4.83s, Vitesse: 12.4 t/s
+GPU pic: 6033 Mo

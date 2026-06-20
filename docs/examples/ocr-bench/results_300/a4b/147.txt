@@ -1,0 +1,26 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_147.png
+  Image preprocessee: [1, 3, 144, 672]
+  Total: 1 image(s), batch: [1, 3, 144, 672]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [568, 538, 900, 236743, 236812, 1732, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 326
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+T _ n \leq \lambda ( n + 4 )
+---
+The expression in the image can be written in LaTeX as:
+
+```latex
+T_n \leq \lambda (n + 4)
+```<turn|>
+
+--- Stats ---
+Tokens: 32
+Temps: 3.44s, Vitesse: 9.3 t/s
+GPU pic: 16305 Mo

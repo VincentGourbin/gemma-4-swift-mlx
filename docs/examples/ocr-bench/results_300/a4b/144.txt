@@ -1,0 +1,26 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_144.png
+  Image preprocessee: [1, 3, 96, 1200]
+  Total: 1 image(s), batch: [1, 3, 96, 1200]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [236743, 236828, 236743, 236771, 11909, 3522, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 339
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+\angle G O B + \angle E O G + \angle A O E = 1 8 0^\circ 
+---
+The expression in the image can be written in LaTeX as:
+
+```latex
+\angle GOB + \angle EOG + \angle AOE = 180^\circ
+```<turn|>
+
+--- Stats ---
+Tokens: 40
+Temps: 3.95s, Vitesse: 10.1 t/s
+GPU pic: 16305 Mo

@@ -18,6 +18,8 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
 | Model download | ✅ **Working** | Direct HTTPS from HuggingFace (no HF SDK dependency) |
+| **DiffusionGemma 26B-A4B** | ✅ **Ported** | Block-AR text diffusion + vision. **80.8% OCRBench**, **79% ScreenSpot v1**, 95% BFCL. Voir [docs/DIFFUSIONGEMMA.md](docs/DIFFUSIONGEMMA.md) |
+| `gemma4-bench-ui` GUI | ✅ **Working** | 4 onglets (Bench AR vs Diffusion, Web agent step-by-step, Akinator VQA, iOS Sim agent) |
 
 ## Requirements
 
@@ -134,6 +136,47 @@ gemma4-cli profile run --model-path ~/Library/Caches/models/mlx-community/gemma-
 gemma4-cli profile sweep --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-4bit \
   --context-sizes 500,2000,8000 --kv-bits-list 0,4 --output results.sqlite
 ```
+
+### GUI bench app (`gemma4-bench-ui`)
+
+A small SwiftUI app for interactive testing of the multimodal pipelines —
+4 tabs : AR vs Diffusion bench, web agent step-by-step, Akinator VQA,
+iOS Simulator agent.
+
+```bash
+# Build (Release for the best inference speed)
+xcodebuild -scheme gemma4-bench-ui -configuration Release \
+  -destination "platform=macOS" -derivedDataPath .build/xcode \
+  -skipMacroValidation build
+
+# Run
+.build/xcode/Build/Products/Release/gemma4-bench-ui
+```
+
+> Or open the package in Xcode and run the `gemma4-bench-ui` scheme
+> directly. First launch downloads the selected model from HuggingFace
+> (cached under `~/Library/Caches/models/`).
+
+**Tabs :**
+
+- **Bench AR vs Diffusion** — side-by-side comparison of an autoregressive
+  Gemma 4 family (E2B/E4B/26B-A4B/31B, 4-bit/bf16) vs DiffusionGemma
+  26B-A4B on the same prompt. Shows tok/s, GPU peak, latency.
+- **Web agent (step-by-step)** — pilot a `WKWebView` with DiffusionGemma
+  or E4B as the visual planner. Action vocabulary: `click` / `scroll` /
+  `type` / `click_and_type` / `done`. Each run is logged to
+  `/tmp/web-agent-runs/run-<ts>/` (prompts, raw outputs, screenshots).
+  See [docs/DIFFUSIONGEMMA.md](docs/DIFFUSIONGEMMA.md#use-cases-web-navigation)
+  for the Wikipedia "Montcuq" demo.
+- **VQA Akinator** — vision-language guessing game. Model asks
+  yes/no questions about an image you choose, narrows down to a guess.
+- **iOS Simulator agent** — visual agent that drives the iOS Simulator
+  via `xcrun simctl`. Limitations of small-model tap precision documented
+  in [issue #30](https://github.com/VincentGourbin/gemma-4-swift-mlx/issues/30).
+
+For the Toolathlon tool-use benchmark POC (CLI + OpenAI-compatible proxy
++ MCP harness on `find-alita-paper`), see
+[docs/examples/toolathlon-bench/](docs/examples/toolathlon-bench/).
 
 ## Supported Models
 

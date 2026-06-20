@@ -1,0 +1,829 @@
+{
+  "kind": "diff",
+  "overall": "95/100",
+  "total_time_s": 1560.9609589576721,
+  "by_category": {
+    "simple": {
+      "c": 29,
+      "t": 30,
+      "time": 449.85736298561096
+    },
+    "multiple": {
+      "c": 30,
+      "t": 30,
+      "time": 464.5013358592987
+    },
+    "parallel": {
+      "c": 20,
+      "t": 20,
+      "time": 304.5335898399353
+    },
+    "irrelevance": {
+      "c": 16,
+      "t": 20,
+      "time": 342.06867027282715
+    }
+  },
+  "details": [
+    {
+      "id": "simple_327",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.97580599784851,
+      "output_snippet": "FUNCTION_CALL: sports_team.get_schedule(team_name='Manchester United', num_of_games=6, league='Premier League')<turn|><e"
+    },
+    {
+      "id": "simple_57",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.127899169921875,
+      "output_snippet": "FUNCTION_CALL: calculate_cell_density(optical_density=0.6, dilution=5)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "simple_12",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.127994060516357,
+      "output_snippet": "FUNCTION_CALL: geometry.circumference(radius=3)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "simple_379",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.8612961769104,
+      "output_snippet": "FUNCTION_CALL: get_current_time(location=\"Sydney\", country=\"Australia\")<turn|><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_140",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.869300127029419,
+      "output_snippet": "FUNCTION_CALL: calculate_cagr(initial_value=2000, final_value=3000, period_in_years=4)<turn|><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_125",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.384555101394653,
+      "output_snippet": "FUNCTION_CALL: predict_house_price(area=2500, rooms=5, year=1990, location='San Francisco')<turn|><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_114",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.205337047576904,
+      "output_snippet": "FUNCTION_CALL: prob_dist.binomial(trials=10, successes=5, p=0.5)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "simple_71",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.959085941314697,
+      "output_snippet": "FUNCTION_CALL: generate_DNA_sequence(length=100, preferences=[\"G\", \"C\"])<turn|><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "simple_377",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.965616226196289,
+      "output_snippet": "FUNCTION_CALL: get_current_time(city=\"Sydney\", country=\"Australia\")<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "simple_52",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.417296171188354,
+      "output_snippet": "FUNCTION_CALL: calc_heat_capacity(temp=298, volume=10, gas='air')<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "simple_346",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.339962244033813,
+      "output_snippet": "FUNCTION_CALL: get_collectables_in_season(game_name='Animal Crossing: New Horizons', season='Spring', item_type='all')<t"
+    },
+    {
+      "id": "simple_279",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.87640905380249,
+      "output_snippet": "FUNCTION_CALL: instrument_price.get(brand=\"Fender\", model=\"American Professional II Stratocaster\", finish=\"Rosewood\")<tu"
+    },
+    {
+      "id": "simple_44",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.140970945358276,
+      "output_snippet": "FUNCTION_CALL: calculate_electric_field_strength(charge=0.01, distance=4)<turn|><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "simple_302",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 13.929270029067993,
+      "output_snippet": "FUNCTION_CALL: calculate_batting_average(hits=180, at_bats=600, decimal_places=3)<turn|><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_216",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.320707082748413,
+      "output_snippet": "FUNCTION_CALL: sentiment_analysis(text='I love the food here! It's always fresh and delicious.', language='english')<eos"
+    },
+    {
+      "id": "simple_16",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.79203200340271,
+      "output_snippet": "FUNCTION_CALL: calculus.derivative(function=\"2x^2\", value=1, function_variable=\"x\")<turn|><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "simple_15",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.908681869506836,
+      "output_snippet": "FUNCTION_CALL: integrate(function='x^3', start_x=-2, end_x=3, method='simpson')<turn|><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "simple_47",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.357705116271973,
+      "output_snippet": "FUNCTION_CALL: get_boiling_melting_points(substance='water', sea_level=5000)<turn|><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_111",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.963419198989868,
+      "output_snippet": "FUNCTION_CALL: random.normalvariate(mu=0, sigma=1)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "simple_119",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.990864992141724,
+      "output_snippet": "FUNCTION_CALL: hypothesis_testing.ttest_ind(sample1=[22,33,42,12,34], sample2=[23,45,44,14,38], significance_level=0.05)"
+    },
+    {
+      "id": "simple_258",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.487743854522705,
+      "output_snippet": "FUNCTION_CALL: mix_paint_color(color1=\"yellow\", color2=\"blue\", lightness=60)<turn|><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "simple_308",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.795405626296997,
+      "output_snippet": "FUNCTION_CALL: sports.match_schedule(team_name='Manchester United', num_matches=5, league='English Premier League')<turn"
+    },
+    {
+      "id": "simple_13",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 15.943566083908081,
+      "output_snippet": "FUNCTION_CALL: calculate_area_under_curve(function=\"y=x^2\", interval=[1, 3])<eos><eos><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "simple_287",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.960684061050415,
+      "output_snippet": "FUNCTION_CALL: concert.search(genre=\"classical\", location=\"Los Angeles\", date=\"this weekend\", price_range=\"cheap\")<turn|"
+    },
+    {
+      "id": "simple_101",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.858357906341553,
+      "output_snippet": "FUNCTION_CALL: calculate_speed(distance=450, time=20, to_unit=\"km/h\")<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "simple_366",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.005181074142456,
+      "output_snippet": "FUNCTION_CALL: recipe.unit_conversion(value=2, from_unit='tablespoon', to_unit='teaspoon')<turn|><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "simple_332",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.334207773208618,
+      "output_snippet": "FUNCTION_CALL: chess.rating(player_name='Magnus Carlsen', variant='classical')<turn|><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "simple_359",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.244307279586792,
+      "output_snippet": "FUNCTION_CALL: recipe_search(dietary_restriction='Vegetarian', ingredients=['pasta', 'cheese'], servings=2)<turn|><eos><"
+    },
+    {
+      "id": "simple_214",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.869675636291504,
+      "output_snippet": "FUNCTION_CALL: event_finder.find_upcoming(location=\"New York, NY\", genre=\"rock\", days_ahead=30)<turn|><eos><eos><eos><eo"
+    },
+    {
+      "id": "simple_112",
+      "category": "simple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.844025135040283,
+      "output_snippet": "FUNCTION_CALL: calculate_probability(total_outcomes=52, favorable_outcomes=4)<turn|><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_114",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.242462158203125,
+      "output_snippet": "FUNCTION_CALL: prediction.evolution(species='Homo Sapiens', years=50, model='Darwin')<turn|><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "multiple_150",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.437372922897339,
+      "output_snippet": "FUNCTION_CALL: calculate_neuronal_activity(input_synaptic_rate=200, weight=0.5, decay_rate=0.1)<turn|><eos><eos><eos><eo"
+    },
+    {
+      "id": "multiple_71",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 16.403512954711914,
+      "output_snippet": "FUNCTION_CALL: get_population(year=1954, category='veterans')<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_1",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.812058210372925,
+      "output_snippet": "FUNCTION_CALL: math.triangle_area_heron(side1=3, side2=4, side3=5)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_194",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.365694999694824,
+      "output_snippet": "FUNCTION_CALL: get_museum_hours(museum_name=\"Metropolitan Museum of Art\", day=\"Saturday\")<turn|><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "multiple_40",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.149874925613403,
+      "output_snippet": "FUNCTION_CALL: electromagnetism.biot_savart_law(current=12, distance=8)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_178",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 16.03849506378174,
+      "output_snippet": "FUNCTION_CALL: find_card_in_deck(rank='Queen', suit='Hearts')<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_108",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.650718927383423,
+      "output_snippet": "FUNCTION_CALL: calc_heat_capacity(temp=298, volume=10)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_87",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.207581043243408,
+      "output_snippet": "FUNCTION_CALL: games.update.find(game='Cyberpunk 2077', platform='Xbox')<turn|><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_197",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 16.613343954086304,
+      "output_snippet": "FUNCTION_CALL: mutation_type.find(snp_id=\"rs6034464\")<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_39",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.840118885040283,
+      "output_snippet": "FUNCTION_CALL: ride_hailing.get_rides(source='New York', destination='Philadelphia', max_cost=50)<turn|><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_55",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.104451656341553,
+      "output_snippet": "FUNCTION_CALL: stock_forecast(company='Google', days=3)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "multiple_86",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.621146202087402,
+      "output_snippet": "FUNCTION_CALL: BoardGameGeek.recommend(numPlayers=2, category='strategy')<turn|><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "multiple_26",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.086172819137573,
+      "output_snippet": "FUNCTION_CALL: game_rewards.get(game='Fortnite', platform='Playstation')<turn|><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_23",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.362430810928345,
+      "output_snippet": "FUNCTION_CALL: basketball.player_stats.get(player_name=\"LeBron James\", stats_fields=[\"points\", \"assists\", \"minutes\"])<tu"
+    },
+    {
+      "id": "multiple_97",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.475735902786255,
+      "output_snippet": "FUNCTION_CALL: geometry.area_circle(radius=10)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_24",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.839169025421143,
+      "output_snippet": "FUNCTION_CALL: route_planner.calculate_route(start=\"London\", destination=\"Edinburgh\", method=\"fastest\")<turn|><eos><eos>"
+    },
+    {
+      "id": "multiple_91",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 16.51721715927124,
+      "output_snippet": "FUNCTION_CALL: recipe.find(mainIngredient='apple', ingredientLimit=4)<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_88",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.065627813339233,
+      "output_snippet": "FUNCTION_CALL: video_games.get_player_count(game_title='World of Warcraft', year=2020)<turn|><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_154",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 16.432969093322754,
+      "output_snippet": "FUNCTION_CALL: US_president.in_year(year=1861, full_name=true)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_67",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.06634783744812,
+      "output_snippet": "FUNCTION_CALL: translate(text=\"Hello, how are you?\", source_language=\"English\", target_language=\"French\")<turn|><eos><eo"
+    },
+    {
+      "id": "multiple_11",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.38808012008667,
+      "output_snippet": "FUNCTION_CALL: math_roots.quadratic(a=5, b=20, c=-25)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "multiple_117",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.270301818847656,
+      "output_snippet": "FUNCTION_CALL: calculate_BMI(weight_kg=70, height_m=1.75)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_137",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.383065938949585,
+      "output_snippet": "FUNCTION_CALL: lawsuit_search(company='Google', start_date='2021-01-01', location='California', status='ongoing')<turn|>"
+    },
+    {
+      "id": "multiple_31",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 14.910725116729736,
+      "output_snippet": "FUNCTION_CALL: geometry_rectangle.calculate(width=7, length=10)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "multiple_96",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.473037004470825,
+      "output_snippet": "FUNCTION_CALL: solve_quadratic_equation(a=2, b=6, c=5)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "multiple_20",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.174738883972168,
+      "output_snippet": "FUNCTION_CALL: sculpture_price.calculate(material='marble', size=3)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_141",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.384475231170654,
+      "output_snippet": "FUNCTION_CALL: lawsuit.check_case(case_id=1234, closed_status=true)<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><"
+    },
+    {
+      "id": "multiple_75",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.606208086013794,
+      "output_snippet": "FUNCTION_CALL: paint_color.trends(room='living room')<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "multiple_160",
+      "category": "multiple",
+      "n_calls": 1,
+      "correct": true,
+      "elapsed": 15.578201293945312,
+      "output_snippet": "FUNCTION_CALL: get_sculpture_info(artist_name=\"James Plensa\", detail=True)<turn|><eos><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "parallel_158",
+      "category": "parallel",
+      "n_calls": 4,
+      "correct": true,
+      "elapsed": 15.067967176437378,
+      "output_snippet": "FUNCTION_CALL: random.normalvariate(mu=5, sigma=2) AND FUNCTION_CALL: random.normalvariate(mu=5, sigma=2) AND FUNCTION_C"
+    },
+    {
+      "id": "parallel_92",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 14.861387968063354,
+      "output_snippet": "FUNCTION_CALL: get_shortest_driving_distance(origin=\"New York City\", destination=\"Los Angeles\", unit=\"miles\") AND FUNCTI"
+    },
+    {
+      "id": "parallel_147",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 15.756004095077515,
+      "output_snippet": "FUNCTION_CALL: light_travel_time(distance_in_light_years=4.22, speed_of_light=299792458) AND FUNCTION_CALL: light_travel"
+    },
+    {
+      "id": "parallel_49",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 14.847405195236206,
+      "output_snippet": "FUNCTION_CALL: player_status.check(team='RocketLeague', player_id=3142, season=2017) AND FUNCTION_CALL: player_status.ch"
+    },
+    {
+      "id": "parallel_180",
+      "category": "parallel",
+      "n_calls": 8,
+      "correct": true,
+      "elapsed": 15.312558889389038,
+      "output_snippet": "FUNCTION_CALL: stock_price(company='Microsoft', days=30, data_type='Open') AND FUNCTION_CALL: stock_price(company='Micro"
+    },
+    {
+      "id": "parallel_17",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 16.29943084716797,
+      "output_snippet": "FUNCTION_CALL: get_stock_data(symbol=\"AAPL\", data_points=[\"price\", \"volume\"]) AND FUNCTION_CALL: get_stock_data(symbol=\""
+    },
+    {
+      "id": "parallel_11",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.88828992843628,
+      "output_snippet": "FUNCTION_CALL: ml.predict_house_price(location='New York', size=3000) AND FUNCTION_CALL: ml.predict_house_price(location"
+    },
+    {
+      "id": "parallel_169",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.954752922058105,
+      "output_snippet": "FUNCTION_CALL: calculate_discounted_cash_flow(coupon_payment=50, period=5, discount_rate=0.05, face_value=1000) AND FUNC"
+    },
+    {
+      "id": "parallel_58",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 15.182078838348389,
+      "output_snippet": "FUNCTION_CALL: get_exchange_rate(base_currency=\"USD\", target_currency=\"AUD\") AND FUNCTION_CALL: get_exchange_rate(base_c"
+    },
+    {
+      "id": "parallel_197",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 15.37577223777771,
+      "output_snippet": "FUNCTION_CALL: lawsuit_info(case_number='12345ABC', year=2018, location='New York') AND FUNCTION_CALL: lawsuit_info(case"
+    },
+    {
+      "id": "parallel_74",
+      "category": "parallel",
+      "n_calls": 4,
+      "correct": true,
+      "elapsed": 15.344305992126465,
+      "output_snippet": "FUNCTION_CALL: get_prime_factors(number=4567, formatted=true) AND FUNCTION_CALL: get_prime_factors(number=4567, formatte"
+    },
+    {
+      "id": "parallel_20",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.62888765335083,
+      "output_snippet": "FUNCTION_CALL: loan_eligibility_check(financial_institution=\"HSBC\", loan_amount=500000, annual_income=100000) AND FUNCTI"
+    },
+    {
+      "id": "parallel_59",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.61074686050415,
+      "output_snippet": "FUNCTION_CALL: get_conversion_cost(amount=15000, from_currency=\"EUR\", to_currency=\"USD\") AND FUNCTION_CALL: get_conversi"
+    },
+    {
+      "id": "parallel_25",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.796050071716309,
+      "output_snippet": "FUNCTION_CALL: lawsuit.lookup(company_name='Dara Inc', year=2019) AND FUNCTION_CALL: lawsuit.lookup(company_name='Dara I"
+    },
+    {
+      "id": "parallel_97",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 14.564292192459106,
+      "output_snippet": "FUNCTION_CALL: calculate_resonant_frequency(inductance=0.005, capacitance=0.0000001, round_off=3) AND FUNCTION_CALL: cal"
+    },
+    {
+      "id": "parallel_71",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 15.968409776687622,
+      "output_snippet": "FUNCTION_CALL: calculate_derivative(function=\"3x^3 - 2x^2 + 5x - 7\", x_value=4) AND FUNCTION_CALL: calculate_derivative("
+    },
+    {
+      "id": "parallel_116",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 14.940248012542725,
+      "output_snippet": "FUNCTION_CALL: calculate_genotype_frequency(allele_frequency=0.7, genotype=\"AA\") AND FUNCTION_CALL: calculate_genotype_f"
+    },
+    {
+      "id": "parallel_162",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 16.186553239822388,
+      "output_snippet": "FUNCTION_CALL: probability_of_event(success_outcomes=4, total_outcomes=52) AND FUNCTION_CALL: probability_of_event(succe"
+    },
+    {
+      "id": "parallel_93",
+      "category": "parallel",
+      "n_calls": 3,
+      "correct": true,
+      "elapsed": 15.520710945129395,
+      "output_snippet": "FUNCTION_CALL: route.estimate_time(start_location=\"New York\", end_location=\"Miami\", stops=[\"Philadelphia\", \"Washington D"
+    },
+    {
+      "id": "parallel_41",
+      "category": "parallel",
+      "n_calls": 2,
+      "correct": true,
+      "elapsed": 15.42773699760437,
+      "output_snippet": "FUNCTION_CALL: find_music_instrument_store(location=\"San Francisco, California\", instruments=[\"Yamaha acoustic guitar\", "
+    },
+    {
+      "id": "irrelevance_94",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.278746128082275,
+      "output_snippet": "NO_CALL: The available function allows retrieving case details by a specific case ID, but it does not search for cases b"
+    },
+    {
+      "id": "irrelevance_90",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.826371908187866,
+      "output_snippet": "NO_CALL: The available functions are only for filing complaints and do not provide general information about legal conce"
+    },
+    {
+      "id": "irrelevance_53",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 16.237187147140503,
+      "output_snippet": "NO_CALL: I do not have access to a database containing sports results to answer this question.<turn|><eos><eos><eos><eos"
+    },
+    {
+      "id": "irrelevance_171",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.2934889793396,
+      "output_snippet": "NO_CALL: The available function is not designed to answer historical questions about laws and orders.<eos><eos><eos><eos"
+    },
+    {
+      "id": "irrelevance_68",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 15.34810495376587,
+      "output_snippet": "FUNCTION_CALL: statistics.calculate_p_value(sample_mean=98.2, population_mean=98.6, sample_std_dev=1.4, sample_size=40)<"
+    },
+    {
+      "id": "irrelevance_179",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 18.22982621192932,
+      "output_snippet": "NO_CALL: The available function only retrieves game results between two teams and does not list players for a specific t"
+    },
+    {
+      "id": "irrelevance_239",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 15.289695978164673,
+      "output_snippet": "FUNCTION_CALL: get_date(location_1=\"San Francisco\", location_2=\"Los Angeles\", unit=\"kilometers\")<turn|><eos><eos><eos><e"
+    },
+    {
+      "id": "irrelevance_174",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.013526916503906,
+      "output_snippet": "NO_CALL: The available function is designed to provide primary triads for a specific key signature, whereas the question"
+    },
+    {
+      "id": "irrelevance_165",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 15.173957109451294,
+      "output_snippet": "FUNCTION_CALL: get_instrument_info(instrument_name=\"cello\", detail=\"type\")<turn|><eos><eos><eos><eos><eos><eos><eos><eos"
+    },
+    {
+      "id": "irrelevance_18",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 20.706513166427612,
+      "output_snippet": "NO_CALL: I do not have enough information to calculate the angle of force from momentum, as force is the rate of change "
+    },
+    {
+      "id": "irrelevance_155",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 16.68932318687439,
+      "output_snippet": "NO_CALL: The available function is designed to calculate architectural capacity, not to provide information about the cr"
+    },
+    {
+      "id": "irrelevance_162",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 19.203155994415283,
+      "output_snippet": "NO_CALL: The available function only retrieves artists within a specific museum, and the question is general about dance"
+    },
+    {
+      "id": "irrelevance_43",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 18.11527967453003,
+      "output_snippet": "NO_CALL: Evolutionary algorithms can be used in game AI to evolve agent behaviors, neural networks, or balancing paramet"
+    },
+    {
+      "id": "irrelevance_136",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.241336822509766,
+      "output_snippet": "NO_CALL: The available functions only provide information about the President, not the Vice President.<eos><eos><eos><eo"
+    },
+    {
+      "id": "irrelevance_186",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 17.292706966400146,
+      "output_snippet": "NO_CALL: The available functions do not provide team rankings, only MVP information for specific seasons.<eos><eos><eos>"
+    },
+    {
+      "id": "irrelevance_62",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 16.40983510017395,
+      "output_snippet": "NO_CALL: The available functions are only for creating recommendation models, not for building frontend interfaces.<eos>"
+    },
+    {
+      "id": "irrelevance_41",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 16.885127067565918,
+      "output_snippet": "NO_CALL: I do not have a function to answer questions about biological common ancestry.<eos><eos><eos><eos><eos><eos><eo"
+    },
+    {
+      "id": "irrelevance_118",
+      "category": "irrelevance",
+      "n_calls": 1,
+      "correct": false,
+      "elapsed": 15.134168863296509,
+      "output_snippet": "FUNCTION_CALL: playoff.brackets(year=1996, round=\"Finals\")<turn|><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><eos>"
+    },
+    {
+      "id": "irrelevance_97",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 16.1143798828125,
+      "output_snippet": "NO_CALL: I do not have a tool to provide restaurant recommendations.<eos><eos><eos><eos><eos><eos><eos><eos><eos><eos><e"
+    },
+    {
+      "id": "irrelevance_69",
+      "category": "irrelevance",
+      "n_calls": 0,
+      "correct": true,
+      "elapsed": 18.585938215255737,
+      "output_snippet": "NO_CALL: I do not have access to a tool to retrieve historical market data or house price averages.<eos><eos><eos><eos><"
+    }
+  ]
+}

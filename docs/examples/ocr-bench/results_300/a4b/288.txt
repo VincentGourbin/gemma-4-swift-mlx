@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_288.png
+  Image preprocessee: [1, 3, 768, 768]
+  Total: 1 image(s), batch: [1, 3, 768, 768]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [506, 3260, 529, 672, 2260, 236881, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 306
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: who's the author of this book?
+---
+Based on the cover image provided, the book is titled *Best Sex Writing 2010* and it is **edited by Rachel Kramer Bussel**.<turn|>
+
+--- Stats ---
+Tokens: 33
+Temps: 3.57s, Vitesse: 9.2 t/s
+GPU pic: 16311 Mo

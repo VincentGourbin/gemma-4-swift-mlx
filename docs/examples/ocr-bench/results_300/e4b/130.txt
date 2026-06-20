@@ -1,0 +1,30 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_130.png
+  Image preprocessee: [1, 3, 96, 528]
+  Total: 1 image(s), batch: [1, 3, 96, 528]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [783, 236743, 236771, 236743, 236828, 568, 520, 236884, 236778, 1732, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 335
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+9 . 3 \times 5 . 6 = 5 2 . 0 8 ( m^2 )
+---
+Here is the expression written out in LaTeX format:
+
+```latex
+9.3 \times 5.6 = 52.08 (\text{m}^2)
+```
+
+**Explanation of the components:**
+
+*   `9.3 \times 5.6 =
+
+--- Stats ---
+Tokens: 60
+Temps: 4.90s, Vitesse: 12.3 t/s
+GPU pic: 6133 Mo

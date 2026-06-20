@@ -1,0 +1,27 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_089.png
+  Image preprocessee: [1, 3, 1008, 624]
+  Total: 1 image(s), batch: [1, 3, 1008, 624]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [14070, 563, 506, 4398, 529, 784, 2301, 10805, 1262, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 303
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what is the average of all No confidence data?
+---
+Here is the breakdown of the "No confidence" percentages for each leader:
+
+* **Angela Merkel:** 31%
+* **Emmanuel Macron:** 34%
+* **Xi Jinping:** 56%
+* **Vladimir Putin:** 62%
+* **Donald Trump
+
+--- Stats ---
+Tokens: 60
+Temps: 4.83s, Vitesse: 12.4 t/s
+GPU pic: 6048 Mo

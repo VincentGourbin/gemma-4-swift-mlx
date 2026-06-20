@@ -1,0 +1,51 @@
+[Gemma4Config] audio_config present but decode failed (DecodingError.valueNotFound: Expected value of type Dictionary<String, Any> but found null instead. Path: audio_config. Debug description: Cannot get keyed decoding container -- found null value instead); fallback to text-only
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-bf16
+Modele charge.
+Traitement de l'image: /Users/vincent/Developpements/gemma-4-swift-mlx/docs/examples/vision-image-description/UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 1 image(s), batch: [1, 3, 624, 1008]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [506, 11273, 532, 3739, 5708, 236761, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 320
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this user interface screenshot in detail. Read all visible text including French text. Describe the layout and application purpose.
+---
+This is a screenshot of a desktop application interface, likely a professional creative tool for AI-driven media generation (specifically video or image animation). The interface uses a dark mode theme with a deep navy blue background and white/light gray text.
+
+### **Application Purpose**
+Based on the terminology used (e.g., "Génération d'image," "Générer une vidéo," "LoRA," "Débruitage"), this is an AI generative media workstation. It is designed to allow users to create images, videos, and custom AI models (LoRA) through a workflow-oriented interface.
+
+### **Layout Description**
+
+**1. Left Sidebar (Navigation Menu):**
+The sidebar is organized into several functional categories:
+*   **Création (Creation):**
+    *   `Forge ton idée` (Forge your idea) — This is the currently active tab, highlighted with a blue background and a lightbulb icon.
+    *   `Génération d'image` (Image generation) — Icon of a landscape.
+    *   `Générer une vidéo` (Generate a video) — Icon of a video camera.
+    *   `File d'attente` (Queue) — Icon of a list, with a blue notification badge showing the number `1`.
+*   **Outils (Tools):**
+    *   `Supprimer l'arrière-...` (Remove background...) — Icon of people.
+    *   `Upscale` — Icon of an upward arrow.
+    *   `Créer un LoRA` (Create a LoRA) — Icon of a magic wand.
+*   **Bibliothèque (Library):**
+    *   `Bibliothèque` (Library) — Icon of a book/folder.
+    *   `Adaptateurs LoRA` (LoRA Adapters) — Icon of a chip/module.
+*   **Réglages (Settings):**
+    *   `Modèles` (Models) — Icon of a grid.
+    *   `Préférences` (Preferences) — Icon of sliders.
+    *   `Cache` — Icon of a hard drive.
+*   **Aide (Help):**
+    *   `Documentation` — Icon of a question mark.
+    *   `Site web & Support` (Website & Support) — Icon of a globe.
+
+**2. Main
+
+--- Stats ---
+Tokens: 500
+Temps: 531.03s, Vitesse: 0.9 t/s
+GPU pic: 56937 Mo

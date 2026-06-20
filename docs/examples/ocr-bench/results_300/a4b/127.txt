@@ -1,0 +1,24 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_127.png
+  Image preprocessee: [1, 3, 192, 2064]
+  Total: 1 image(s), batch: [1, 3, 192, 2064]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [568, 505, 520, 236884, 236800, 1732, 106, 107, 105, 4368, 107, 100, 45518, 107, 101]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 360
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Please write out the expression of the formula in the image using LaTeX format.
+1 0 \times 1 0 \times 2 0 + 1 0 \times 3 0 \times 2 0 = 8 0 0 0 ( c m^3 )
+---
+Based on the image provided, here is the expression written in LaTeX format:
+
+$$10 \times 10 \times 20 + 10 \times 30 \times 20 = 8000 \text{ (cm}^3\text{)}$
+
+--- Stats ---
+Tokens: 60
+Temps: 5.35s, Vitesse: 11.2 t/s
+GPU pic: 16309 Mo

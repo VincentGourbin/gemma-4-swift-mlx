@@ -1,0 +1,23 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_271.png
+  Image preprocessee: [1, 3, 912, 672]
+  Total: 1 image(s), batch: [1, 3, 912, 672]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [3689, 1677, 506, 5346, 1879, 672, 563, 5402, 573, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 303
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: What does the label say this is designed for?
+---
+The label indicates that the device is **Designed for Microsoft Windows® XP**.
+
+Additionally, the label also features the **Intel Inside** logo, suggesting it uses Intel technology, and the text "centrino™ MOBILE TECHNOLOGY."<turn|>
+
+--- Stats ---
+Tokens: 46
+Temps: 3.85s, Vitesse: 11.9 t/s
+GPU pic: 6048 Mo

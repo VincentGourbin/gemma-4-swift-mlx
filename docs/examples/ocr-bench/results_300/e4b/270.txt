@@ -1,0 +1,21 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit
+Modele charge.
+Traitement de l'image: /tmp/ocrbench/sample300/img_270.png
+  Image preprocessee: [1, 3, 672, 912]
+  Total: 1 image(s), batch: [1, 3, 672, 912]
+  Premiers tokens: [2, 107, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [107, 14070, 9639, 4284, 563, 3505, 580, 506, 1519, 236881, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 302
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: what famous road is shown on the sign?
+---
+The famous road shown on the sign is **Route 66**.<turn|>
+
+--- Stats ---
+Tokens: 15
+Temps: 1.70s, Vitesse: 8.8 t/s
+GPU pic: 6044 Mo
