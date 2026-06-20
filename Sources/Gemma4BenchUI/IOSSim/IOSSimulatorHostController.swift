@@ -265,11 +265,18 @@ final class IOSSimulatorHostController: ObservableObject {
             log("⚠ tap impossible : fenêtre Simulator introuvable")
             return
         }
-        let cx = frame.origin.x + nx * frame.size.width
-        let cy = frame.origin.y + ny * frame.size.height
+        // Clamp [0, 1] : evite que le LLM produise (1.5, 2.0) et fasse cliquer
+        // CGEvent en dehors de la fenetre Simulator (sur le Finder ou autre).
+        let cnx = nx.isFinite ? min(1.0, max(0.0, nx)) : 0.5
+        let cny = ny.isFinite ? min(1.0, max(0.0, ny)) : 0.5
+        if cnx != nx || cny != ny {
+            log(String(format: "⚠ tap coords clampees (%.3f,%.3f) -> (%.3f,%.3f)", nx, ny, cnx, cny))
+        }
+        let cx = frame.origin.x + cnx * frame.size.width
+        let cy = frame.origin.y + cny * frame.size.height
         let pt = CGPoint(x: cx, y: cy)
         lastTapPoint = pt
-        log(String(format: "tap norm=(%.3f,%.3f) -> screen=(%.0f,%.0f)", nx, ny, cx, cy))
+        log(String(format: "tap norm=(%.3f,%.3f) -> screen=(%.0f,%.0f)", cnx, cny, cx, cy))
 
         // Activer Simulator d'abord
         if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == simulatorBundleID }) {
@@ -429,12 +436,17 @@ final class IOSSimulatorHostController: ObservableObject {
     /// plusieurs mouseDragged + mouseUp pour produire un geste fluide.
     func swipe(fromX nx1: Double, fromY ny1: Double, toX nx2: Double, toY ny2: Double, durationMs: Int = 300) async {
         guard case .running = connection, let frame = simulatorWindowFrame() else { return }
-        let from = CGPoint(x: frame.origin.x + nx1 * frame.size.width,
-                           y: frame.origin.y + ny1 * frame.size.height)
-        let to = CGPoint(x: frame.origin.x + nx2 * frame.size.width,
-                        y: frame.origin.y + ny2 * frame.size.height)
+        // Clamp [0, 1] : meme protection que tap().
+        let cnx1 = nx1.isFinite ? min(1.0, max(0.0, nx1)) : 0.5
+        let cny1 = ny1.isFinite ? min(1.0, max(0.0, ny1)) : 0.5
+        let cnx2 = nx2.isFinite ? min(1.0, max(0.0, nx2)) : 0.5
+        let cny2 = ny2.isFinite ? min(1.0, max(0.0, ny2)) : 0.5
+        let from = CGPoint(x: frame.origin.x + cnx1 * frame.size.width,
+                           y: frame.origin.y + cny1 * frame.size.height)
+        let to = CGPoint(x: frame.origin.x + cnx2 * frame.size.width,
+                        y: frame.origin.y + cny2 * frame.size.height)
         log(String(format: "swipe norm (%.2f,%.2f) -> (%.2f,%.2f) screen (%.0f,%.0f) -> (%.0f,%.0f)",
-                   nx1, ny1, nx2, ny2, from.x, from.y, to.x, to.y))
+                   cnx1, cny1, cnx2, cny2, from.x, from.y, to.x, to.y))
 
         if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == simulatorBundleID }) {
             app.activate(options: [.activateIgnoringOtherApps])
@@ -474,13 +486,36 @@ final class IOSSimulatorHostController: ObservableObject {
             app.activate(options: [.activateIgnoringOtherApps])
             try? await Task.sleep(nanoseconds: 200_000_000)
         }
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
-        var script = "tell application \"System Events\" to keystroke \"\(escaped)\""
-        if pressEnter {
-            script += "\ndelay 0.15\ntell application \"System Events\" to key code 36"
+        // Sanitize : retire les control chars sauf `\n` (qu'on transforme en
+        // key code 36 plus loin). Puis split sur les newlines pour pouvoir
+        // emettre un keystroke par ligne + Return entre. Cela empeche
+        // l'injection AppleScript par un texte LLM contenant `";say ":` ou
+        // similaire — chaque keystroke ne contient que la ligne courante
+        // proprement echappee.
+        let cleaned = text.unicodeScalars.filter { scalar in
+            scalar == "\n" || !(scalar.value < 0x20)
         }
+        let normalized = String(String.UnicodeScalarView(cleaned))
+        let lines = normalized.components(separatedBy: "\n")
+        var scriptParts: [String] = []
+        for (i, line) in lines.enumerated() {
+            if !line.isEmpty {
+                let escaped = line
+                    .replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"")
+                scriptParts.append("tell application \"System Events\" to keystroke \"\(escaped)\"")
+            }
+            if i < lines.count - 1 {
+                // Newline entre lignes -> Return
+                scriptParts.append("delay 0.08")
+                scriptParts.append("tell application \"System Events\" to key code 36")
+            }
+        }
+        if pressEnter {
+            scriptParts.append("delay 0.15")
+            scriptParts.append("tell application \"System Events\" to key code 36")
+        }
+        let script = scriptParts.joined(separator: "\n")
         let res = await runProcess("/usr/bin/osascript", ["-e", script])
         log("type \"\(text.prefix(40))\"\(pressEnter ? " ⏎" : "") -> exit \(res.exitCode)")
     }

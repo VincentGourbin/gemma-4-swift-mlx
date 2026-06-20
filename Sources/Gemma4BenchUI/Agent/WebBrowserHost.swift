@@ -137,11 +137,14 @@ final class WebBrowserHostController: ObservableObject {
     /// description courte de ce qui a ete tape (ou nil si echec).
     @discardableResult
     func type(text: String) async -> String? {
-        let escaped = text
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
+        // Encode le texte en literal JS valide via JSONSerialization. Empeche
+        // toute injection : un texte produit par le LLM qui contiendrait des
+        // guillemets, newlines, control chars ou `";alert(1);x="` est traite
+        // comme une simple string.
+        let userTextLiteral = Self.jsStringLiteral(text)
         let js = """
         (function() {
+            var __t = \(userTextLiteral);
             function isTextInput(el) {
                 if (!el || !el.tagName) return false;
                 if (el.tagName === 'TEXTAREA') return true;
@@ -185,16 +188,33 @@ final class WebBrowserHostController: ObservableObject {
             // Append text + dispatch events
             if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
                 var cur = target.value || '';
-                target.value = cur + "\(escaped)";
-                target.dispatchEvent(new InputEvent('input', { bubbles: true, data: "\(escaped)", inputType: 'insertText' }));
+                target.value = cur + __t;
+                target.dispatchEvent(new InputEvent('input', { bubbles: true, data: __t, inputType: 'insertText' }));
                 target.dispatchEvent(new Event('change', { bubbles: true }));
                 return 'TYPED_INPUT:' + ((target.placeholder || target.name || target.id || target.type || 'input') + '').slice(0,40);
             }
-            document.execCommand('insertText', false, "\(escaped)");
+            document.execCommand('insertText', false, __t);
             return 'TYPED_CONTENTEDITABLE';
         })();
         """
         return (try? await webView.evaluateJavaScript(js)) as? String
+    }
+
+    /// Encode `s` comme un literal JS string echappe (guillemets compris).
+    /// Implementation via JSONSerialization : produit `"..."` avec tous les
+    /// caracteres speciaux (newlines, control chars, guillemets) correctement
+    /// escapes selon la spec JSON, qui est un sous-ensemble strict de la spec
+    /// JS pour les string literals.
+    private static func jsStringLiteral(_ s: String) -> String {
+        guard let data = try? JSONSerialization.data(withJSONObject: [s], options: []),
+              let outer = String(data: data, encoding: .utf8),
+              outer.count >= 2
+        else {
+            // Fallback ultra-defensif : double-quote vide
+            return "\"\""
+        }
+        // outer = `["..."]` -> strip [...] pour ne garder que `"..."`
+        return String(outer.dropFirst().dropLast())
     }
 
     func pressEnter() async {
