@@ -15,10 +15,28 @@ xcodebuild -scheme gemma4-cli -configuration Release \
 # Binary location
 .build/xcode/Build/Products/Release/gemma4-cli
 
-# Run tests
-xcodebuild -scheme Gemma4Swift -destination "platform=macOS" \
+# Run tests (scheme = Gemma4Swift-Package; the Gemma4Swift scheme has no test action)
+xcodebuild -scheme Gemma4Swift-Package -destination "platform=macOS" \
   -derivedDataPath .build/xcode -skipMacroValidation test
 ```
+
+## Dependency pinning
+
+`mlx-swift` and `mlx-swift-lm` are bounded with `.upToNextMinor` — both have broken
+APIs on minor bumps. Never move them to a `branch:` requirement: SwiftPM refuses a
+branch dependency transitively under a semver-tagged package, which makes this repo
+unconsumable by any downstream project that depends on a tag.
+
+Since mlx-swift-lm 3.x, upstream ships its **own** Gemma 4 (`"gemma4"`, `"gemma4_text"`,
+`"gemma4_unified"` in both `LLMModelFactory` and `VLMModelFactory`).
+`Gemma4Registration.register()` deliberately overwrites those entries —
+`ModelTypeRegistry.registerModelType` is last-write-wins — so it must be called before
+any load, otherwise upstream's text-only implementation silently answers instead.
+
+If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
+SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
+from `.build/*/checkouts/mlx-swift-lm/.git/packed-refs` (or delete the checkout) and
+re-resolve.
 
 ## Architecture
 

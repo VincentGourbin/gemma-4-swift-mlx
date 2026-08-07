@@ -10,9 +10,11 @@ let package = Package(
         .executable(name: "gemma4-bench-ui", targets: ["Gemma4BenchUI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
+        // Bornes semver volontairement serrees : mlx-swift et mlx-swift-lm ont deja
+        // casse des APIs sur des bumps mineurs. Toute montee de version est deliberee.
+        .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.31.4")),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", branch: "main"),
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
         .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.4.0"),
     ],
