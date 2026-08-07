@@ -70,7 +70,16 @@ public class Gemma4Attention: Module {
         self._oProj.wrappedValue = Linear(numHeads * headDim, dim, bias: false)
         self._qNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
 
-        if kvSharedOnly {
+        // KV sharing
+        let firstKvSharedLayerIdx = config.firstKvSharedLayerIdx
+        let isKvSharedLayer = layerIdx >= firstKvSharedLayerIdx && firstKvSharedLayerIdx > 0
+        self.isKvSharedLayer = isKvSharedLayer
+
+        // Une couche KV-shared ne calcule jamais ses propres K/V : elle lit soit le
+        // cache de sa couche source (inference), soit les `sharedKV` passes par le
+        // TextModel (sans cache). Instancier k_proj/v_proj/k_norm/v_norm reviendrait
+        // a exiger des poids que les checkpoints ne fournissent plus.
+        if kvSharedOnly || isKvSharedLayer {
             // Drafter Assistant: pas de K/V propres, jamais. Skip les modules associes.
             self._kProj.wrappedValue = nil
             self._vProj.wrappedValue = nil
@@ -86,10 +95,6 @@ public class Gemma4Attention: Module {
             self._kNorm.wrappedValue = RMSNorm(dimensions: headDim, eps: config.rmsNormEps)
             self._vNorm.wrappedValue = RMSNormNoScale(eps: config.rmsNormEps)
         }
-
-        // KV sharing
-        let firstKvSharedLayerIdx = config.firstKvSharedLayerIdx
-        self.isKvSharedLayer = layerIdx >= firstKvSharedLayerIdx && firstKvSharedLayerIdx > 0
 
         // RoPE adapte au type d'attention
         let ropeTheta = config.ropeTheta(forLayerType: layerType)
@@ -186,7 +191,10 @@ public class Gemma4Attention: Module {
                 .reshaped(B, L, -1)
                 return (oProj(output), (state[0], state[1]), effectiveOffset)
             }
-            // Fallback: compute own KV (ne devrait pas arriver)
+            // Fallback: compute own KV. N'arrive que si le cache de la couche source
+            // est vide au moment ou cette couche s'execute — impossible dans l'ordre
+            // de forward normal, et impossible a rattraper depuis 42 couches sans
+            // k_proj/v_proj propres (cf. computeKV, qui leve alors une fatalError).
             let kv = computeKV(x: x, B: B, L: L)
             keys = kv.keys; values = kv.values
             keys = rope(keys, offset: effectiveOffset)
@@ -241,7 +249,10 @@ public class Gemma4Attention: Module {
         x: MLXArray, B: Int, L: Int
     ) -> (keys: MLXArray, values: MLXArray) {
         guard let kProj = kProj, let kNorm = kNorm, let vNorm = vNorm else {
-            fatalError("computeKV appele sur une couche kvSharedOnly — sharedKV doit etre fourni externe")
+            fatalError(
+                "computeKV appele sur une couche sans K/V propres (layer \(layerIdx), "
+                    + "kvSharedOnly=\(kvSharedOnly), isKvSharedLayer=\(isKvSharedLayer)) — "
+                    + "sharedKV ou le cache de la couche source doit etre fourni")
         }
         var keys = kProj(x).reshaped(B, L, numKVHeads, headDim)
 
