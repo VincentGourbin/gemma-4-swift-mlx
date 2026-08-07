@@ -47,7 +47,10 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
-        WeightSanitizer.sanitize(weights: weights)
+        WeightSanitizer.sanitize(
+            weights: weights,
+            firstKvSharedLayerIdx: config.firstKvSharedLayerIdx
+        )
     }
 
     /// Prepare les tokens d'entree pour la generation

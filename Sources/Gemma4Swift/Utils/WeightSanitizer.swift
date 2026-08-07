@@ -12,22 +12,48 @@ public enum WeightSanitizer {
         weights.keys.contains { $0.hasPrefix("model.") }
     }
 
+    /// Vrai si `key` designe un k_proj/v_proj/k_norm/v_norm appartenant a une couche
+    /// d'indice >= `firstKvSharedLayerIdx` (donc une couche KV-shared).
+    static func isOwnKVOfSharedLayer(_ key: String, _ firstKvSharedLayerIdx: Int) -> Bool {
+        guard key.contains(".self_attn.") else { return false }
+        guard ["k_proj", "v_proj", "k_norm", "v_norm"].contains(where: {
+            key.contains(".self_attn.\($0).")
+        }) else { return false }
+
+        guard let range = key.range(of: ".layers.") else { return false }
+        let rest = key[range.upperBound...]
+        guard let dot = rest.firstIndex(of: "."),
+              let layerIdx = Int(rest[..<dot])
+        else { return false }
+
+        return layerIdx >= firstKvSharedLayerIdx
+    }
+
     /// Nettoie les poids charges depuis les safetensors
     /// - Supprime les prefixes "model."
     /// - Remappe "language_model.X" → "language_model.model.X"
     /// - Ignore les cles rotary_emb
     /// - Transpose les poids Conv2d/Conv1d PyTorch → MLX (format Google uniquement)
     /// - Split les poids MoE gate_up_proj
+    /// - Supprime les K/V propres des couches KV-shared (`firstKvSharedLayerIdx > 0`)
     public static func sanitize(
         weights: [String: MLXArray],
         hasVision: Bool = false,
         hasAudio: Bool = false,
-        useClippedLinears: Bool = false
+        useClippedLinears: Bool = false,
+        firstKvSharedLayerIdx: Int = 0
     ) -> [String: MLXArray] {
         let isGoogle = isGoogleFormat(weights)
         var sanitized: [String: MLXArray] = [:]
 
         for (key, value) in weights {
+            // Les couches KV-shared lisent les K/V de leur couche source : elles n'ont
+            // pas de k_proj/v_proj/k_norm/v_norm cote Swift. Les checkpoints recents ne
+            // les fournissent plus non plus, mais les anciens portaient ces poids morts.
+            if firstKvSharedLayerIdx > 0, isOwnKVOfSharedLayer(key, firstKvSharedLayerIdx) {
+                continue
+            }
+
             // Skip clipping params si non utilises
             if key.contains("input_max") || key.contains("input_min")
                 || key.contains("output_max") || key.contains("output_min") {

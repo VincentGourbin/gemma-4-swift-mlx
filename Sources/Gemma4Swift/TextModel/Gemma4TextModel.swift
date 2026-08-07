@@ -29,19 +29,66 @@ public struct TextForwardOutput {
     public let intermediates: [LayerIntermediate?]
 }
 
-/// Linear avec scaling integre (pour per_layer_model_projection)
-class ScaledLinear: Module {
+/// Linear avec scaling integre (pour per_layer_model_projection).
+///
+/// Conforme a `Quantizable` : `quantize(model:)` ne convertit que les modules
+/// conformes et ignore silencieusement les autres. Les checkpoints 4-bit de
+/// gemma-4-E4B livrent `per_layer_model_projection` sous forme quantifiee
+/// (`.weight` packe + `.scales` + `.biases`) ; sans cette conformance la couche
+/// restait en float et le chargement echouait sur un mismatch de forme
+/// (`[10752, 320]` recu contre `[10752, 2560]` attendu).
+class ScaledLinear: Module, Quantizable {
     @ModuleInfo var weight: MLXArray
     let scalar: Float
 
-    init(inFeatures: Int, outFeatures: Int, scalar: Float) {
-        self._weight.wrappedValue = MLXArray.zeros([outFeatures, inFeatures])
+    init(weight: MLXArray, scalar: Float) {
+        self._weight.wrappedValue = weight
         self.scalar = scalar
         super.init()
     }
 
+    convenience init(inFeatures: Int, outFeatures: Int, scalar: Float) {
+        self.init(weight: MLXArray.zeros([outFeatures, inFeatures]), scalar: scalar)
+    }
+
     func callAsFunction(_ x: MLXArray) -> MLXArray {
         (matmul(x, weight.T)) * MLXArray(scalar, dtype: x.dtype)
+    }
+
+    func toQuantized(groupSize: Int, bits: Int, mode: QuantizationMode) -> Module {
+        QuantizedScaledLinear(self, groupSize: groupSize, bits: bits, mode: mode)
+    }
+}
+
+/// Variante quantifiee de ``ScaledLinear``.
+///
+/// Doit deriver de `ScaledLinear` : la substitution des sous-modules par
+/// `quantize(model:)` passe par `@ModuleInfo`, qui verifie que le remplacant
+/// est du type declare par la propriete.
+final class QuantizedScaledLinear: ScaledLinear, Quantized {
+    let groupSize: Int
+    let bits: Int
+    let mode: QuantizationMode
+    let scales: MLXArray
+    let biases: MLXArray?
+
+    init(_ other: ScaledLinear, groupSize: Int, bits: Int, mode: QuantizationMode) {
+        self.groupSize = groupSize
+        self.bits = bits
+        self.mode = mode
+        let (quantizedWeight, scales, biases) = MLX.quantized(
+            other.weight, groupSize: groupSize, bits: bits, mode: mode)
+        self.scales = scales
+        self.biases = biases
+        super.init(weight: quantizedWeight, scalar: other.scalar)
+        self.freeze()
+    }
+
+    override func callAsFunction(_ x: MLXArray) -> MLXArray {
+        quantizedMM(
+            x, weight, scales: scales, biases: biases, transpose: true,
+            groupSize: groupSize, bits: bits, mode: mode
+        ) * MLXArray(scalar, dtype: x.dtype)
     }
 }
 

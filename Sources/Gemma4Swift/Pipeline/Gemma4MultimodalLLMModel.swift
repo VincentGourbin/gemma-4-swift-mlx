@@ -245,7 +245,8 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
             weights: weights,
             hasVision: true,
             hasAudio: config.audioConfig != nil,
-            useClippedLinears: useClipped
+            useClippedLinears: useClipped,
+            firstKvSharedLayerIdx: config.textConfig.firstKvSharedLayerIdx
         )
     }
 
