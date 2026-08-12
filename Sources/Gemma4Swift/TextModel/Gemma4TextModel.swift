@@ -27,6 +27,12 @@ public struct TextForwardOutput {
     public let preNormHidden: MLXArray
 
     public let intermediates: [LayerIntermediate?]
+
+    /// Hidden states par couche, convention HuggingFace `output_hidden_states=True` :
+    /// `[embeddings scalees, sortie couche 0, ..., sortie couche N-2, norm(sortie couche N-1)]`
+    /// soit `numHiddenLayers + 1` entrees. Vide sauf si le forward a ete demande via
+    /// `forwardCollectingHiddenStates`.
+    public let hiddenStates: [MLXArray]
 }
 
 /// Linear avec scaling integre (pour per_layer_model_projection).
@@ -261,6 +267,44 @@ public class Gemma4TextModel: Module {
         )
     }
 
+    /// Forward qui retourne les hidden states de TOUTES les couches, convention
+    /// HuggingFace `output_hidden_states=True` :
+    ///
+    /// ```
+    /// [0]   embeddings * sqrt(hidden_size)   (entree de la couche 0)
+    /// [i]   sortie de la couche i-1          (1 <= i <= numHiddenLayers-1)
+    /// [N]   norm(sortie de la couche N-1)    (N = numHiddenLayers)
+    /// ```
+    ///
+    /// soit `numHiddenLayers + 1` tenseurs `[B, T, hidden_size]` (49 pour le 12B Unified).
+    /// Seule la derniere entree passe le RMSNorm final — comme en Python, ou
+    /// `all_hidden_states` est alimente AVANT chaque couche puis complete par
+    /// `self.norm(hidden_states)`.
+    ///
+    /// Consommateur type : un encodeur texte de modele de diffusion (LTX) qui
+    /// conditionne sur l'ensemble des couches et non sur la seule sortie finale.
+    ///
+    /// - Note: les `numHiddenLayers + 1` tenseurs sont retenus simultanement
+    ///   (~T x hidden x 2 octets par couche). Sur 12B a T=512 cela represente
+    ///   ~190 Mo en bf16 : dimensionner le prompt en consequence.
+    public func forwardCollectingHiddenStates(
+        inputs: MLXArray? = nil,
+        inputsEmbeds: MLXArray? = nil,
+        cache: [KVCache?]? = nil,
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
+    ) -> [MLXArray] {
+        // Le KV-sharing (E2B/E4B) exige la collecte des intermediates ; les modeles
+        // sans couches partagees (12B Unified, 31B) gardent le fast-path.
+        let needsIntermediates = firstKvSharedLayerIdx < numHiddenLayers
+        return runForward(
+            inputs: inputs, inputsEmbeds: inputsEmbeds, cache: cache,
+            perLayerInputs: perLayerInputs, visionTokenMask: visionTokenMask,
+            collectIntermediates: needsIntermediates,
+            collectHiddenStates: true
+        ).hiddenStates
+    }
+
     /// Path partage entre `callAsFunction` (fast-path sans intermediates) et
     /// `forwardCollectingIntermediates` (avec intermediates pour KV-sharing /
     /// MTP). La logique embedding, masks, layer loop et norm est identique ;
@@ -271,7 +315,8 @@ public class Gemma4TextModel: Module {
         cache: [KVCache?]?,
         perLayerInputs: MLXArray?,
         visionTokenMask: MLXArray?,
-        collectIntermediates: Bool
+        collectIntermediates: Bool,
+        collectHiddenStates: Bool = false
     ) -> TextForwardOutput {
         var h: MLXArray
         if let inputsEmbeds = inputsEmbeds {
@@ -338,7 +383,18 @@ public class Gemma4TextModel: Module {
                 ? Array(repeating: nil, count: numHiddenLayers)
                 : []
 
+        // Hidden states par couche (convention HF) : l'entree de chaque couche est
+        // enregistree AVANT son execution, la sortie de la derniere couche n'est
+        // ajoutee qu'apres le RMSNorm final.
+        var collectedHidden: [MLXArray] = []
+        if collectHiddenStates {
+            collectedHidden.reserveCapacity(numHiddenLayers + 1)
+        }
+
         for (i, layer) in layers.enumerated() {
+            if collectHiddenStates {
+                collectedHidden.append(h)
+            }
             let cacheIdx = layerIdxToCacheIdx[i]
             let c = cacheIdx < cacheArray.count ? cacheArray[cacheIdx] : nil
             let isGlobal = layerTypes[i] == "full_attention"
@@ -389,6 +445,10 @@ public class Gemma4TextModel: Module {
         let preNormHidden = h
         let normedHidden = norm(h)
 
+        if collectHiddenStates {
+            collectedHidden.append(normedHidden)
+        }
+
         let publicIntermediates: [LayerIntermediate?]
         if collectIntermediates {
             publicIntermediates = intermediates.map { entry in
@@ -404,7 +464,8 @@ public class Gemma4TextModel: Module {
         return TextForwardOutput(
             hidden: normedHidden,
             preNormHidden: preNormHidden,
-            intermediates: publicIntermediates
+            intermediates: publicIntermediates,
+            hiddenStates: collectedHidden
         )
     }
 }
