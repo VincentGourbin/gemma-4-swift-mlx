@@ -89,6 +89,29 @@ public class Gemma4LanguageModel: Module {
         )
     }
 
+    /// Hidden states de toutes les couches du decoder texte, convention HuggingFace
+    /// `output_hidden_states=True` : `numHiddenLayers + 1` tenseurs `[B, T, hidden_size]`
+    /// (embeddings scalees, sorties des couches 0..N-2, puis `norm(sortie couche N-1)`).
+    ///
+    /// Pas de lm_head applique : c'est l'API pour les consommateurs qui utilisent
+    /// Gemma 4 comme encodeur texte (conditionnement d'un modele de diffusion),
+    /// pas comme generateur. Voir [[Gemma4TextModel.forwardCollectingHiddenStates]].
+    public func forwardCollectingHiddenStates(
+        inputs: MLXArray? = nil,
+        inputsEmbeds: MLXArray? = nil,
+        cache: [KVCache?]? = nil,
+        perLayerInputs: MLXArray? = nil,
+        visionTokenMask: MLXArray? = nil
+    ) -> [MLXArray] {
+        model.forwardCollectingHiddenStates(
+            inputs: inputs,
+            inputsEmbeds: inputsEmbeds,
+            cache: cache,
+            perLayerInputs: perLayerInputs,
+            visionTokenMask: visionTokenMask
+        )
+    }
+
     /// Estime si TurboQuant est benefique pour cette architecture.
     /// TurboQuant compresse les couches full attention. L'overhead fixe
     /// (rotation matrices, codecs, graph MLX) n'est rentable que si le

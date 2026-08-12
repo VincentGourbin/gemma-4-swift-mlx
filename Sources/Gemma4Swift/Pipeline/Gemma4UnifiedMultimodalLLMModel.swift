@@ -126,6 +126,37 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
+    /// Hidden states de toutes les couches du decoder, convention HuggingFace
+    /// `output_hidden_states=True` : `num_hidden_layers + 1` tenseurs `[B, T, hidden_size]`
+    /// (49 x `[B, T, 3840]` sur le 12B Unified).
+    ///
+    /// Point d'entree public pour l'usage "encodeur texte" du modele : un modele de
+    /// diffusion (LTX) conditionne sur l'ensemble des couches, pas sur les seuls logits.
+    /// Les tokens multimodaux sont pris en charge comme dans `callAsFunction`
+    /// (embeds fusionnes + overlay bidirectionnel vision).
+    ///
+    /// - Parameter cache: normalement `nil` pour un encodage one-shot ; le passer
+    ///   n'a de sens que pour prolonger une sequence deja prefill.
+    public func forwardCollectingHiddenStates(
+        _ inputs: MLXArray,
+        cache: [KVCache]? = nil
+    ) -> [MLXArray] {
+        let cacheArray: [KVCache?]? = cache?.map { $0 as KVCache? }
+        let visionMask: MLXArray? = computeVisionTokenMask(inputs)
+        if let inputsEmbeds = prepareMultimodalEmbeds(inputs) {
+            return languageModel.forwardCollectingHiddenStates(
+                inputsEmbeds: inputsEmbeds,
+                cache: cacheArray,
+                visionTokenMask: visionMask
+            )
+        }
+        return languageModel.forwardCollectingHiddenStates(
+            inputs: inputs,
+            cache: cacheArray,
+            visionTokenMask: visionMask
+        )
+    }
+
     /// Calcule un mask [B, T] bool : true ou le token est image OU video.
     /// Retourne nil si T==1 (decodage), ou si AUCUN token vision ni AUCUN audio
     /// (path text pur, pas de masking custom necessaire).
