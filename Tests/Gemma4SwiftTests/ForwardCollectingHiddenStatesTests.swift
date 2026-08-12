@@ -164,6 +164,29 @@ struct ForwardCollectingHiddenStatesTests {
         #expect(abs(viaLang.last! - viaText.last!).max().item(Float.self) == 0)
     }
 
+    @Test("Gemma4LLMModel (wrapper rendu par le registry en text-only) expose la meme API")
+    func testLLMModelPassthrough() {
+        let cfg = decode(plainConfigJSON)
+        let llm = Gemma4LLMModel(config: cfg)
+
+        let B = 1, L = 3
+        let inputs = MLXArray((0 ..< B * L).map { Int32($0 % 100) }).reshaped(B, L)
+
+        let states = llm.forwardCollectingHiddenStates(inputs)
+        let direct = llm(inputs, cache: nil)
+
+        #expect(states.count == cfg.numHiddenLayers + 1)
+        for s in states {
+            #expect(s.shape == [B, L, cfg.hiddenSize])
+        }
+
+        // callAsFunction applique le lm_head : on compare a la hidden post-norm,
+        // pas aux logits. states.last doit etre l'entree du lm_head.
+        #expect(direct.shape == [B, L, cfg.vocabSize])
+        eval(states.last!, direct)
+        #expect(!isNaN(states.last!).any().item(Bool.self))
+    }
+
     @Test("forwardCollectingIntermediates ne collecte pas les hidden states")
     func testIntermediatesPathStaysLean() {
         let cfg = decode(plainConfigJSON)
