@@ -41,6 +41,25 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         return languageModel(inputs: inputs, cache: cacheArray)
     }
 
+    /// Hidden states de toutes les couches, convention HuggingFace
+    /// `output_hidden_states=True` : `num_hidden_layers + 1` tenseurs
+    /// `[B, T, hidden_size]` (49 x `[B, T, 3840]` sur le 12B).
+    ///
+    /// C'est le point d'entree de l'usage "encodeur texte" : `Gemma4Registration`
+    /// resout `gemma4`, `gemma4_text` et `gemma4_unified` vers ce type des lors que
+    /// `register(multimodal:)` vaut `false`. Meme API que sur
+    /// [[Gemma4UnifiedMultimodalLLMModel]], pour que le consommateur n'ait pas a
+    /// savoir quel wrapper le registry lui a rendu.
+    ///
+    /// - Parameter cache: normalement `nil` pour un encodage one-shot.
+    public func forwardCollectingHiddenStates(
+        _ inputs: MLXArray,
+        cache: [KVCache]? = nil
+    ) -> [MLXArray] {
+        let cacheArray: [KVCache?]? = cache?.map { $0 as KVCache? }
+        return languageModel.forwardCollectingHiddenStates(inputs: inputs, cache: cacheArray)
+    }
+
     public func newCache(parameters: GenerateParameters?) -> [any KVCache] {
         let kvBits: Float? = parameters?.kvBits != nil ? Float(parameters!.kvBits!) : nil
         return languageModel.makeCache(kvBits: kvBits)
