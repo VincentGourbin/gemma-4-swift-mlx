@@ -33,20 +33,68 @@
 
 set -euo pipefail
 
+# Controle des jobs : chaque tache de fond obtient son propre groupe de process,
+# ce qui permet de tuer le chien de garde *et* son `sleep` en fin de script. Sans
+# ca, le sleep survit, garde stdout ouvert, et un appel du type
+# `Scripts/run-tests.sh | grep ...` reste bloque jusqu'a l'expiration du delai.
+set -m
+
 cd "$(dirname "$0")/.."
 
 env_args=(TEST_RUNNER_SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1)
 
-# Relais des variables d'activation des tests d'integration (xcodebuild n'en
-# transmet aucune au runner sans le prefixe TEST_RUNNER_).
-if [[ -n "${GEMMA4_INTEGRATION_MODEL_PATH:-}" ]]; then
-    env_args+=("TEST_RUNNER_GEMMA4_INTEGRATION_MODEL_PATH=${GEMMA4_INTEGRATION_MODEL_PATH}")
-fi
+# Relais de toutes les variables GEMMA4_* (activation des tests d'integration) :
+# xcodebuild ne transmet au runner que ce qui est prefixe TEST_RUNNER_. Pas de
+# liste blanche, sinon la prochaine variable ajoutee serait silencieusement
+# ignoree et le test correspondant sauterait en se faisant passer pour vert.
+while IFS= read -r line; do
+    case "$line" in
+        GEMMA4_*) env_args+=("TEST_RUNNER_${line}") ;;
+    esac
+done < <(env)
 
-exec env "${env_args[@]}" \
+# Garde-fou. Le contournement repose sur deux maillons non garantis : xcodebuild
+# qui relaie les variables TEST_RUNNER_, et un nom de variable que swift-testing
+# annonce lui-meme comme EXPERIMENTAL. Si l'un des deux lache, le deadlock
+# revient et la commande se fige sans rien dire.
+#
+# Les options natives d'xcodebuild ne rattrapent pas ce cas : verifie le
+# 2026-08-14 avec `-test-timeouts-enabled YES
+# -default-test-execution-time-allowance 60`, le process etait toujours bloque
+# 87 s plus tard, sans « exceeded its execution time allowance ». D'ou ce
+# chien de garde en horloge murale, sur la duree totale du run (la suite passe
+# en ~1,2 s, ~35 s avec les tests d'integration).
+timeout_seconds="${GEMMA4_TEST_TIMEOUT:-900}"
+
+env "${env_args[@]}" \
     xcodebuild \
         -scheme Gemma4Swift-Package \
         -destination "platform=macOS" \
         -derivedDataPath .build/xcode \
         -skipMacroValidation \
-        test "$@"
+        test "$@" &
+build_pid=$!
+
+(
+    sleep "${timeout_seconds}"
+    if kill -0 "${build_pid}" 2>/dev/null; then
+        echo "" >&2
+        echo "run-tests.sh : aucun resultat apres ${timeout_seconds}s." >&2
+        echo "Le contournement du deadlock mlx-swift ne s'applique probablement plus" >&2
+        echo "(cf. l'en-tete de ce script et CLAUDE.md). Arret du build." >&2
+        kill -TERM "${build_pid}" 2>/dev/null || true
+        sleep 5
+        kill -KILL "${build_pid}" 2>/dev/null || true
+        echo "Un process xctest peut survivre au build : verifier avec 'pgrep xctest'." >&2
+    fi
+) &
+watchdog_pid=$!
+
+status=0
+wait "${build_pid}" || status=$?
+
+# Le groupe entier, pour emporter le `sleep` avec le sous-shell.
+kill -- -"${watchdog_pid}" 2>/dev/null || kill "${watchdog_pid}" 2>/dev/null || true
+wait "${watchdog_pid}" 2>/dev/null || true
+
+exit "${status}"

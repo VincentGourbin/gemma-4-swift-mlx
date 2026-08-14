@@ -246,6 +246,13 @@ All 16 model variants (4 families × 4 quantizations) benchmarked. Full results 
 
 Train LoRA, DoRA, or full SFT adapters entirely on-device. Compatible with [mlx-lm](https://github.com/ml-explore/mlx-swift-lm) Python adapters — train in one, infer in the other.
 
+> **Do not run training concurrently with inference.** `mlx-swift` takes its
+> per-compiled-function lock and its global `evalLock` in opposite orders in
+> `CompiledFunction.call` versus `vjp`/`jvp`, so a gradient step on one thread and
+> a forward pass on another can deadlock the process (both locks are global —
+> `Gemma4LoRATrain.train` is callable from any task, `Gemma4Pipeline` is
+> `@MainActor`). Serialize the two until this is fixed upstream.
+
 ### Supported modes
 
 | Mode | Description | Memory (E2B bf16) |

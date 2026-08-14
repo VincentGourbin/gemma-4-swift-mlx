@@ -30,8 +30,14 @@ takes the per-function `NSLock` then the global `evalLock`
 functions during tracing (`Transforms.swift:31`, `:68`). One thread in a
 gradient (`DrafterTrainingTests`, `LoRATests`) plus one thread in a forward
 going through `geluApproximate` (a `compile`d function) is enough. `evalLock` is
-recursive, so single-threaded use is fine — only swift-testing's parallel
-execution triggers it.
+recursive, so single-threaded use never deadlocks — it takes two threads.
+
+**This is not a test-only hazard.** Both locks are process-global, and the
+library exposes both sides: `Gemma4LoRATrain.train` is a nonisolated public
+static (runnable from any task) while `Gemma4Pipeline` is `@MainActor`. An app
+that fine-tunes on a background task while streaming inference can hit the same
+ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
+inference — serialize the two.
 
 `Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
 (via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
