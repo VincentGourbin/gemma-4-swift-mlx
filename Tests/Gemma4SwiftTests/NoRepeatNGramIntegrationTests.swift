@@ -8,12 +8,12 @@ import MLX
 /// tournent que s'il est fourni :
 ///
 /// ```
-/// # xcodebuild ne transmet au runner que les variables prefixees TEST_RUNNER_
-/// TEST_RUNNER_GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit \
-///   xcodebuild -scheme Gemma4Swift-Package -destination "platform=macOS" \
-///   -derivedDataPath .build/xcode -skipMacroValidation test \
-///   -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
+/// GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit \
+///   Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
 /// ```
+///
+/// Le wrapper se charge du prefixe `TEST_RUNNER_` (seules ces variables sont
+/// transmises au process de test par xcodebuild).
 private let integrationModelPath = ProcessInfo.processInfo
     .environment["GEMMA4_INTEGRATION_MODEL_PATH"]
 
