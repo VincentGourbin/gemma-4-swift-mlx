@@ -103,4 +103,25 @@ struct WeightSanitizerTests {
         // L'original ne doit plus etre present
         #expect(sanitized["language_model.model.layers.0.experts.gate_up_proj"] == nil)
     }
+
+    @Test("KV-shared: ne supprime que les K/V du LLM, pas ceux des tours vision/audio")
+    func testKvSharedDropIsLLMOnly() {
+        let weights: [String: MLXArray] = [
+            // LLM couche 20 (>= firstKvSharedLayerIdx 15) : K/V morts, a supprimer
+            "language_model.model.layers.20.self_attn.k_proj.weight": MLXArray.zeros([4, 4]),
+            "language_model.model.layers.20.self_attn.v_norm.weight": MLXArray.zeros([4]),
+            // Vision couche 15 : K/V bien vivants, a conserver
+            "vision_tower.encoder.layers.15.self_attn.k_proj.linear.weight": MLXArray.zeros([4, 4]),
+            "vision_tower.encoder.layers.15.self_attn.k_norm.weight": MLXArray.zeros([4]),
+            "audio_tower.encoder.layers.15.self_attn.v_proj.linear.weight": MLXArray.zeros([4, 4]),
+        ]
+        let sanitized = WeightSanitizer.sanitize(
+            weights: weights, hasVision: true, hasAudio: true,
+            firstKvSharedLayerIdx: 15)
+        #expect(sanitized["language_model.model.layers.20.self_attn.k_proj.weight"] == nil)
+        #expect(sanitized["language_model.model.layers.20.self_attn.v_norm.weight"] == nil)
+        #expect(sanitized["vision_tower.encoder.layers.15.self_attn.k_proj.linear.weight"] != nil)
+        #expect(sanitized["vision_tower.encoder.layers.15.self_attn.k_norm.weight"] != nil)
+        #expect(sanitized["audio_tower.encoder.layers.15.self_attn.v_proj.linear.weight"] != nil)
+    }
 }
