@@ -49,11 +49,12 @@ struct ModelRegistryTests {
         #expect(Gemma4Pipeline.Model.b31b4bit.parameterCount == "31.3B")
     }
 
-    @Test("isMoE uniquement pour 26B-A4B")
+    @Test("isMoE pour 26B-A4B et DiffusionGemma")
     func testIsMoE() {
         let moeModels = Gemma4Pipeline.Model.allCases.filter { $0.isMoE }
-        #expect(moeModels.count == 4) // a4b 4-bit, 6-bit, 8-bit, bf16
-        #expect(moeModels.allSatisfy { $0.family == .a4b })
+        // a4b 4-bit, 6-bit, 8-bit, bf16 + DiffusionGemma 26B-A4B bf16
+        #expect(moeModels.count == 5)
+        #expect(moeModels.allSatisfy { $0.family == .a4b || $0.family == .a4bDiff })
     }
 
     @Test("Tous les modeles sont IT")
@@ -89,17 +90,21 @@ struct ModelRegistryTests {
         #expect(Gemma4Pipeline.Model.e4b4bit.estimatedSizeGB < Gemma4Pipeline.Model.a4b4bit.estimatedSizeGB)
     }
 
-    @Test("20 modeles au total (5 familles x 4 quantisations)")
+    @Test("21 modeles au total (5 familles x 4 quantisations + DiffusionGemma)")
     func testModelCount() {
         // 5 familles : E2B, E4B, 31B, 26B-A4B, 12B Unified ; 4 quants chacune.
-        #expect(Gemma4Pipeline.Model.allCases.count == 20)
+        // + DiffusionGemma 26B-A4B, publie uniquement en bf16 par Google.
+        #expect(Gemma4Pipeline.Model.allCases.count == 21)
     }
 
     @Test("Raw values sont des IDs HuggingFace valides")
     func testRawValues() {
         for model in Gemma4Pipeline.Model.allCases {
             #expect(model.rawValue.contains("/"))
-            #expect(model.rawValue.hasPrefix("mlx-community/"))
+            // Les repos MLX community sont pre-quantises ; DiffusionGemma n'existe
+            // que sur le repo Google officiel (bf16, quantifiable a la volee).
+            let expectedOwner = model.isDiffusion ? "google/" : "mlx-community/"
+            #expect(model.rawValue.hasPrefix(expectedOwner))
         }
     }
 
