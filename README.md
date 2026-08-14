@@ -566,6 +566,28 @@ for try await token in stream {
 let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
 
+### Blocking repeated n-grams
+
+`chatStream` and `chatStreamMultimodal` accept `noRepeatNGramSize`, the equivalent
+of HF transformers' `no_repeat_ngram_size`: at each step, any token that would
+complete an n-gram already present in `prompt + generated` gets a `-inf` logit.
+This matters for long greedy captions (e.g. the LTX-2.5 prompt enhancer, which
+uses `no_repeat_ngram_size = 5`), where decoding otherwise drifts into
+repetitions.
+
+```swift
+let stream = try pipeline.chatStream(
+    prompt: "user prompt: a cat on a red carpet",
+    systemPrompt: enhancerSystemPrompt,
+    temperature: 0.0,        // greedy
+    maxTokens: 600,
+    noRepeatNGramSize: 5)
+```
+
+`nil` (the default) keeps the previous behavior. When set, the text path bypasses
+`ChatSession` — which cannot carry a custom `LogitProcessor` — so the turn is not
+recorded in the session and `continueChat` is unavailable afterwards.
+
 > No need to import `MLXLMCommon` — `Gemma4Pipeline.load()` handles registration, tokenizer loading, and model container setup internally.
 
 ### Thinking Mode Filter

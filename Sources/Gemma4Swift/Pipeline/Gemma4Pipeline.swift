@@ -342,14 +342,33 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     }
 
     /// Genere en streaming (token par token)
+    ///
+    /// - Parameter noRepeatNGramSize: si non-nil, interdit tout n-gramme de cette
+    ///   taille deja present dans `prompt + genere` (equivalent de
+    ///   `no_repeat_ngram_size` de HF transformers). Ce mode contourne
+    ///   `ChatSession`, qui ne sait pas injecter de `LogitProcessor` : la session
+    ///   courante est alors reinitialisee et `continueChat` n'est pas disponible
+    ///   apres coup. `nil` (defaut) = comportement inchange.
     public func chatStream(
         prompt: String,
         systemPrompt: String? = nil,
         temperature: Float = 0.3,
-        maxTokens: Int = 1024
+        maxTokens: Int = 1024,
+        noRepeatNGramSize: Int? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
+        }
+
+        if let ngramSize = noRepeatNGramSize {
+            return try chatStreamNoRepeatNGram(
+                container: container,
+                prompt: prompt,
+                systemPrompt: systemPrompt,
+                temperature: temperature,
+                maxTokens: maxTokens,
+                ngramSize: ngramSize
+            )
         }
 
         let params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
@@ -380,6 +399,80 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         }
     }
 
+    /// Path texte avec blocage de n-grammes : bypass `ChatSession` (qui ne sait
+    /// pas injecter de `LogitProcessor`) tout en reconstruisant le meme prompt
+    /// (message system + message user via le processor du modele) et en utilisant
+    /// le `TokenIterator` natif.
+    private func chatStreamNoRepeatNGram(
+        container: ModelContainer,
+        prompt: String,
+        systemPrompt: String?,
+        temperature: Float,
+        maxTokens: Int,
+        ngramSize: Int
+    ) throws -> AsyncThrowingStream<String, Error> {
+        guard ngramSize >= 1 else {
+            throw Gemma4PipelineError.invalidInput(
+                "noRepeatNGramSize doit etre >= 1 (recu \(ngramSize))")
+        }
+
+        // La generation ne passe pas par une ChatSession : pas d'historique a continuer.
+        currentSession = nil
+        state = .processing
+
+        let instructions = systemPrompt ?? "Tu es un assistant utile."
+        let promptCapture = prompt
+        let temperatureCapture = temperature
+        let maxTokensCapture = maxTokens
+
+        return AsyncThrowingStream { continuation in
+            Task { [weak self] in
+                do {
+                    try await container.perform { context in
+                        let messages: [Chat.Message] = [
+                            .system(instructions),
+                            .user(promptCapture),
+                        ]
+                        let input = try await context.processor.prepare(
+                            input: UserInput(chat: messages))
+                        let params = GenerateParameters(
+                            maxTokens: maxTokensCapture,
+                            temperature: temperatureCapture,
+                            topP: 0.95
+                        )
+                        let iterator = try TokenIterator(
+                            input: input,
+                            model: context.model,
+                            cache: nil,
+                            processor: NoRepeatNGramLogitProcessor(ngramSize: ngramSize),
+                            sampler: params.sampler(),
+                            prefillStepSize: params.prefillStepSize,
+                            maxTokens: maxTokensCapture
+                        )
+                        let (stream, _) = MLXLMCommon.generateTask(
+                            promptTokenCount: input.text.tokens.size,
+                            modelConfiguration: context.configuration,
+                            tokenizer: context.tokenizer,
+                            iterator: iterator
+                        )
+                        for await generation in stream {
+                            switch generation {
+                            case .chunk(let text):
+                                continuation.yield(text)
+                            case .info, .toolCall:
+                                break
+                            }
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+                await MainActor.run { self?.state = .ready }
+            }
+        }
+    }
+
     /// Streame une reponse AR avec image(s) en entree. Bypass `ChatSession`
     /// (qui ne sait pas injecter de pixelValues) mais utilise quand meme le
     /// `TokenIterator` natif de MLXLMCommon (asyncEval pipeliné, sampler
@@ -390,21 +483,32 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     /// le modele (consume au premier forward). (3) `MLXLMCommon.generate(...)`
     /// avec `LMInput(tokens:)` et `GenerateParameters` — streame des `.chunk`.
     ///
+    /// - Parameter noRepeatNGramSize: si non-nil, interdit tout n-gramme de cette
+    ///   taille deja present dans `prompt + genere` (equivalent de
+    ///   `no_repeat_ngram_size` de HF transformers). `nil` (defaut) = comportement
+    ///   inchange.
+    ///
     /// - Requires: `load(multimodal: true)` (necessaire pour vision_tower + embed_vision).
     public func chatStreamMultimodal(
         prompt: String,
         pixelValues: MLXArray,
         temperature: Float = 0.3,
-        maxTokens: Int = 256
+        maxTokens: Int = 256,
+        noRepeatNGramSize: Int? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
+        }
+        if let ngramSize = noRepeatNGramSize, ngramSize < 1 {
+            throw Gemma4PipelineError.invalidInput(
+                "noRepeatNGramSize doit etre >= 1 (recu \(ngramSize))")
         }
         state = .processing
         nonisolated(unsafe) let pixelsCapture = pixelValues
         let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
         let promptCapture = prompt
+        let ngramCapture = noRepeatNGramSize
 
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
@@ -446,9 +550,30 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             temperature: temperatureCapture,
                             topP: 0.95
                         )
-                        let stream = try MLXLMCommon.generate(
-                            input: lmInput, parameters: params, context: context
-                        )
+                        let stream: AsyncStream<Generation>
+                        if let ngramSize = ngramCapture {
+                            // GenerateParameters ne transporte pas de processor custom :
+                            // construire le TokenIterator explicitement.
+                            let iterator = try TokenIterator(
+                                input: lmInput,
+                                model: context.model,
+                                cache: nil,
+                                processor: NoRepeatNGramLogitProcessor(ngramSize: ngramSize),
+                                sampler: params.sampler(),
+                                prefillStepSize: params.prefillStepSize,
+                                maxTokens: maxTokensCapture
+                            )
+                            stream = MLXLMCommon.generateTask(
+                                promptTokenCount: lmInput.text.tokens.size,
+                                modelConfiguration: context.configuration,
+                                tokenizer: context.tokenizer,
+                                iterator: iterator
+                            ).0
+                        } else {
+                            stream = try MLXLMCommon.generate(
+                                input: lmInput, parameters: params, context: context
+                            )
+                        }
                         for await generation in stream {
                             switch generation {
                             case .chunk(let text):
