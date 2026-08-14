@@ -15,6 +15,11 @@ public enum WeightSanitizer {
     /// Vrai si `key` designe un k_proj/v_proj/k_norm/v_norm appartenant a une couche
     /// d'indice >= `firstKvSharedLayerIdx` (donc une couche KV-shared).
     static func isOwnKVOfSharedLayer(_ key: String, _ firstKvSharedLayerIdx: Int) -> Bool {
+        // KV-sharing est une propriete du LLM uniquement. Les tours vision/audio
+        // ont leurs propres `.layers.N.self_attn.k_proj/...` complets — sans ce
+        // garde, la couche vision N >= firstKvSharedLayerIdx perdait ses K/V au
+        // chargement (E2B: vision layer 15 videe, keyNotFound au update).
+        guard !key.contains("vision_tower"), !key.contains("audio_tower") else { return false }
         guard key.contains(".self_attn.") else { return false }
         guard ["k_proj", "v_proj", "k_norm", "v_norm"].contains(where: {
             key.contains(".self_attn.\($0).")

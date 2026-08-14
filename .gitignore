@@ -9,3 +9,4 @@ DerivedData/
 *.profraw
 *_trace.json
 *.sqlite
+.xcodebuild-tests/
