@@ -15,9 +15,41 @@ xcodebuild -scheme gemma4-cli -configuration Release \
 # Binary location
 .build/xcode/Build/Products/Release/gemma4-cli
 
-# Run tests (scheme = Gemma4Swift-Package; the Gemma4Swift scheme has no test action)
-xcodebuild -scheme Gemma4Swift-Package -destination "platform=macOS" \
-  -derivedDataPath .build/xcode -skipMacroValidation test
+# Run tests — always through this wrapper, never bare `xcodebuild test`
+Scripts/run-tests.sh
+Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/WeightSanitizerTests
+```
+
+### Why the test wrapper
+
+A bare `xcodebuild ... test` **hangs forever** (0% CPU after ~250 tests). It is a
+lock-ordering deadlock in mlx-swift, not a slow test: `CompiledFunction.call`
+takes the per-function `NSLock` then the global `evalLock`
+(`Transforms+Compile.swift:39` and `:89`), while `vjp`/`jvp` — every
+`value_and_grad` — take the global `evalLock` first and then re-enter compiled
+functions during tracing (`Transforms.swift:31`, `:68`). One thread in a
+gradient (`DrafterTrainingTests`, `LoRATests`) plus one thread in a forward
+going through `geluApproximate` (a `compile`d function) is enough. `evalLock` is
+recursive, so single-threaded use never deadlocks — it takes two threads.
+
+**This is not a test-only hazard.** Both locks are process-global, and the
+library exposes both sides: `Gemma4LoRATrain.train` is a nonisolated public
+static (runnable from any task) while `Gemma4Pipeline` is `@MainActor`. An app
+that fine-tunes on a background task while streaming inference can hit the same
+ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
+inference — serialize the two.
+
+`Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
+(via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
+process). The whole suite then passes in ~1.2s. Drop the wrapper once the
+deadlock is fixed upstream.
+
+Integration tests that need a local model are gated on an env var, forwarded by
+the wrapper:
+
+```bash
+GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit \
+  Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
 ```
 
 ## Dependency pinning
