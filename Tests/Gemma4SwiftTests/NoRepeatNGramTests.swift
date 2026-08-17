@@ -109,6 +109,74 @@ struct NoRepeatNGramTests {
         #expect(values(out)[2] == -Float.infinity)
     }
 
+    // MARK: - Fenetre d'interdiction configurable
+
+    @Test("includePromptInWindow=false : le prompt reste citable verbatim")
+    func testPromptExcludedAllowsVerbatimQuote() {
+        // Prompt [a=1, b=2, c=3, d=4, e=5], n=5 : regenerer a,b,c,d ne doit pas
+        // interdire e (la citation fidele du prompt reste possible).
+        var processor = NoRepeatNGramLogitProcessor(
+            ngramSize: 5, includePromptInWindow: false)
+        processor.prompt(MLXArray([Int32(1), 2, 3, 4, 5]))
+        for token: Int32 in [1, 2, 3, 4] {
+            processor.didSample(token: MLXArray([token]))
+        }
+
+        let out = values(processor.process(logits: zeroLogits()))
+        #expect(out[5] == 0)
+        #expect(out.allSatisfy { $0 == 0 })
+    }
+
+    @Test("includePromptInWindow=true (defaut) : le meme cas bannit bien e")
+    func testPromptIncludedBansVerbatimQuote() {
+        var processor = NoRepeatNGramLogitProcessor(ngramSize: 5)
+        processor.prompt(MLXArray([Int32(1), 2, 3, 4, 5]))
+        for token: Int32 in [1, 2, 3, 4] {
+            processor.didSample(token: MLXArray([token]))
+        }
+
+        let out = values(processor.process(logits: zeroLogits()))
+        #expect(out[5] == -Float.infinity)
+        #expect(out[6] == 0)
+    }
+
+    @Test("includePromptInWindow=false : une boucle interne au genere est tuee")
+    func testPromptExcludedStillKillsGeneratedLoop() {
+        var processor = NoRepeatNGramLogitProcessor(
+            ngramSize: 5, includePromptInWindow: false)
+        processor.prompt(MLXArray([Int32(6), 7]))
+        // Le genere boucle : a,b,c,d,e puis a,b,c,d → e doit etre banni.
+        for token: Int32 in [1, 2, 3, 4, 5, 1, 2, 3, 4] {
+            processor.didSample(token: MLXArray([token]))
+        }
+
+        let out = values(processor.process(logits: zeroLogits()))
+        #expect(out[5] == -Float.infinity)
+        #expect(out[6] == 0)
+        #expect(out[7] == 0)
+    }
+
+    @Test("includePromptInWindow=false, n=1 : seuls les tokens generes sont bannis")
+    func testPromptExcludedUnigram() {
+        var processor = NoRepeatNGramLogitProcessor(
+            ngramSize: 1, includePromptInWindow: false)
+        processor.prompt(MLXArray([Int32(2), 5]))
+        // Rien de genere encore : le prompt n'interdit rien.
+        #expect(values(processor.process(logits: zeroLogits())).allSatisfy { $0 == 0 })
+
+        processor.didSample(token: MLXArray([Int32(3)]))
+
+        let out = values(processor.process(logits: zeroLogits()))
+        #expect(out[3] == -Float.infinity)
+        #expect(out[2] == 0)
+        #expect(out[5] == 0)
+    }
+
+    @Test("Le defaut du parametre est la parite HF")
+    func testDefaultIncludesPrompt() {
+        #expect(NoRepeatNGramLogitProcessor(ngramSize: 5).includePromptInWindow)
+    }
+
     @Test("Logits 1D acceptes (rang preserve)")
     func testOneDimensionalLogits() {
         var processor = NoRepeatNGramLogitProcessor(ngramSize: 2)

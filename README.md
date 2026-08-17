@@ -595,6 +595,36 @@ let stream = try pipeline.chatStream(
 `ChatSession` — which cannot carry a custom `LogitProcessor` — so the turn is not
 recorded in the session and `continueChat` is unavailable afterwards.
 
+#### Ban window: prompt included or not
+
+`noRepeatNGramIncludesPrompt` (default `true`, HF parity) selects what feeds the
+ban window:
+
+| Value | Window | Effect |
+|---|---|---|
+| `true` (default) | `prompt + generated` | HF parity. A prompt passage cannot be quoted verbatim once it is `n` tokens long. |
+| `false` | generated only | Generation loops are still killed; the prompt stays quotable verbatim. |
+
+Use `false` when the answer must reproduce part of the prompt exactly —
+timelines, timestamps, identifiers. In HF mode, such a passage bans its own
+faithful quotation (`"From 00:08.000 to 00:14.000"` repeated verbatim is a
+repeated 5-gram), and greedy decoding routes around it with degraded spellings
+(`"From the 0008.0"`). Killing loops is the actual purpose of the mechanism, and
+that still works from the generated history alone.
+
+```swift
+let stream = try pipeline.chatStream(
+    prompt: "user prompt: <caption with an explicit timeline>",
+    systemPrompt: enhancerSystemPrompt,
+    temperature: 0.0,
+    maxTokens: 600,
+    noRepeatNGramSize: 5,
+    noRepeatNGramIncludesPrompt: false)   // prompt stays quotable
+```
+
+`NoRepeatNGramLogitProcessor(ngramSize:includePromptInWindow:)` exposes the same
+switch if you build the `TokenIterator` yourself.
+
 > No need to import `MLXLMCommon` — `Gemma4Pipeline.load()` handles registration, tokenizer loading, and model container setup internally.
 
 ### Thinking Mode Filter
