@@ -349,12 +349,17 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   `ChatSession`, qui ne sait pas injecter de `LogitProcessor` : la session
     ///   courante est alors reinitialisee et `continueChat` n'est pas disponible
     ///   apres coup. `nil` (defaut) = comportement inchange.
+    /// - Parameter noRepeatNGramIncludesPrompt: `true` (defaut) = fenetre
+    ///   `prompt + genere`, parite HF. `false` = seuls les n-grammes repetes
+    ///   *dans le texte genere* sont interdits, le prompt reste citable
+    ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
     public func chatStream(
         prompt: String,
         systemPrompt: String? = nil,
         temperature: Float = 0.3,
         maxTokens: Int = 1024,
-        noRepeatNGramSize: Int? = nil
+        noRepeatNGramSize: Int? = nil,
+        noRepeatNGramIncludesPrompt: Bool = true
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
@@ -367,7 +372,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 systemPrompt: systemPrompt,
                 temperature: temperature,
                 maxTokens: maxTokens,
-                ngramSize: ngramSize
+                ngramSize: ngramSize,
+                includePromptInWindow: noRepeatNGramIncludesPrompt
             )
         }
 
@@ -409,7 +415,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         systemPrompt: String?,
         temperature: Float,
         maxTokens: Int,
-        ngramSize: Int
+        ngramSize: Int,
+        includePromptInWindow: Bool
     ) throws -> AsyncThrowingStream<String, Error> {
         guard ngramSize >= 1 else {
             throw Gemma4PipelineError.invalidInput(
@@ -444,7 +451,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             input: input,
                             model: context.model,
                             cache: nil,
-                            processor: NoRepeatNGramLogitProcessor(ngramSize: ngramSize),
+                            processor: NoRepeatNGramLogitProcessor(
+                                ngramSize: ngramSize,
+                                includePromptInWindow: includePromptInWindow
+                            ),
                             sampler: params.sampler(),
                             prefillStepSize: params.prefillStepSize,
                             maxTokens: maxTokensCapture
@@ -487,6 +497,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   taille deja present dans `prompt + genere` (equivalent de
     ///   `no_repeat_ngram_size` de HF transformers). `nil` (defaut) = comportement
     ///   inchange.
+    /// - Parameter noRepeatNGramIncludesPrompt: `true` (defaut) = fenetre
+    ///   `prompt + genere`, parite HF. `false` = seuls les n-grammes repetes
+    ///   *dans le texte genere* sont interdits, le prompt reste citable
+    ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
     ///
     /// - Requires: `load(multimodal: true)` (necessaire pour vision_tower + embed_vision).
     public func chatStreamMultimodal(
@@ -494,7 +508,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         pixelValues: MLXArray,
         temperature: Float = 0.3,
         maxTokens: Int = 256,
-        noRepeatNGramSize: Int? = nil
+        noRepeatNGramSize: Int? = nil,
+        noRepeatNGramIncludesPrompt: Bool = true
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
@@ -509,6 +524,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let maxTokensCapture = maxTokens
         let promptCapture = prompt
         let ngramCapture = noRepeatNGramSize
+        let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
 
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
@@ -558,7 +574,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 input: lmInput,
                                 model: context.model,
                                 cache: nil,
-                                processor: NoRepeatNGramLogitProcessor(ngramSize: ngramSize),
+                                processor: NoRepeatNGramLogitProcessor(
+                                    ngramSize: ngramSize,
+                                    includePromptInWindow: ngramIncludesPromptCapture
+                                ),
                                 sampler: params.sampler(),
                                 prefillStepSize: params.prefillStepSize,
                                 maxTokens: maxTokensCapture

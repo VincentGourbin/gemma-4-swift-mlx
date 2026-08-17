@@ -129,6 +129,37 @@ struct NoRepeatNGramIntegrationTests {
         #expect(longestRepeatedWordNGram(text) <= 4)
     }
 
+    @Test("includesPrompt=false : la citation verbatim du prompt redevient possible",
+          .enabled(if: integrationModelPath != nil))
+    @MainActor
+    func testPromptQuoteSurvivesWithPromptExcluded() async throws {
+        let pipeline = try await loadPipeline()
+        defer { pipeline.unload() }
+
+        // Cas mesure cote ltx-video : une timeline explicite du prompt que la
+        // reponse doit recopier a l'identique. En mode HF (fenetre =
+        // prompt + genere), ce passage s'interdit lui-meme.
+        let quote = "From 00:08.000 to 00:14.000, the camera pans left."
+        let system = "Tu obeis litteralement, sans commentaire ni reformulation."
+        let prompt = "Recopie exactement la ligne suivante, telle quelle : \(quote)"
+
+        let excluded = try await collect(pipeline.chatStream(
+            prompt: prompt, systemPrompt: system,
+            temperature: 0.0, maxTokens: 60,
+            noRepeatNGramSize: 5, noRepeatNGramIncludesPrompt: false))
+        let included = try await collect(pipeline.chatStream(
+            prompt: prompt, systemPrompt: system,
+            temperature: 0.0, maxTokens: 60,
+            noRepeatNGramSize: 5, noRepeatNGramIncludesPrompt: true))
+
+        #expect(excluded.contains(quote))
+        // Le blocage restant s'applique au genere seul : pas de 5-gramme repete.
+        #expect(longestRepeatedWordNGram(excluded) <= 4)
+        // En parite HF, le 5-gramme du prompt est a -inf : la citation fidele
+        // est inatteignable et le greedy contourne en graphie degradee.
+        #expect(!included.contains(quote))
+    }
+
     @Test("noRepeatNGramSize invalide -> invalidInput",
           .enabled(if: integrationModelPath != nil))
     @MainActor

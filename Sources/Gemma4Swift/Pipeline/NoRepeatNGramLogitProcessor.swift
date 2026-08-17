@@ -5,11 +5,19 @@ import MLX
 @preconcurrency import MLXLMCommon
 
 /// `LogitProcessor` qui interdit de completer un n-gramme deja present dans la
-/// sequence (prompt + tokens generes), a la maniere de `no_repeat_ngram_size`
-/// de HF transformers.
+/// sequence, a la maniere de `no_repeat_ngram_size` de HF transformers.
 ///
 /// A chaque etape, on regarde les `n - 1` derniers tokens : tout token qui a
 /// deja suivi ce prefixe dans l'historique voit son logit mis a `-inf`.
+///
+/// La fenetre d'interdiction est configurable via `includePromptInWindow` :
+/// - `true` (defaut) — historique = `prompt + genere`, parite HF.
+/// - `false` — historique = tokens generes seulement. Les boucles de
+///   generation restent tuees, mais le modele peut citer le prompt
+///   verbatim. Utile quand le prompt contient du texte que la reponse doit
+///   recopier a l'identique (timeline, timestamps, identifiants) : en mode
+///   HF, un tel passage s'interdit lui-meme et le decodage greedy contourne
+///   en graphies degradees.
 ///
 /// Utilise par le prompt enhancer LTX-2.5 (`no_repeat_ngram_size = 5`), ou le
 /// decodage greedy de longues captions derive sans ce blocage (repetitions,
@@ -24,19 +32,29 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     /// Taille du n-gramme bloque (`n`). `1` interdit tout token deja vu.
     public let ngramSize: Int
 
-    /// Historique complet : prompt + tokens echantillonnes.
+    /// Si `true` (defaut), les tokens du prompt alimentent l'historique
+    /// (parite HF). Si `false`, seuls les tokens generes comptent.
+    public let includePromptInWindow: Bool
+
+    /// Historique pris en compte : `prompt + genere`, ou `genere` seul selon
+    /// `includePromptInWindow`.
     private var history: [Int32] = []
 
     /// Prefixe de taille `n - 1` → tokens qui l'ont deja suivi.
     private var continuations: [[Int32]: Set<Int32>] = [:]
 
-    /// - Parameter ngramSize: taille du n-gramme, >= 1.
-    public init(ngramSize: Int) {
+    /// - Parameters:
+    ///   - ngramSize: taille du n-gramme, >= 1.
+    ///   - includePromptInWindow: inclure le prompt dans la fenetre
+    ///     d'interdiction (defaut `true`, parite HF).
+    public init(ngramSize: Int, includePromptInWindow: Bool = true) {
         precondition(ngramSize >= 1, "ngramSize doit etre >= 1 (recu \(ngramSize))")
         self.ngramSize = ngramSize
+        self.includePromptInWindow = includePromptInWindow
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
+        guard includePromptInWindow else { return }
         append(tokens(of: prompt))
     }
 
