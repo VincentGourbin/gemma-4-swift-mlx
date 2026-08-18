@@ -97,6 +97,70 @@ public struct Gemma4Processor {
         return fullPrompt
     }
 
+    /// Construit les ids d'un tour image + texte : rendu du chat template du
+    /// modele, puis expansion de chaque marqueur `<|image|>` en
+    /// `boi + image_token × numImageTokens + eoi`.
+    ///
+    /// Le placement du role systeme est delegue au template — pour Gemma 4 il
+    /// rend un tour `<|turn>system ... <turn|>` distinct, il ne fusionne pas le
+    /// systeme dans le premier tour utilisateur. On ne prefixe donc rien a la
+    /// main : c'est le `chat_template.jinja` qui decide.
+    ///
+    /// - Parameters:
+    ///   - userPrompt: texte du tour utilisateur (le marqueur image est ajoute
+    ///     devant par cette methode).
+    ///   - systemPrompt: contenu du tour systeme. `nil` = aucun tour systeme,
+    ///     ids strictement identiques a ceux d'avant l'ajout du parametre.
+    ///   - numImageTokens: soft tokens par image (280 pour Gemma 4).
+    /// - Throws: `Gemma4PipelineError.invalidInput` si `systemPrompt` rend
+    ///   lui-meme un marqueur image — l'expansion doit rester cantonnee au tour
+    ///   utilisateur, sinon `maskedScatter` recoit plus de positions a remplir
+    ///   que d'embeddings d'image disponibles.
+    public static func multimodalChatIds(
+        userPrompt: String,
+        systemPrompt: String? = nil,
+        tokenizer: any Tokenizer,
+        numImageTokens: Int = 280
+    ) throws -> [Int] {
+        let userMessage = ["role": "user", "content": "\(imageToken)\n\(userPrompt)"]
+        var messages: [[String: String]] = []
+        if let systemPrompt {
+            messages.append(["role": "system", "content": systemPrompt])
+        }
+        messages.append(userMessage)
+
+        let ids = try tokenizer.applyChatTemplate(messages: messages)
+
+        // Le tour utilisateur peut legitimement porter plusieurs marqueurs (N
+        // images empilees sur l'axe batch de pixelValues) ; le tour systeme,
+        // jamais. On compare donc au rendu du seul tour utilisateur plutot que
+        // d'imposer un marqueur unique.
+        if systemPrompt != nil {
+            let userOnly = try tokenizer.applyChatTemplate(messages: [userMessage])
+            let marker = Int(imageTokenId)
+            let fromSystem = ids.count(where: { $0 == marker })
+                - userOnly.count(where: { $0 == marker })
+            guard fromSystem == 0 else {
+                throw Gemma4PipelineError.invalidInput(
+                    "systemPrompt contient \(fromSystem) marqueur(s) image : "
+                        + "l'expansion image doit rester dans le tour utilisateur.")
+            }
+        }
+
+        var expanded: [Int] = []
+        expanded.reserveCapacity(ids.count)
+        for id in ids {
+            guard id == Int(imageTokenId) else {
+                expanded.append(id)
+                continue
+            }
+            expanded.append(Int(boiTokenId))
+            expanded.append(contentsOf: repeatElement(Int(imageTokenId), count: numImageTokens))
+            expanded.append(Int(eoiTokenId))
+        }
+        return expanded
+    }
+
     /// Tokenise le prompt multimodal et retourne les input_ids
     /// Le tokenizer doit reconnaitre les tokens speciaux <|image|>, <|audio|>, etc.
     public static func tokenize(

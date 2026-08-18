@@ -493,6 +493,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     /// le modele (consume au premier forward). (3) `MLXLMCommon.generate(...)`
     /// avec `LMInput(tokens:)` et `GenerateParameters` — streame des `.chunk`.
     ///
+    /// - Parameter systemPrompt: si non-nil, un tour `system` distinct precede le
+    ///   tour utilisateur, comme sur le chemin texte. Le rendu est delegue au
+    ///   `chat_template.jinja` du modele (Gemma 4 emet `<|turn>system ... <turn|>`
+    ///   et ne fusionne pas le systeme dans le tour user). `nil` (defaut) = ids
+    ///   strictement identiques a avant.
     /// - Parameter noRepeatNGramSize: si non-nil, interdit tout n-gramme de cette
     ///   taille deja present dans `prompt + genere` (equivalent de
     ///   `no_repeat_ngram_size` de HF transformers). `nil` (defaut) = comportement
@@ -506,6 +511,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     public func chatStreamMultimodal(
         prompt: String,
         pixelValues: MLXArray,
+        systemPrompt: String? = nil,
         temperature: Float = 0.3,
         maxTokens: Int = 256,
         noRepeatNGramSize: Int? = nil,
@@ -523,32 +529,21 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
         let promptCapture = prompt
+        let systemPromptCapture = systemPrompt
         let ngramCapture = noRepeatNGramSize
         let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
 
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
                 do {
-                    let content = "<|image|>\n\(promptCapture)"
-                    let messages: [[String: String]] = [["role": "user", "content": content]]
-
                     try await container.perform { context in
-                        // 1. Tokenize + expansion <|image|> → boi + image_token × 280 + eoi
-                        var ids = try context.tokenizer.applyChatTemplate(messages: messages)
-                        let imageTokenId = Int(Gemma4Processor.imageTokenId)
-                        let boiTokenId = Int(Gemma4Processor.boiTokenId)
-                        let eoiTokenId = Int(Gemma4Processor.eoiTokenId)
-                        var expanded: [Int] = []
-                        for tid in ids {
-                            if tid == imageTokenId {
-                                expanded.append(boiTokenId)
-                                for _ in 0 ..< 280 { expanded.append(imageTokenId) }
-                                expanded.append(eoiTokenId)
-                            } else {
-                                expanded.append(tid)
-                            }
-                        }
-                        ids = expanded
+                        // 1. Chat template (+ tour system si fourni) puis expansion
+                        //    <|image|> → boi + image_token × 280 + eoi
+                        let ids = try Gemma4Processor.multimodalChatIds(
+                            userPrompt: promptCapture,
+                            systemPrompt: systemPromptCapture,
+                            tokenizer: context.tokenizer
+                        )
 
                         // 2. Injection pixelValues — sera consommé au premier forward du prefill
                         guard let m = context.model as? Gemma4MultimodalLLMModel else {

@@ -573,6 +573,31 @@ for try await token in stream {
 let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
 
+### System role
+
+`chatStream` and `chatStreamMultimodal` both take an optional `systemPrompt`. It is
+rendered as a **separate system turn** by the model's `chat_template.jinja` — Gemma 4
+emits `<|turn>system … <turn|>` ahead of the user turn rather than folding the
+instructions into it, which is what the HF reference implementations produce:
+
+```swift
+let stream = try pipeline.chatStreamMultimodal(
+    prompt: "user prompt: a 2CV on a coastal road",
+    pixelValues: pixels,
+    systemPrompt: enhancerSystemPrompt,   // its own turn, not concatenated
+    temperature: 0.0,
+    maxTokens: 600)
+```
+
+Concatenating the instructions into the user turn instead produces a structurally
+different render, and the model follows them less closely.
+
+`nil` (the default) emits no system turn — token ids are identical to what the call
+produced before the parameter existed. The image expansion (`boi + image_token × 280
++ eoi`) stays confined to the user turn; an image marker inside `systemPrompt` is
+rejected with `invalidInput`, since `maskedScatter` would otherwise be handed more
+positions than there are image embeddings.
+
 ### Blocking repeated n-grams
 
 `chatStream` and `chatStreamMultimodal` accept `noRepeatNGramSize`, the equivalent
