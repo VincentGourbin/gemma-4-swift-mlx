@@ -169,17 +169,21 @@ public struct Gemma4Processor {
     /// - Parameters:
     ///   - userPrompt: texte du tour utilisateur (le marqueur image est ajoute
     ///     devant par cette methode).
-    ///   - systemPrompt: contenu du tour systeme. `nil` = aucun tour systeme,
-    ///     ids strictement identiques a ceux d'avant l'ajout du parametre.
+    ///   - systemPrompt: contenu du tour systeme. `nil` = aucun tour systeme.
+    ///   - templateVariables: variables passees au chat template en
+    ///     `additionalContext` — p.ex. `["enable_thinking": true]`, que le
+    ///     template Gemma 4 traduit par un `<|think|>` en tete du tour systeme
+    ///     (qu'il cree au besoin). `nil` = rendu inchange.
     ///   - numImageTokens: soft tokens par image (280 pour Gemma 4).
     /// - Throws: `Gemma4PipelineError.invalidInput` si `systemPrompt` rend
-    ///   lui-meme un marqueur image — l'expansion doit rester cantonnee au tour
-    ///   utilisateur, sinon `maskedScatter` recoit plus de positions a remplir
-    ///   que d'embeddings d'image disponibles.
+    ///   lui-meme un marqueur multimodal — l'expansion doit rester cantonnee au
+    ///   tour utilisateur, sinon `maskedScatter` recoit plus de positions a
+    ///   remplir que d'embeddings disponibles.
     public static func multimodalChatIds(
         userPrompt: String,
         systemPrompt: String? = nil,
         tokenizer: any Tokenizer,
+        templateVariables: [String: any Sendable]? = nil,
         numImageTokens: Int = 280
     ) throws -> [Int] {
         let userMessage = ["role": "user", "content": "\(imageToken)\n\(userPrompt)"]
@@ -190,7 +194,8 @@ public struct Gemma4Processor {
         messages.append(userMessage)
 
         let ids = strippingTemplateArtifacts(
-            try tokenizer.applyChatTemplate(messages: messages))
+            try tokenizer.applyChatTemplate(
+                messages: messages, tools: nil, additionalContext: templateVariables))
 
         // Le tour utilisateur peut legitimement porter plusieurs marqueurs (N
         // images empilees sur l'axe batch de pixelValues) ; le tour systeme,
@@ -200,7 +205,8 @@ public struct Gemma4Processor {
         // sinon des ids speciaux bruts dans la sequence, et fausserait le compte
         // du masked_scatter si l'appelant fournit aussi de l'audio ou de la video.
         if systemPrompt != nil {
-            let userOnly = try tokenizer.applyChatTemplate(messages: [userMessage])
+            let userOnly = try tokenizer.applyChatTemplate(
+                messages: [userMessage], tools: nil, additionalContext: templateVariables)
             let markers = [
                 imageTokenId, audioTokenId, videoTokenId,
                 boiTokenId, eoiTokenId, boaTokenId, eoaTokenId,
@@ -227,6 +233,28 @@ public struct Gemma4Processor {
             expanded.append(Int(eoiTokenId))
         }
         return expanded
+    }
+
+    /// Equivalent texte de `multimodalChatIds` : meme rendu de chat template,
+    /// memes reparations d'artefacts, sans marqueur image.
+    ///
+    /// Sert au chemin texte quand il doit contourner `ChatSession` — celle-ci
+    /// ne sait transporter ni `LogitProcessor` ni variables de template.
+    public static func textChatIds(
+        userPrompt: String,
+        systemPrompt: String? = nil,
+        tokenizer: any Tokenizer,
+        templateVariables: [String: any Sendable]? = nil
+    ) throws -> [Int] {
+        var messages: [[String: String]] = []
+        if let systemPrompt {
+            messages.append(["role": "system", "content": systemPrompt])
+        }
+        messages.append(["role": "user", "content": userPrompt])
+
+        return strippingTemplateArtifacts(
+            try tokenizer.applyChatTemplate(
+                messages: messages, tools: nil, additionalContext: templateVariables))
     }
 
     /// Tokenise le prompt multimodal et retourne les input_ids
