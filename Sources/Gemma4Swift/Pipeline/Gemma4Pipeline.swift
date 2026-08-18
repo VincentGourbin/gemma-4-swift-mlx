@@ -496,8 +496,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     /// - Parameter systemPrompt: si non-nil, un tour `system` distinct precede le
     ///   tour utilisateur, comme sur le chemin texte. Le rendu est delegue au
     ///   `chat_template.jinja` du modele (Gemma 4 emet `<|turn>system ... <turn|>`
-    ///   et ne fusionne pas le systeme dans le tour user). `nil` (defaut) = ids
-    ///   strictement identiques a avant.
+    ///   et ne fusionne pas le systeme dans le tour user). `nil` (defaut)
+    ///   n'emet aucun tour systeme.
+    ///
+    ///   Dans les deux cas les ids sont ceux du rendu HF du meme template :
+    ///   `Gemma4Processor.strippingTemplateArtifacts` retire les sauts de ligne
+    ///   parasites de swift-jinja. Les ids different donc de ceux produits avant
+    ///   1.3.0 d'un `\n` apres `<bos>`, y compris sans `systemPrompt`.
     /// - Parameter noRepeatNGramSize: si non-nil, interdit tout n-gramme de cette
     ///   taille deja present dans `prompt + genere` (equivalent de
     ///   `no_repeat_ngram_size` de HF transformers). `nil` (defaut) = comportement
@@ -544,6 +549,19 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             systemPrompt: systemPromptCapture,
                             tokenizer: context.tokenizer
                         )
+
+                        // maskedScatter indexe la source modulo sa taille : un
+                        // desaccord entre marqueurs et images ne leve rien, il
+                        // recopie des embeddings au hasard. On le refuse ici.
+                        let markerCount = ids.count(where: {
+                            $0 == Int(Gemma4Processor.boiTokenId)
+                        })
+                        let imageCount = pixelsCapture.dim(0)
+                        guard markerCount == imageCount else {
+                            throw Gemma4PipelineError.invalidInput(
+                                "\(imageCount) image(s) fournie(s) mais \(markerCount) "
+                                    + "marqueur(s) <|image|> dans le prompt.")
+                        }
 
                         // 2. Injection pixelValues — sera consommé au premier forward du prefill
                         guard let m = context.model as? Gemma4MultimodalLLMModel else {

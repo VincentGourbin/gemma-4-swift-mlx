@@ -117,20 +117,25 @@ public struct Gemma4Processor {
     /// Repare les sauts de ligne parasites que swift-jinja insere dans le rendu
     /// du chat template Gemma 4.
     ///
-    /// swift-jinja n'implemente pas `trim_blocks`, que HF active
-    /// (`ImmutableSandboxedEnvironment(trim_blocks: true, lstrip_blocks: true)`).
-    /// Le saut de ligne qui suit le `{%- endif %}` du bloc systeme du template
-    /// est donc emis alors que la reference le supprime. Une seule cause, deux
-    /// symptomes selon qu'il y a un tour systeme ou non :
+    /// Le template Gemma 4 fait suivre le `{%- endif %}` du bloc systeme d'une
+    /// ligne vide puis d'un commentaire `{#- Pre-scan ... -#}`. Le `-` initial
+    /// de ce tag commentaire avale les espaces qui le precedent : jinja2 honore
+    /// ce controle d'espaces sur les commentaires, swift-jinja non, et le saut
+    /// de ligne survit. Verifie en rendant le meme fichier avec jinja2 — le
+    /// resultat est identique aux quatre combinaisons de `trim_blocks` /
+    /// `lstrip_blocks`, et le parasite n'apparait qu'en retirant le `-` du tag
+    /// commentaire. Ce n'est donc pas `trim_blocks` : le correctif amont porte
+    /// sur le controle d'espaces des commentaires.
     ///
-    /// - sans systeme : `<bos>` `\n` `<|turn>` au lieu de `<bos>` `<|turn>`
-    ///   (c'est le meme parasite que le contournement present cote CLI LoRA) ;
+    /// Une seule cause, deux symptomes selon qu'il y a un tour systeme ou non :
+    ///
+    /// - sans systeme : `<bos>` `\n` `<|turn>` au lieu de `<bos>` `<|turn>` ;
     /// - avec systeme : `<turn|>` `\n\n` `<|turn>` au lieu de `<turn|>` `\n`
     ///   `<|turn>`, le tokenizer fusionnant les deux sauts en un token 108.
     ///
     /// Les ids attendus sont ceux du rendu HF du meme `chat_template.jinja`,
     /// mesures token par token (voir `MultimodalSystemPromptTests`).
-    static func strippingTemplateArtifacts(_ ids: [Int]) -> [Int] {
+    public static func strippingTemplateArtifacts(_ ids: [Int]) -> [Int] {
         var out = ids
 
         // <bos> \n <|turn>  →  <bos> <|turn>
@@ -190,21 +195,28 @@ public struct Gemma4Processor {
         // Le tour utilisateur peut legitimement porter plusieurs marqueurs (N
         // images empilees sur l'axe batch de pixelValues) ; le tour systeme,
         // jamais. On compare donc au rendu du seul tour utilisateur plutot que
-        // d'imposer un marqueur unique.
+        // d'imposer un marqueur unique. Le comptage couvre toutes les modalites :
+        // un long prompt systeme qui documente les marqueurs du modele glisserait
+        // sinon des ids speciaux bruts dans la sequence, et fausserait le compte
+        // du masked_scatter si l'appelant fournit aussi de l'audio ou de la video.
         if systemPrompt != nil {
             let userOnly = try tokenizer.applyChatTemplate(messages: [userMessage])
-            let marker = Int(imageTokenId)
-            let fromSystem = ids.count(where: { $0 == marker })
-                - userOnly.count(where: { $0 == marker })
+            let markers = [
+                imageTokenId, audioTokenId, videoTokenId,
+                boiTokenId, eoiTokenId, boaTokenId, eoaTokenId,
+            ].map(Int.init)
+            let fromSystem = markers.reduce(into: 0) { total, marker in
+                total += ids.count(where: { $0 == marker })
+                    - userOnly.count(where: { $0 == marker })
+            }
             guard fromSystem == 0 else {
                 throw Gemma4PipelineError.invalidInput(
-                    "systemPrompt contient \(fromSystem) marqueur(s) image : "
-                        + "l'expansion image doit rester dans le tour utilisateur.")
+                    "systemPrompt contient \(fromSystem) marqueur(s) multimodal : "
+                        + "les marqueurs doivent rester dans le tour utilisateur.")
             }
         }
 
         var expanded: [Int] = []
-        expanded.reserveCapacity(ids.count)
         for id in ids {
             guard id == Int(imageTokenId) else {
                 expanded.append(id)

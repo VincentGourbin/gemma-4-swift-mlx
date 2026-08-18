@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreGraphics
+import MLX
 import MLXLMCommon
 @testable import Gemma4Swift
 
@@ -177,6 +178,26 @@ struct MultimodalSystemPromptTests {
         }
     }
 
+    @Test("Un marqueur audio ou video dans le systemPrompt est refuse aussi",
+          .enabled(if: integrationModelPath != nil))
+    func testOtherModalityMarkersInSystemPromptThrow() async throws {
+        let tokenizer = try await loadTokenizer()
+
+        // Cas realiste : un long prompt systeme qui documente les marqueurs du
+        // modele. Sans garde, ces ids speciaux partent bruts dans la sequence.
+        for marker in [
+            Gemma4Processor.audioToken, Gemma4Processor.videoToken,
+            Gemma4Processor.boiToken, Gemma4Processor.eoiToken,
+        ] {
+            #expect(throws: Gemma4PipelineError.self) {
+                _ = try Gemma4Processor.multimodalChatIds(
+                    userPrompt: "Describe this image.",
+                    systemPrompt: "Never emit \(marker) yourself.",
+                    tokenizer: tokenizer)
+            }
+        }
+    }
+
     @Test("buildMultimodalPrompt tokenise comme le chat template du modele",
           .enabled(if: integrationModelPath != nil))
     func testBuildMultimodalPromptMatchesChatTemplate() async throws {
@@ -320,5 +341,28 @@ struct MultimodalSystemPromptIntegrationTests {
 
         #expect(guided.contains("BANANE"))
         #expect(!plain.contains("BANANE"))
+    }
+
+    @Test("Desaccord entre nombre d'images et de marqueurs : erreur, pas de silence",
+          .enabled(if: integrationModelPath != nil))
+    @MainActor
+    func testImageCountMismatchThrows() async throws {
+        let pipeline = try await loadPipeline()
+        defer { pipeline.unload() }
+
+        // Deux images empilees, un seul marqueur : maskedScatter indexe modulo
+        // la taille de la source et laisserait passer en silence.
+        let one = try Gemma4ImageProcessor.processImage(try syntheticImage())
+        let two = concatenated([one, one], axis: 0)
+
+        var caught: Error? = nil
+        do {
+            let stream = try pipeline.chatStreamMultimodal(
+                prompt: "Compare.", pixelValues: two, maxTokens: 8)
+            for try await _ in stream {}
+        } catch {
+            caught = error
+        }
+        #expect(caught is Gemma4PipelineError)
     }
 }

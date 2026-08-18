@@ -598,11 +598,19 @@ rejected with `invalidInput`, since `maskedScatter` would otherwise be handed mo
 positions than there are image embeddings.
 
 The ids are token-for-token identical to the HF render of the same
-`chat_template.jinja`. Two stray newlines that swift-jinja emits — it does not
-implement `trim_blocks`, which HF enables — are repaired on this path: a `\n` between
-`<bos>` and the first `<|turn>`, and `\n\n` instead of `\n` between the system and user
-turns. The text path still carries the first of the two; a general fix belongs
-upstream in swift-jinja.
+`chat_template.jinja`. Two stray newlines that swift-jinja emits are repaired on this
+path: a `\n` between `<bos>` and the first `<|turn>`, and `\n\n` instead of `\n` between
+the system and user turns. Both come from one cause — the template's
+`{#- Pre-scan … -#}` comment tag, whose leading `-` should swallow the preceding
+whitespace; jinja2 honours that whitespace control on comments, swift-jinja does not.
+Because of this repair, ids on this path differ from pre-1.3.0 output by one `\n` even
+when `systemPrompt` is `nil`.
+
+The text path (`chatStream`, `chat`) goes through `ChatSession` and still carries the
+first artifact; a general fix belongs upstream in swift-jinja. Note also that those
+two entry points are **not** symmetric with the multimodal one: they fall back to a
+default `"Tu es un assistant utile."` system turn when `systemPrompt` is `nil`, so
+there is currently no way to ask the text path for no system turn at all.
 
 ### Blocking repeated n-grams
 
