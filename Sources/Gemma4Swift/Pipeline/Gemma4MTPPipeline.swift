@@ -332,7 +332,7 @@ public actor Gemma4MTPPipeline {
     }
 
     private nonisolated func isEOS(_ tokenId: Int32, tokenizer: any Tokenizer) -> Bool {
-        // Gemma 4 utilise plusieurs tokens de fin: <eos>=1, <end_of_turn>=106, <pad>=0
+        // Gemma 4 utilise plusieurs tokens de fin: <eos>=1, <turn|>=106, <pad>=0
         // (cf. Gemma4Processor.eosTokenIds)
         if Gemma4Processor.eosTokenIds.contains(tokenId) {
             return true

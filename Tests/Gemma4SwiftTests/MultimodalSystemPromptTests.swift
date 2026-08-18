@@ -24,12 +24,10 @@ struct MultimodalSystemPromptTests {
             from: URL(fileURLWithPath: integrationModelPath!))
     }
 
-    /// Construction historique (avant l'ajout de `systemPrompt`), recopiee ici
-    /// pour servir d'oracle de non-regression.
-    private func legacyIds(prompt: String, tokenizer: any Tokenizer) throws -> [Int] {
-        let content = "<|image|>\n\(prompt)"
-        let ids = try tokenizer.applyChatTemplate(
-            messages: [["role": "user", "content": content]])
+    /// Expanse les marqueurs image d'une sequence d'ids de reference, pour
+    /// pouvoir comparer a la sortie de `multimodalChatIds` sans recopier 280
+    /// ids a la main.
+    private func expandingImageMarkers(_ ids: [Int]) -> [Int] {
         let imageTokenId = Int(Gemma4Processor.imageTokenId)
         var expanded: [Int] = []
         for tid in ids {
@@ -48,16 +46,73 @@ struct MultimodalSystemPromptTests {
         ids.filter { $0 == Int(Gemma4Processor.imageTokenId) }.count
     }
 
-    @Test("Sans systemPrompt : ids strictement identiques a avant",
+    // Ids de reference : rendu du meme chat_template.jinja par HF
+    // (jinja2 ImmutableSandboxedEnvironment(trim_blocks: true,
+    // lstrip_blocks: true), add_generation_prompt=true), pour le prompt
+    // "<|image|>\nHi." — marqueur image non encore expanse.
+    private static let hfUserOnly = [
+        2, 105, 2364, 107, 258880, 107, 10979, 236761, 106, 107, 105, 4368, 107,
+    ]
+    private static let hfSystemAndUser = [
+        2, 105, 9731, 107, 3912, 17514, 236761, 106, 107,
+        105, 2364, 107, 258880, 107, 10979, 236761, 106, 107, 105, 4368, 107,
+    ]
+
+    @Test("Sans systemPrompt : parite token a token avec le rendu HF",
           .enabled(if: integrationModelPath != nil))
-    func testNoSystemPromptIsUnchanged() async throws {
+    func testNoSystemPromptMatchesReference() async throws {
         let tokenizer = try await loadTokenizer()
-        let prompt = "user prompt: a 2CV driving along a coastal road"
 
         let ids = try Gemma4Processor.multimodalChatIds(
-            userPrompt: prompt, systemPrompt: nil, tokenizer: tokenizer)
+            userPrompt: "Hi.", systemPrompt: nil, tokenizer: tokenizer)
 
-        #expect(ids == (try legacyIds(prompt: prompt, tokenizer: tokenizer)))
+        #expect(ids == expandingImageMarkers(Self.hfUserOnly))
+    }
+
+    @Test("Avec systemPrompt : parite token a token avec le rendu HF",
+          .enabled(if: integrationModelPath != nil))
+    func testSystemPromptMatchesReference() async throws {
+        let tokenizer = try await loadTokenizer()
+
+        let ids = try Gemma4Processor.multimodalChatIds(
+            userPrompt: "Hi.", systemPrompt: "Be terse.", tokenizer: tokenizer)
+
+        #expect(ids == expandingImageMarkers(Self.hfSystemAndUser))
+    }
+
+    @Test("Les sauts de ligne parasites de swift-jinja sont reparés",
+          .enabled(if: integrationModelPath != nil))
+    func testJinjaWhitespaceArtifactsAreStripped() async throws {
+        let tokenizer = try await loadTokenizer()
+        let bos = Int(Gemma4Processor.bosTokenId)
+        let turnStart = Int(Gemma4Processor.turnStartTokenId)
+        let turnEnd = Int(Gemma4Processor.turnEndTokenId)
+        let newline = Int(Gemma4Processor.newlineTokenId)
+        let doubleNewline = Int(Gemma4Processor.doubleNewlineTokenId)
+
+        // Ce que rend swift-jinja aujourd'hui : \n parasite apres <bos> quand il
+        // n'y a pas de tour systeme, \n\n entre les tours quand il y en a un.
+        let rawNoSystem = try tokenizer.applyChatTemplate(
+            messages: [["role": "user", "content": "Hi."]])
+        let rawWithSystem = try tokenizer.applyChatTemplate(messages: [
+            ["role": "system", "content": "Be terse."],
+            ["role": "user", "content": "Hi."],
+        ])
+        #expect(rawNoSystem.count >= 2 && rawNoSystem[1] == newline)
+        #expect(rawWithSystem.contains(doubleNewline))
+
+        // Apres reparation, plus aucun des deux.
+        let fixedNoSystem = Gemma4Processor.strippingTemplateArtifacts(rawNoSystem)
+        let fixedWithSystem = Gemma4Processor.strippingTemplateArtifacts(rawWithSystem)
+        #expect(fixedNoSystem[0] == bos && fixedNoSystem[1] == turnStart)
+        #expect(!fixedWithSystem.contains(doubleNewline))
+        #expect(fixedNoSystem.count == rawNoSystem.count - 1)
+        #expect(fixedWithSystem.count == rawWithSystem.count)
+        // Et le contenu utile n'a pas bouge.
+        #expect(fixedWithSystem.filter { $0 != newline } == rawWithSystem.filter {
+            $0 != newline && $0 != doubleNewline
+        })
+        #expect(fixedWithSystem.contains(turnEnd))
     }
 
     @Test("Avec systemPrompt : tour system distinct, different de la concatenation",
@@ -120,6 +175,71 @@ struct MultimodalSystemPromptTests {
                 systemPrompt: "Voici l'image de reference : <|image|>",
                 tokenizer: tokenizer)
         }
+    }
+
+    @Test("buildMultimodalPrompt tokenise comme le chat template du modele",
+          .enabled(if: integrationModelPath != nil))
+    func testBuildMultimodalPromptMatchesChatTemplate() async throws {
+        let tokenizer = try await loadTokenizer()
+        let userPrompt = "What is the capital of France?"
+
+        // Oracle : le rendu du chat_template.jinja du modele, debarrasse des
+        // sauts de ligne parasites de swift-jinja.
+        let expected = Gemma4Processor.strippingTemplateArtifacts(
+            try tokenizer.applyChatTemplate(
+                messages: [["role": "user", "content": userPrompt]]))
+        // La construction manuelle doit tomber sur les memes ids : c'est ce qui
+        // garantit que l'evaluation LoRA voit le meme format que l'inference.
+        let built = tokenizer.encode(
+            text: Gemma4Processor.buildMultimodalPrompt(userPrompt: userPrompt),
+            addSpecialTokens: false)
+
+        #expect(built == expected)
+    }
+
+    @Test("buildMultimodalPrompt : le tour systeme suit aussi le template",
+          .enabled(if: integrationModelPath != nil))
+    func testBuildMultimodalPromptSystemMatchesChatTemplate() async throws {
+        let tokenizer = try await loadTokenizer()
+        let system = "You are terse."
+        let userPrompt = "Hello."
+
+        let expected = Gemma4Processor.strippingTemplateArtifacts(
+            try tokenizer.applyChatTemplate(messages: [
+                ["role": "system", "content": system],
+                ["role": "user", "content": userPrompt],
+            ]))
+        let built = tokenizer.encode(
+            text: Gemma4Processor.buildMultimodalPrompt(
+                userPrompt: userPrompt, systemPrompt: system),
+            addSpecialTokens: false)
+
+        #expect(built == expected)
+    }
+
+    @Test("applyGemma4ChatTemplate porte les marqueurs de tour Gemma 4",
+          .enabled(if: integrationModelPath != nil))
+    func testLoRAChatTemplateUsesGemma4Markers() async throws {
+        let tokenizer = try await loadTokenizer()
+        let text = applyGemma4ChatTemplate(messages: [
+            ChatMessage(role: "user", content: "Decris."),
+            ChatMessage(role: "assistant", content: "Une image."),
+        ])
+        let ids = tokenizer.encode(text: text, addSpecialTokens: false)
+
+        // Le preprocessing LoRA multimodal cherche <|turn> user \n (105, 2364,
+        // 107) pour y injecter boi + image_token × 280 + eoi, et <|turn> model
+        // (105, 4368) pour masquer le prompt. Avec des marqueurs Gemma 3, ces
+        // ancres n'existent pas et l'image n'est jamais injectee.
+        let turn = Int(105), user = Int(2364), newline = Int(107), model = Int(4368)
+        let hasInjectionPoint = (0 ..< max(0, ids.count - 2)).contains {
+            ids[$0] == turn && ids[$0 + 1] == user && ids[$0 + 2] == newline
+        }
+        let hasMaskAnchor = (0 ..< max(0, ids.count - 1)).contains {
+            ids[$0] == turn && ids[$0 + 1] == model
+        }
+        #expect(hasInjectionPoint)
+        #expect(hasMaskAnchor)
     }
 
     @Test("Plusieurs images restent possibles via le tour utilisateur",

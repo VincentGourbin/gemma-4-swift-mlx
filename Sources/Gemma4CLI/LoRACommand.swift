@@ -332,8 +332,8 @@ extension LoRA {
                     return ids
                 }
 
-                // Trouver le point d'injection: juste apres <start_of_turn>user\n
-                // Token IDs: 105=<start_of_turn>, 2364=user, 107=\n
+                // Trouver le point d'injection: juste apres <|turn>user\n
+                // Token IDs: 105=<|turn>, 2364=user, 107=\n
                 // On cherche la PREMIERE occurrence (le user prompt)
                 var insertionIdx: Int? = nil
                 for j in 0 ..< tokens.count - 2 {

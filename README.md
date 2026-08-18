@@ -592,11 +592,17 @@ let stream = try pipeline.chatStreamMultimodal(
 Concatenating the instructions into the user turn instead produces a structurally
 different render, and the model follows them less closely.
 
-`nil` (the default) emits no system turn — token ids are identical to what the call
-produced before the parameter existed. The image expansion (`boi + image_token × 280
-+ eoi`) stays confined to the user turn; an image marker inside `systemPrompt` is
+`nil` (the default) emits no system turn. The image expansion (`boi + image_token ×
+280 + eoi`) stays confined to the user turn; an image marker inside `systemPrompt` is
 rejected with `invalidInput`, since `maskedScatter` would otherwise be handed more
 positions than there are image embeddings.
+
+The ids are token-for-token identical to the HF render of the same
+`chat_template.jinja`. Two stray newlines that swift-jinja emits — it does not
+implement `trim_blocks`, which HF enables — are repaired on this path: a `\n` between
+`<bos>` and the first `<|turn>`, and `\n\n` instead of `\n` between the system and user
+turns. The text path still carries the first of the two; a general fix belongs
+upstream in swift-jinja.
 
 ### Blocking repeated n-grams
 
