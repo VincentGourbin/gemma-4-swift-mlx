@@ -18,10 +18,10 @@ final class LoRATests: XCTestCase {
         let result = applyGemma4ChatTemplate(messages: messages)
 
         XCTAssertEqual(result, """
-        <start_of_turn>user
-        Hello<end_of_turn>
-        <start_of_turn>model
-        Hi there!<end_of_turn>
+        <|turn>user
+        Hello<turn|>
+        <|turn>model
+        Hi there!<turn|>
         """)
     }
 
@@ -34,9 +34,9 @@ final class LoRATests: XCTestCase {
 
         let result = applyGemma4ChatTemplate(messages: messages)
 
-        XCTAssertTrue(result.contains("<start_of_turn>system\nTu es un expert Swift.<end_of_turn>"))
-        XCTAssertTrue(result.contains("<start_of_turn>user\nComment faire un struct?<end_of_turn>"))
-        XCTAssertTrue(result.contains("<start_of_turn>model\nstruct Foo { }<end_of_turn>"))
+        XCTAssertTrue(result.contains("<|turn>system\nTu es un expert Swift.<turn|>"))
+        XCTAssertTrue(result.contains("<|turn>user\nComment faire un struct?<turn|>"))
+        XCTAssertTrue(result.contains("<|turn>model\nstruct Foo { }<turn|>"))
     }
 
     func testApplyGemma4ChatTemplateModelRole() {
@@ -48,7 +48,7 @@ final class LoRATests: XCTestCase {
         let result2 = applyGemma4ChatTemplate(messages: messages2)
 
         XCTAssertEqual(result1, result2)
-        XCTAssertTrue(result1.contains("<start_of_turn>model"))
+        XCTAssertTrue(result1.contains("<|turn>model"))
     }
 
     func testApplyGemma4ChatTemplateMultiTurn() {
@@ -60,7 +60,7 @@ final class LoRATests: XCTestCase {
         ]
 
         let result = applyGemma4ChatTemplate(messages: messages)
-        let turns = result.components(separatedBy: "<start_of_turn>").filter { !$0.isEmpty }
+        let turns = result.components(separatedBy: "<|turn>").filter { !$0.isEmpty }
 
         XCTAssertEqual(turns.count, 4)
     }
@@ -99,9 +99,9 @@ final class LoRATests: XCTestCase {
 
         let data = try loadGemma4TrainingData(directory: tmpDir, name: "train")
         XCTAssertEqual(data.count, 1)
-        XCTAssertTrue(data[0].contains("<start_of_turn>user"))
+        XCTAssertTrue(data[0].contains("<|turn>user"))
         XCTAssertTrue(data[0].contains("Bonjour"))
-        XCTAssertTrue(data[0].contains("<start_of_turn>model"))
+        XCTAssertTrue(data[0].contains("<|turn>model"))
         XCTAssertTrue(data[0].contains("Salut!"))
     }
 
@@ -120,7 +120,7 @@ final class LoRATests: XCTestCase {
         let data = try loadGemma4TrainingData(directory: tmpDir, name: "train")
         XCTAssertEqual(data.count, 2)
         XCTAssertEqual(data[0], "Ligne texte.")
-        XCTAssertTrue(data[1].contains("<start_of_turn>"))
+        XCTAssertTrue(data[1].contains("<|turn>"))
     }
 
     func testLoadGemma4TrainingDataTxtFormat() throws {
@@ -465,11 +465,11 @@ final class LoRATests: XCTestCase {
     // MARK: - Token Injection Tests
 
     func testAudioTokenInjectionPosition() {
-        // Simule une sequence tokenisee: <bos><start_of_turn>user\n...text...<end_of_turn>\n<start_of_turn>model\n...response...
-        // Tokens: 2=bos, 105=<start_of_turn>, 2364=user, 107=\n
+        // Simule une sequence tokenisee: <bos><|turn>user\n...text...<turn|>\n<|turn>model\n...response...
+        // Tokens: 2=bos, 105=<|turn>, 2364=user, 107=\n
         var tokens = [2, 105, 2364, 107, 500, 501, 502, 106, 107, 105, 4368, 107, 600, 601]
 
-        // Trouver le point d'injection (apres <start_of_turn>user\n)
+        // Trouver le point d'injection (apres <|turn>user\n)
         var insertionIdx: Int? = nil
         for j in 0 ..< tokens.count - 2 {
             if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
@@ -478,7 +478,7 @@ final class LoRATests: XCTestCase {
             }
         }
 
-        XCTAssertEqual(insertionIdx, 4, "Insertion doit etre apres <start_of_turn>user\\n")
+        XCTAssertEqual(insertionIdx, 4, "Insertion doit etre apres <|turn>user\\n")
 
         // Injecter les tokens audio: BOA + audio*3 + EOA
         let boaId = Int(Gemma4Processor.boaTokenId)   // 256000

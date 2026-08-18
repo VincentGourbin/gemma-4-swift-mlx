@@ -56,13 +56,17 @@ public struct MultimodalTrainingSample: Sendable {
 
 /// Applique le chat template Gemma 4 a une liste de messages.
 ///
-/// Format:
+/// Format (marqueurs Gemma 4 — `<start_of_turn>` est du Gemma 3 et n'existe pas
+/// dans ce vocabulaire, il se tokeniserait en texte litteral) :
 /// ```
-/// <start_of_turn>user
-/// {message}<end_of_turn>
-/// <start_of_turn>model
-/// {message}<end_of_turn>
+/// <|turn>user
+/// {message}<turn|>
+/// <|turn>model
+/// {message}<turn|>
 /// ```
+///
+/// Fallback : le CLI passe un `chatFormatter` bati sur le tokenizer du modele.
+/// Cette fonction sert quand aucun tokenizer n'est disponible.
 public func applyGemma4ChatTemplate(messages: [ChatMessage]) -> String {
     var parts: [String] = []
 
@@ -77,7 +81,9 @@ public func applyGemma4ChatTemplate(messages: [ChatMessage]) -> String {
             role = "user"
         }
 
-        parts.append("<start_of_turn>\(role)\n\(message.content)<end_of_turn>")
+        parts.append(
+            "\(Gemma4Processor.turnStartToken)\(role)\n"
+                + "\(message.content)\(Gemma4Processor.turnEndToken)")
     }
 
     return parts.joined(separator: "\n")

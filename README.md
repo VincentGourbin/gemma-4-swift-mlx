@@ -573,6 +573,45 @@ for try await token in stream {
 let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
 
+### System role
+
+`chatStream` and `chatStreamMultimodal` both take an optional `systemPrompt`. It is
+rendered as a **separate system turn** by the model's `chat_template.jinja` — Gemma 4
+emits `<|turn>system … <turn|>` ahead of the user turn rather than folding the
+instructions into it, which is what the HF reference implementations produce:
+
+```swift
+let stream = try pipeline.chatStreamMultimodal(
+    prompt: "user prompt: a 2CV on a coastal road",
+    pixelValues: pixels,
+    systemPrompt: enhancerSystemPrompt,   // its own turn, not concatenated
+    temperature: 0.0,
+    maxTokens: 600)
+```
+
+Concatenating the instructions into the user turn instead produces a structurally
+different render, and the model follows them less closely.
+
+`nil` (the default) emits no system turn. The image expansion (`boi + image_token ×
+280 + eoi`) stays confined to the user turn; an image marker inside `systemPrompt` is
+rejected with `invalidInput`, since `maskedScatter` would otherwise be handed more
+positions than there are image embeddings.
+
+The ids are token-for-token identical to the HF render of the same
+`chat_template.jinja`. Two stray newlines that swift-jinja emits are repaired on this
+path: a `\n` between `<bos>` and the first `<|turn>`, and `\n\n` instead of `\n` between
+the system and user turns. Both come from one cause — the template's
+`{#- Pre-scan … -#}` comment tag, whose leading `-` should swallow the preceding
+whitespace; jinja2 honours that whitespace control on comments, swift-jinja does not.
+Because of this repair, ids on this path differ from pre-1.3.0 output by one `\n` even
+when `systemPrompt` is `nil`.
+
+The text path (`chatStream`, `chat`) goes through `ChatSession` and still carries the
+first artifact; a general fix belongs upstream in swift-jinja. Note also that those
+two entry points are **not** symmetric with the multimodal one: they fall back to a
+default `"Tu es un assistant utile."` system turn when `systemPrompt` is `nil`, so
+there is currently no way to ask the text path for no system turn at all.
+
 ### Blocking repeated n-grams
 
 `chatStream` and `chatStreamMultimodal` accept `noRepeatNGramSize`, the equivalent

@@ -122,11 +122,7 @@ extension LoRA {
                                     ids = Array(ids.dropLast(3))
                                 }
                             }
-                            // Fix swift-jinja: retire le \n parasite entre <bos> et <|turn>
-                            // Python produit [2, 105, ...] mais Swift produit [2, 107, 105, ...]
-                            if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
-                                ids.remove(at: 1)
-                            }
+                            ids = Gemma4Processor.strippingTemplateArtifacts(ids)
                             return ids
                         } else if let text = sample.text {
                             return tok.encode(text: text)
@@ -223,11 +219,8 @@ extension LoRA {
                             ids = Array(ids.dropLast(3))
                         }
                     }
-                    // Fix swift-jinja parasitic \n
-                    if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
-                        ids.remove(at: 1)
-                    }
-                    return tok.decode(tokenIds: ids)
+                    return tok.decode(
+                        tokenIds: Gemma4Processor.strippingTemplateArtifacts(ids))
                 }
 
                 let train = try loadGemma4MultimodalJSONL(
@@ -325,15 +318,11 @@ extension LoRA {
                 let sampleText = sample.text
                 var tokens: [Int] = try await container.perform { (context: ModelContext) -> [Int] in
                     var ids = context.tokenizer.encode(text: sampleText)
-                    // Fix swift-jinja: retirer \n parasite entre <bos> et <|turn>
-                    if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
-                        ids.remove(at: 1)
-                    }
-                    return ids
+                    return Gemma4Processor.strippingTemplateArtifacts(ids)
                 }
 
-                // Trouver le point d'injection: juste apres <start_of_turn>user\n
-                // Token IDs: 105=<start_of_turn>, 2364=user, 107=\n
+                // Trouver le point d'injection: juste apres <|turn>user\n
+                // Token IDs: 105=<|turn>, 2364=user, 107=\n
                 // On cherche la PREMIERE occurrence (le user prompt)
                 var insertionIdx: Int? = nil
                 for j in 0 ..< tokens.count - 2 {
@@ -425,7 +414,8 @@ extension LoRA {
                 let tok = context.tokenizer
                 let genPromptSuffix = "<|turn>model\n"
                 let formatter: ([[String: String]]) throws -> String = { messages in
-                    let ids = try tok.applyChatTemplate(messages: messages)
+                    let ids = Gemma4Processor.strippingTemplateArtifacts(
+                        try tok.applyChatTemplate(messages: messages))
                     var text = tok.decode(tokenIds: ids)
                     if text.hasSuffix(genPromptSuffix) {
                         text = String(text.dropLast(genPromptSuffix.count))
@@ -570,11 +560,7 @@ extension LoRA {
                     }
                     messages.append(["role": "user", "content": capturedPrompt])
                     var ids = try tokenizer.applyChatTemplate(messages: messages)
-                    // Fix swift-jinja: retire le \n parasite entre <bos> et <|turn>
-                    if ids.count >= 3 && ids[0] == 2 && ids[1] == 107 && ids[2] == 105 {
-                        ids.remove(at: 1)
-                    }
-                    tokenIds = ids
+                    tokenIds = Gemma4Processor.strippingTemplateArtifacts(ids)
                 }
                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
@@ -716,10 +702,7 @@ extension LoRA {
                     )
 
                     var tokenIds = tokenizer.encode(text: prompt)
-                    // Fix swift-jinja
-                    if tokenIds.count >= 3 && tokenIds[0] == 2 && tokenIds[1] == 107 && tokenIds[2] == 105 {
-                        tokenIds.remove(at: 1)
-                    }
+                    tokenIds = Gemma4Processor.strippingTemplateArtifacts(tokenIds)
 
                     // Setter les pending media
                     if let mmModel = model as? Gemma4MultimodalLLMModel {

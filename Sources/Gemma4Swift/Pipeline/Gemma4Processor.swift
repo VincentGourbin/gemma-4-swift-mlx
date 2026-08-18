@@ -17,6 +17,12 @@ public struct Gemma4Processor {
     public static let audioToken = "<|audio|>" // 258881
     public static let videoToken = "<|video|>" // 258884
 
+    // Marqueurs de tour Gemma 4 (le format Gemma 3 <start_of_turn> n'existe pas
+    // dans ce vocabulaire — il se tokeniserait en texte litteral).
+    public static let bosToken = "<bos>"           // 2
+    public static let turnStartToken = "<|turn>"   // 105
+    public static let turnEndToken = "<turn|>"     // 106
+
     // Token IDs — multimodal (de config.json)
     public static let imageTokenId: Int32 = 258880
     public static let audioTokenId: Int32 = 258881
@@ -25,6 +31,13 @@ public struct Gemma4Processor {
     public static let eoiTokenId: Int32 = 258882
     public static let boaTokenId: Int32 = 256000
     public static let eoaTokenId: Int32 = 258883
+
+    // Token IDs — structure de tour
+    public static let bosTokenId: Int32 = 2
+    public static let turnStartTokenId: Int32 = 105
+    public static let turnEndTokenId: Int32 = 106
+    public static let newlineTokenId: Int32 = 107
+    public static let doubleNewlineTokenId: Int32 = 108
 
     // Token IDs — thinking/channel (de tokenizer.json added_tokens)
     public static let thinkTokenId: Int32 = 98        // <|think|>
@@ -88,13 +101,132 @@ public struct Gemma4Processor {
         // Construire le prompt complet avec le chat template Gemma 4
         let content = parts.joined(separator: "\n")
 
-        var fullPrompt = "<bos>"
+        // Format de tour Gemma 4 : <|turn>role\n ... <turn|>\n — les marqueurs
+        // Gemma 3 (<start_of_turn>) n'existent pas dans le vocabulaire Gemma 4
+        // et se tokeniseraient en texte litteral.
+        var fullPrompt = bosToken
         if let sys = systemPrompt {
-            fullPrompt += "<start_of_turn>system\n\(sys)<end_of_turn>\n"
+            fullPrompt += "\(turnStartToken)system\n\(sys)\(turnEndToken)\n"
         }
-        fullPrompt += "<start_of_turn>user\n\(content)<end_of_turn>\n<start_of_turn>model\n"
+        fullPrompt += "\(turnStartToken)user\n\(content)\(turnEndToken)\n"
+        fullPrompt += "\(turnStartToken)model\n"
 
         return fullPrompt
+    }
+
+    /// Repare les sauts de ligne parasites que swift-jinja insere dans le rendu
+    /// du chat template Gemma 4.
+    ///
+    /// Le template Gemma 4 fait suivre le `{%- endif %}` du bloc systeme d'une
+    /// ligne vide puis d'un commentaire `{#- Pre-scan ... -#}`. Le `-` initial
+    /// de ce tag commentaire avale les espaces qui le precedent : jinja2 honore
+    /// ce controle d'espaces sur les commentaires, swift-jinja non, et le saut
+    /// de ligne survit. Verifie en rendant le meme fichier avec jinja2 — le
+    /// resultat est identique aux quatre combinaisons de `trim_blocks` /
+    /// `lstrip_blocks`, et le parasite n'apparait qu'en retirant le `-` du tag
+    /// commentaire. Ce n'est donc pas `trim_blocks` : le correctif amont porte
+    /// sur le controle d'espaces des commentaires.
+    ///
+    /// Une seule cause, deux symptomes selon qu'il y a un tour systeme ou non :
+    ///
+    /// - sans systeme : `<bos>` `\n` `<|turn>` au lieu de `<bos>` `<|turn>` ;
+    /// - avec systeme : `<turn|>` `\n\n` `<|turn>` au lieu de `<turn|>` `\n`
+    ///   `<|turn>`, le tokenizer fusionnant les deux sauts en un token 108.
+    ///
+    /// Les ids attendus sont ceux du rendu HF du meme `chat_template.jinja`,
+    /// mesures token par token (voir `MultimodalSystemPromptTests`).
+    public static func strippingTemplateArtifacts(_ ids: [Int]) -> [Int] {
+        var out = ids
+
+        // <bos> \n <|turn>  →  <bos> <|turn>
+        if out.count >= 3, out[0] == Int(bosTokenId), out[1] == Int(newlineTokenId),
+            out[2] == Int(turnStartTokenId)
+        {
+            out.remove(at: 1)
+        }
+
+        // <turn|> \n\n <|turn>  →  <turn|> \n <|turn>
+        for i in out.indices.dropFirst().dropLast()
+        where out[i] == Int(doubleNewlineTokenId)
+            && out[i - 1] == Int(turnEndTokenId)
+            && out[i + 1] == Int(turnStartTokenId)
+        {
+            out[i] = Int(newlineTokenId)
+        }
+
+        return out
+    }
+
+    /// Construit les ids d'un tour image + texte : rendu du chat template du
+    /// modele, puis expansion de chaque marqueur `<|image|>` en
+    /// `boi + image_token × numImageTokens + eoi`.
+    ///
+    /// Le placement du role systeme est delegue au template — pour Gemma 4 il
+    /// rend un tour `<|turn>system ... <turn|>` distinct, il ne fusionne pas le
+    /// systeme dans le premier tour utilisateur. On ne prefixe donc rien a la
+    /// main : c'est le `chat_template.jinja` qui decide.
+    ///
+    /// - Parameters:
+    ///   - userPrompt: texte du tour utilisateur (le marqueur image est ajoute
+    ///     devant par cette methode).
+    ///   - systemPrompt: contenu du tour systeme. `nil` = aucun tour systeme,
+    ///     ids strictement identiques a ceux d'avant l'ajout du parametre.
+    ///   - numImageTokens: soft tokens par image (280 pour Gemma 4).
+    /// - Throws: `Gemma4PipelineError.invalidInput` si `systemPrompt` rend
+    ///   lui-meme un marqueur image — l'expansion doit rester cantonnee au tour
+    ///   utilisateur, sinon `maskedScatter` recoit plus de positions a remplir
+    ///   que d'embeddings d'image disponibles.
+    public static func multimodalChatIds(
+        userPrompt: String,
+        systemPrompt: String? = nil,
+        tokenizer: any Tokenizer,
+        numImageTokens: Int = 280
+    ) throws -> [Int] {
+        let userMessage = ["role": "user", "content": "\(imageToken)\n\(userPrompt)"]
+        var messages: [[String: String]] = []
+        if let systemPrompt {
+            messages.append(["role": "system", "content": systemPrompt])
+        }
+        messages.append(userMessage)
+
+        let ids = strippingTemplateArtifacts(
+            try tokenizer.applyChatTemplate(messages: messages))
+
+        // Le tour utilisateur peut legitimement porter plusieurs marqueurs (N
+        // images empilees sur l'axe batch de pixelValues) ; le tour systeme,
+        // jamais. On compare donc au rendu du seul tour utilisateur plutot que
+        // d'imposer un marqueur unique. Le comptage couvre toutes les modalites :
+        // un long prompt systeme qui documente les marqueurs du modele glisserait
+        // sinon des ids speciaux bruts dans la sequence, et fausserait le compte
+        // du masked_scatter si l'appelant fournit aussi de l'audio ou de la video.
+        if systemPrompt != nil {
+            let userOnly = try tokenizer.applyChatTemplate(messages: [userMessage])
+            let markers = [
+                imageTokenId, audioTokenId, videoTokenId,
+                boiTokenId, eoiTokenId, boaTokenId, eoaTokenId,
+            ].map(Int.init)
+            let fromSystem = markers.reduce(into: 0) { total, marker in
+                total += ids.count(where: { $0 == marker })
+                    - userOnly.count(where: { $0 == marker })
+            }
+            guard fromSystem == 0 else {
+                throw Gemma4PipelineError.invalidInput(
+                    "systemPrompt contient \(fromSystem) marqueur(s) multimodal : "
+                        + "les marqueurs doivent rester dans le tour utilisateur.")
+            }
+        }
+
+        var expanded: [Int] = []
+        for id in ids {
+            guard id == Int(imageTokenId) else {
+                expanded.append(id)
+                continue
+            }
+            expanded.append(Int(boiTokenId))
+            expanded.append(contentsOf: repeatElement(Int(imageTokenId), count: numImageTokens))
+            expanded.append(Int(eoiTokenId))
+        }
+        return expanded
     }
 
     /// Tokenise le prompt multimodal et retourne les input_ids

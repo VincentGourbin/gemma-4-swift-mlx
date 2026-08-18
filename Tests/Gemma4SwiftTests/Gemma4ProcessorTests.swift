@@ -37,9 +37,9 @@ final class Gemma4ProcessorTests: XCTestCase {
         let userPrompt = "What is the capital of France?"
         let result = Gemma4Processor.buildMultimodalPrompt(userPrompt: userPrompt)
 
-        XCTAssertTrue(result.contains("<start_of_turn>user"), "Missing user turn marker")
+        XCTAssertTrue(result.contains("<|turn>user"), "Missing user turn marker")
         XCTAssertTrue(result.contains(userPrompt), "Missing user prompt text")
-        XCTAssertTrue(result.contains("<start_of_turn>model"), "Missing model turn marker")
+        XCTAssertTrue(result.contains("<|turn>model"), "Missing model turn marker")
         // No multimodal tokens
         XCTAssertFalse(result.contains(Gemma4Processor.imageToken))
         XCTAssertFalse(result.contains(Gemma4Processor.audioToken))
@@ -126,7 +126,7 @@ final class Gemma4ProcessorTests: XCTestCase {
         )
 
         XCTAssertTrue(result.contains(systemPrompt), "System prompt text not found in output")
-        XCTAssertTrue(result.contains("<start_of_turn>system"), "Missing system turn marker")
+        XCTAssertTrue(result.contains("<|turn>system"), "Missing system turn marker")
     }
 
     // MARK: - buildMultimodalPrompt — combined modalities
