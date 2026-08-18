@@ -612,6 +612,45 @@ two entry points are **not** symmetric with the multimodal one: they fall back t
 default `"Tu es un assistant utile."` system turn when `systemPrompt` is `nil`, so
 there is currently no way to ask the text path for no system turn at all.
 
+### Chat template variables (thinking mode)
+
+`chatStream` and `chatStreamMultimodal` take `templateVariables`, passed straight to
+the chat template as `additionalContext`. The Gemma 4 template reads
+`enable_thinking`, which makes the model emit its reasoning in a
+`<|channel>thought … <channel|>` block before the answer:
+
+```swift
+let stream = try pipeline.chatStreamMultimodal(
+    prompt: "How many shapes do you see?",
+    pixelValues: pixels,
+    maxTokens: 400,
+    templateVariables: ["enable_thinking": true])
+```
+
+The template creates the system turn itself when there is none, so
+`enable_thinking` works with or without a `systemPrompt`; ids are token-for-token
+identical to the HF render in both cases. `nil` (the default) leaves the render
+untouched.
+
+**The stream is raw.** Reasoning and answer arrive as one text stream, with the
+`<|channel>` / `<channel|>` delimiters intact — verified on a real model, the
+streaming detokenizer does not swallow them. Filtering is the caller's job;
+`Gemma4TokenFilter` does it (`.disabled` strips the thought, `.structured` returns
+both parts separately) but works on token ids, so it fits a manual generation loop
+rather than this stream.
+
+Two things worth knowing before enabling it:
+
+- Reasoning is verbose — ~350 tokens for a one-sentence answer in our test. Budget
+  `maxTokens` accordingly, or the generation is cut off mid-thought and never
+  reaches the answer.
+- Reasoning tokens are ordinary generated tokens: with `noRepeatNGramSize` set they
+  feed the ban window like any other, so a phrase used in the thought cannot be
+  reused verbatim in the answer.
+
+On the text path, `templateVariables` bypasses `ChatSession` exactly like
+`noRepeatNGramSize` does, so `continueChat` is unavailable afterwards.
+
 ### Blocking repeated n-grams
 
 `chatStream` and `chatStreamMultimodal` accept `noRepeatNGramSize`, the equivalent

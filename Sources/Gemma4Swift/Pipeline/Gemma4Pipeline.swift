@@ -353,27 +353,35 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   `prompt + genere`, parite HF. `false` = seuls les n-grammes repetes
     ///   *dans le texte genere* sont interdits, le prompt reste citable
     ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
+    /// - Parameter templateVariables: variables passees au chat template en
+    ///   `additionalContext` (p.ex. `["enable_thinking": true]`). Comme
+    ///   `noRepeatNGramSize`, ce mode contourne `ChatSession` — qui ne sait
+    ///   transporter ni `LogitProcessor` ni variables de template — donc
+    ///   `continueChat` n'est pas disponible ensuite. `nil` (defaut) =
+    ///   comportement inchange.
     public func chatStream(
         prompt: String,
         systemPrompt: String? = nil,
         temperature: Float = 0.3,
         maxTokens: Int = 1024,
         noRepeatNGramSize: Int? = nil,
-        noRepeatNGramIncludesPrompt: Bool = true
+        noRepeatNGramIncludesPrompt: Bool = true,
+        templateVariables: [String: any Sendable]? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
         }
 
-        if let ngramSize = noRepeatNGramSize {
-            return try chatStreamNoRepeatNGram(
+        if noRepeatNGramSize != nil || templateVariables != nil {
+            return try chatStreamBypassingSession(
                 container: container,
                 prompt: prompt,
                 systemPrompt: systemPrompt,
                 temperature: temperature,
                 maxTokens: maxTokens,
-                ngramSize: ngramSize,
-                includePromptInWindow: noRepeatNGramIncludesPrompt
+                ngramSize: noRepeatNGramSize,
+                includePromptInWindow: noRepeatNGramIncludesPrompt,
+                templateVariables: templateVariables
             )
         }
 
@@ -405,20 +413,26 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         }
     }
 
-    /// Path texte avec blocage de n-grammes : bypass `ChatSession` (qui ne sait
-    /// pas injecter de `LogitProcessor`) tout en reconstruisant le meme prompt
-    /// (message system + message user via le processor du modele) et en utilisant
-    /// le `TokenIterator` natif.
-    private func chatStreamNoRepeatNGram(
+    /// Path texte contournant `ChatSession`, qui ne sait transporter ni
+    /// `LogitProcessor` ni variables de chat template. Reconstruit le meme
+    /// prompt (message system + message user) et utilise le `TokenIterator`
+    /// natif.
+    ///
+    /// Sans `templateVariables`, le prompt passe par le processor du modele,
+    /// exactement comme avant. Avec, les ids sont construits via
+    /// `Gemma4Processor.textChatIds` — seul chemin capable de transmettre
+    /// `additionalContext` au template.
+    private func chatStreamBypassingSession(
         container: ModelContainer,
         prompt: String,
         systemPrompt: String?,
         temperature: Float,
         maxTokens: Int,
-        ngramSize: Int,
-        includePromptInWindow: Bool
+        ngramSize: Int?,
+        includePromptInWindow: Bool,
+        templateVariables: [String: any Sendable]?
     ) throws -> AsyncThrowingStream<String, Error> {
-        guard ngramSize >= 1 else {
+        if let ngramSize, ngramSize < 1 {
             throw Gemma4PipelineError.invalidInput(
                 "noRepeatNGramSize doit etre >= 1 (recu \(ngramSize))")
         }
@@ -431,17 +445,30 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let promptCapture = prompt
         let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
+        let ngramCapture = ngramSize
+        nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
                 do {
                     try await container.perform { context in
-                        let messages: [Chat.Message] = [
-                            .system(instructions),
-                            .user(promptCapture),
-                        ]
-                        let input = try await context.processor.prepare(
-                            input: UserInput(chat: messages))
+                        let input: LMInput
+                        if let templateVariablesCapture {
+                            let ids = try Gemma4Processor.textChatIds(
+                                userPrompt: promptCapture,
+                                systemPrompt: instructions,
+                                tokenizer: context.tokenizer,
+                                templateVariables: templateVariablesCapture
+                            )
+                            input = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
+                        } else {
+                            let messages: [Chat.Message] = [
+                                .system(instructions),
+                                .user(promptCapture),
+                            ]
+                            input = try await context.processor.prepare(
+                                input: UserInput(chat: messages))
+                        }
                         let params = GenerateParameters(
                             maxTokens: maxTokensCapture,
                             temperature: temperatureCapture,
@@ -451,10 +478,12 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             input: input,
                             model: context.model,
                             cache: nil,
-                            processor: NoRepeatNGramLogitProcessor(
-                                ngramSize: ngramSize,
-                                includePromptInWindow: includePromptInWindow
-                            ),
+                            processor: ngramCapture.map {
+                                NoRepeatNGramLogitProcessor(
+                                    ngramSize: $0,
+                                    includePromptInWindow: includePromptInWindow
+                                )
+                            },
                             sampler: params.sampler(),
                             prefillStepSize: params.prefillStepSize,
                             maxTokens: maxTokensCapture
@@ -512,6 +541,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   *dans le texte genere* sont interdits, le prompt reste citable
     ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
     ///
+    /// - Parameter templateVariables: variables passees au chat template en
+    ///   `additionalContext`. `["enable_thinking": true]` fait emettre au modele
+    ///   son raisonnement dans un canal `<|channel>thought ... <channel|>` avant
+    ///   la reponse ; le stream le transmet tel quel, a charge de l'appelant de
+    ///   le filtrer (`Gemma4TokenFilter` le fait a partir des ids de tokens).
+    ///   `nil` (defaut) = rendu inchange.
+    ///
     /// - Requires: `load(multimodal: true)` (necessaire pour vision_tower + embed_vision).
     public func chatStreamMultimodal(
         prompt: String,
@@ -520,7 +556,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         temperature: Float = 0.3,
         maxTokens: Int = 256,
         noRepeatNGramSize: Int? = nil,
-        noRepeatNGramIncludesPrompt: Bool = true
+        noRepeatNGramIncludesPrompt: Bool = true,
+        templateVariables: [String: any Sendable]? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
             throw Gemma4PipelineError.modelNotLoaded
@@ -537,6 +574,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let systemPromptCapture = systemPrompt
         let ngramCapture = noRepeatNGramSize
         let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
+        nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
             Task { [weak self] in
@@ -547,7 +585,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                         let ids = try Gemma4Processor.multimodalChatIds(
                             userPrompt: promptCapture,
                             systemPrompt: systemPromptCapture,
-                            tokenizer: context.tokenizer
+                            tokenizer: context.tokenizer,
+                            templateVariables: templateVariablesCapture
                         )
 
                         // maskedScatter indexe la source modulo sa taille : un
