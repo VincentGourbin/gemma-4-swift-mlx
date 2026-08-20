@@ -19,6 +19,15 @@ import MLX
 ///   HF, un tel passage s'interdit lui-meme et le decodage greedy contourne
 ///   en graphies degradees.
 ///
+/// Second axe, `includeThinkingInWindow` : quand le modele raisonne
+/// (`enable_thinking`), les tokens du canal `<|channel>thought ... <channel|>`
+/// sont des tokens generes ordinaires et alimentent donc la fenetre. Le modele
+/// se voit alors interdire verbatim ce qu'il vient de poser dans son
+/// raisonnement, et se rabat sur des paraphrases vagues. `false` les sort de
+/// l'historique : ils sont generes normalement, simplement pas comptes comme
+/// « deja ecrits ». La protection anti-boucle reste entiere sur le texte de
+/// reponse, qui est ce qu'elle doit proteger.
+///
 /// Utilise par le prompt enhancer LTX-2.5 (`no_repeat_ngram_size = 5`), ou le
 /// decodage greedy de longues captions derive sans ce blocage (repetitions,
 /// tokens aberrants).
@@ -36,6 +45,10 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     /// (parite HF). Si `false`, seuls les tokens generes comptent.
     public let includePromptInWindow: Bool
 
+    /// Si `true` (defaut), les tokens du canal de pensee alimentent
+    /// l'historique comme les autres. Si `false`, ils en sont exclus.
+    public let includeThinkingInWindow: Bool
+
     /// Historique pris en compte : `prompt + genere`, ou `genere` seul selon
     /// `includePromptInWindow`.
     private var history: [Int32] = []
@@ -43,14 +56,34 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     /// Prefixe de taille `n - 1` → tokens qui l'ont deja suivi.
     private var continuations: [[Int32]: Set<Int32>] = [:]
 
+    /// Etat de l'automate de canal, utilise seulement quand
+    /// `includeThinkingInWindow == false`.
+    private enum ChannelState {
+        /// Hors canal : les tokens comptent.
+        case outside
+        /// `<|channel>` vu, le token suivant nomme le canal.
+        case awaitingName
+        /// Dans `<|channel>thought` : les tokens ne comptent pas.
+        case insideThought
+    }
+
+    private var channelState: ChannelState = .outside
+
     /// - Parameters:
     ///   - ngramSize: taille du n-gramme, >= 1.
     ///   - includePromptInWindow: inclure le prompt dans la fenetre
     ///     d'interdiction (defaut `true`, parite HF).
-    public init(ngramSize: Int, includePromptInWindow: Bool = true) {
+    ///   - includeThinkingInWindow: inclure les tokens du canal de pensee dans
+    ///     la fenetre d'interdiction (defaut `true`, comportement historique).
+    public init(
+        ngramSize: Int,
+        includePromptInWindow: Bool = true,
+        includeThinkingInWindow: Bool = true
+    ) {
         precondition(ngramSize >= 1, "ngramSize doit etre >= 1 (recu \(ngramSize))")
         self.ngramSize = ngramSize
         self.includePromptInWindow = includePromptInWindow
+        self.includeThinkingInWindow = includeThinkingInWindow
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
@@ -85,10 +118,53 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
 
     private mutating func append(_ newTokens: [Int32]) {
         for token in newTokens {
+            if !includeThinkingInWindow, advanceChannel(with: token) { continue }
             history.append(token)
             guard history.count >= ngramSize else { continue }
             let prefix = Array(history[(history.count - ngramSize) ..< (history.count - 1)])
             continuations[prefix, default: []].insert(token)
+        }
+    }
+
+    /// Automate de canal. Retourne `true` si le token doit etre exclu de
+    /// l'historique — soit parce qu'il est du balisage de canal, soit parce
+    /// qu'il appartient au canal de pensee.
+    ///
+    /// `<|think|>` n'ouvre volontairement **pas** l'etat « dans le canal » :
+    /// le chat template l'emet au sommet du tour system, donc dans le *prompt*,
+    /// et sans `<channel|>` en face. L'y faire ouvrir un canal exclurait tout
+    /// le prompt de la fenetre. Il est seulement retire comme balisage.
+    ///
+    /// Un canal jamais referme (generation coupee par `maxTokens` en plein
+    /// raisonnement) laisse l'automate dans `.insideThought` : le reste n'est
+    /// pas compte. Le mode degrade est « pas de blocage », jamais « blocage sur
+    /// du raisonnement ».
+    private mutating func advanceChannel(with token: Int32) -> Bool {
+        switch channelState {
+        case .outside:
+            if token == Gemma4Processor.channelStartTokenId {
+                channelState = .awaitingName
+                return true
+            }
+            // Delimiteur de fermeture orphelin, ou marqueur de thinking du
+            // prompt : du balisage, jamais du texte a proteger.
+            return token == Gemma4Processor.channelEndTokenId
+                || token == Gemma4Processor.thinkTokenId
+
+        case .awaitingName:
+            if token == Gemma4Processor.thoughtChannelNameTokenId {
+                channelState = .insideThought
+            } else {
+                // Canal de reponse (ou nom inattendu) : le contenu compte.
+                channelState = .outside
+            }
+            return true
+
+        case .insideThought:
+            if token == Gemma4Processor.channelEndTokenId {
+                channelState = .outside
+            }
+            return true
         }
     }
 }

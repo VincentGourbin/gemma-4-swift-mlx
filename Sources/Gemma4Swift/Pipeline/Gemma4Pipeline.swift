@@ -353,6 +353,12 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   `prompt + genere`, parite HF. `false` = seuls les n-grammes repetes
     ///   *dans le texte genere* sont interdits, le prompt reste citable
     ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
+    /// - Parameter noRepeatNGramIncludesThinking: `true` (defaut) = les tokens du
+    ///   canal `<|channel>thought ... <channel|>` alimentent la fenetre comme les
+    ///   autres. `false` = ils en sont exclus : le modele raisonne librement sans
+    ///   s'interdire de reutiliser dans la reponse ce qu'il vient d'ecrire dans
+    ///   son raisonnement. N'a d'effet qu'avec `enable_thinking` actif ; ignore
+    ///   si `noRepeatNGramSize == nil`.
     /// - Parameter templateVariables: variables passees au chat template en
     ///   `additionalContext` (p.ex. `["enable_thinking": true]`). Comme
     ///   `noRepeatNGramSize`, ce mode contourne `ChatSession` — qui ne sait
@@ -366,6 +372,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         maxTokens: Int = 1024,
         noRepeatNGramSize: Int? = nil,
         noRepeatNGramIncludesPrompt: Bool = true,
+        noRepeatNGramIncludesThinking: Bool = true,
         templateVariables: [String: any Sendable]? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
@@ -381,6 +388,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 maxTokens: maxTokens,
                 ngramSize: noRepeatNGramSize,
                 includePromptInWindow: noRepeatNGramIncludesPrompt,
+                includeThinkingInWindow: noRepeatNGramIncludesThinking,
                 templateVariables: templateVariables
             )
         }
@@ -430,6 +438,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         maxTokens: Int,
         ngramSize: Int?,
         includePromptInWindow: Bool,
+        includeThinkingInWindow: Bool,
         templateVariables: [String: any Sendable]?
     ) throws -> AsyncThrowingStream<String, Error> {
         if let ngramSize, ngramSize < 1 {
@@ -446,6 +455,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
         let ngramCapture = ngramSize
+        let ngramIncludesPromptCapture = includePromptInWindow
+        let ngramIncludesThinkingCapture = includeThinkingInWindow
         nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
@@ -481,7 +492,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             processor: ngramCapture.map {
                                 NoRepeatNGramLogitProcessor(
                                     ngramSize: $0,
-                                    includePromptInWindow: includePromptInWindow
+                                    includePromptInWindow: ngramIncludesPromptCapture,
+                                    includeThinkingInWindow: ngramIncludesThinkingCapture
                                 )
                             },
                             sampler: params.sampler(),
@@ -541,6 +553,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   *dans le texte genere* sont interdits, le prompt reste citable
     ///   verbatim. Ignore si `noRepeatNGramSize == nil`.
     ///
+    /// - Parameter noRepeatNGramIncludesThinking: `true` (defaut) = les tokens du
+    ///   canal `<|channel>thought ... <channel|>` alimentent la fenetre comme les
+    ///   autres. `false` = ils en sont exclus : le modele raisonne librement sans
+    ///   s'interdire de reutiliser dans la reponse ce qu'il vient d'ecrire dans
+    ///   son raisonnement. N'a d'effet qu'avec `enable_thinking` actif ; ignore
+    ///   si `noRepeatNGramSize == nil`.
+    ///
     /// - Parameter templateVariables: variables passees au chat template en
     ///   `additionalContext`. `["enable_thinking": true]` fait emettre au modele
     ///   son raisonnement dans un canal `<|channel>thought ... <channel|>` avant
@@ -557,6 +576,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         maxTokens: Int = 256,
         noRepeatNGramSize: Int? = nil,
         noRepeatNGramIncludesPrompt: Bool = true,
+        noRepeatNGramIncludesThinking: Bool = true,
         templateVariables: [String: any Sendable]? = nil
     ) throws -> AsyncThrowingStream<String, Error> {
         guard let container = container else {
@@ -574,6 +594,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let systemPromptCapture = systemPrompt
         let ngramCapture = noRepeatNGramSize
         let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
+        let ngramIncludesThinkingCapture = noRepeatNGramIncludesThinking
         nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
@@ -628,7 +649,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 cache: nil,
                                 processor: NoRepeatNGramLogitProcessor(
                                     ngramSize: ngramSize,
-                                    includePromptInWindow: ngramIncludesPromptCapture
+                                    includePromptInWindow: ngramIncludesPromptCapture,
+                                    includeThinkingInWindow: ngramIncludesThinkingCapture
                                 ),
                                 sampler: params.sampler(),
                                 prefillStepSize: params.prefillStepSize,

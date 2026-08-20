@@ -44,6 +44,14 @@ public struct Gemma4Processor {
     public static let channelStartTokenId: Int32 = 100 // <|channel>
     public static let channelEndTokenId: Int32 = 101   // <channel|>
 
+    // Nom du canal, emis en clair juste apres <|channel> : le tokenizer rend
+    // "<|channel>thought\n" en [100, 45518, 107] et "<|channel>response\n" en
+    // [100, 6275, 107]. Ce sont des tokens de vocabulaire ordinaires, pas des
+    // added_tokens — d'ou la necessite de les nommer pour distinguer le canal
+    // de pensee du canal de reponse a partir des seuls ids.
+    public static let thoughtChannelNameTokenId: Int32 = 45518   // "thought"
+    public static let responseChannelNameTokenId: Int32 = 6275   // "response"
+
     // EOS tokens (de generation_config.json)
     public static let eosTokenIds: Set<Int32> = [1, 106, 50]
 
