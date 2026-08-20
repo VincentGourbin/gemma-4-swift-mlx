@@ -646,7 +646,8 @@ Two things worth knowing before enabling it:
   reaches the answer.
 - Reasoning tokens are ordinary generated tokens: with `noRepeatNGramSize` set they
   feed the ban window like any other, so a phrase used in the thought cannot be
-  reused verbatim in the answer.
+  reused verbatim in the answer. `noRepeatNGramIncludesThinking: false` takes them
+  out of the window — see [Ban window: the thinking channel](#ban-window-the-thinking-channel).
 
 On the text path, `templateVariables` bypasses `ChatSession` exactly like
 `noRepeatNGramSize` does, so `continueChat` is unavailable afterwards.
@@ -700,8 +701,64 @@ let stream = try pipeline.chatStream(
     noRepeatNGramIncludesPrompt: false)   // prompt stays quotable
 ```
 
-`NoRepeatNGramLogitProcessor(ngramSize:includePromptInWindow:)` exposes the same
-switch if you build the `TokenIterator` yourself.
+#### Ban window: the thinking channel
+
+`noRepeatNGramIncludesThinking` (default `true`, previous behavior) selects
+whether the `<|channel>thought … <channel|>` block feeds the ban window.
+
+The two features fight each other when combined. Measured on the LTX-2.5 prompt
+enhancer (E2B, same prompt and image, greedy):
+
+| Configuration | Result |
+|---|---|
+| thinking off, n-gram 5 | 6 timestamps, 3 different formats, timeline contradicts the prompt |
+| thinking on, n-gram off | 6 timestamps, one format, timeline consistent |
+| thinking on, n-gram 5 | **zero** timestamps — vague prose instead |
+
+The third row is the mechanism eating itself: the model reasons *with* the
+timestamps, which puts them in the ban window, so it cannot restate them in the
+answer and falls back to "at the start of the sequence". Set
+`noRepeatNGramIncludesThinking: false` to keep reasoning and n-gram blocking
+together — the thought is generated normally, just not counted as already
+written, and the loop protection still covers the answer, which is what it is
+for.
+
+```swift
+let stream = try pipeline.chatStreamMultimodal(
+    prompt: "user prompt: <caption with an explicit timeline>",
+    pixelValues: pixels,
+    temperature: 0.0,
+    maxTokens: 1200,
+    noRepeatNGramSize: 5,
+    noRepeatNGramIncludesPrompt: false,
+    noRepeatNGramIncludesThinking: false,      // reasoning stays out of the window
+    templateVariables: ["enable_thinking": true])
+```
+
+Detection is a three-state automaton over token ids, driven by `<|channel>`
+(100), the channel name (`thought` = 45518, `response` = 6275) and `<channel|>`
+(101) — a `response` channel keeps feeding the window, only `thought` is exempt.
+Three details worth knowing:
+
+- **No ban applies while inside the thought.** The history is frozen there, so
+  a ban would come from a stale prefix — the last `n-1` tokens from before the
+  channel opened — and would be re-applied at every step of the reasoning.
+  Blocking is suspended for the duration and resumes at `<channel|>`.
+
+- **`<|think|>` does not open the channel.** The chat template emits it at the
+  top of the system turn — in the *prompt*, with no `<channel|>` facing it.
+  Opening a thought state on it would drop the whole prompt out of the window.
+  It is only removed as markup.
+- **An unclosed channel stays open.** If `maxTokens` cuts the generation
+  mid-thought, the automaton stays inside and nothing further is counted. The
+  degraded mode is "no blocking", never "blocking on reasoning".
+
+The prompt is filtered by the same automaton, so a thought block rendered from a
+previous turn (`reasoning` / `reasoning_content`) is exempt too, consistently
+with the generated one.
+
+`NoRepeatNGramLogitProcessor(ngramSize:includePromptInWindow:includeThinkingInWindow:)`
+exposes both switches if you build the `TokenIterator` yourself.
 
 > No need to import `MLXLMCommon` — `Gemma4Pipeline.load()` handles registration, tokenizer loading, and model container setup internally.
 

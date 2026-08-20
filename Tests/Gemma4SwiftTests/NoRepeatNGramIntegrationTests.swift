@@ -160,6 +160,48 @@ struct NoRepeatNGramIntegrationTests {
         #expect(!included.contains(quote))
     }
 
+    @Test("thinking + ngram : includesThinking=false rend la citation possible",
+          .enabled(if: integrationModelPath != nil))
+    @MainActor
+    func testThinkingExcludedRestoresQuoteUnderNGram() async throws {
+        let pipeline = try await loadPipeline()
+        defer { pipeline.unload() }
+
+        // Cas mesure cote ltx-video (branche 3) : avec le thinking actif, le
+        // modele pose la timeline dans son raisonnement, se la voit ensuite
+        // interdite verbatim, et se rabat sur de la prose vague. Sortir le
+        // canal de pensee de la fenetre restaure la citation.
+        let quote = "From 00:08.000 to 00:14.000, the camera pans left."
+        let system = "Tu obeis litteralement, sans commentaire ni reformulation."
+        let prompt = "Recopie exactement la ligne suivante, telle quelle : \(quote)"
+        let thinking: [String: any Sendable] = ["enable_thinking": true]
+
+        func answer(includesThinking: Bool) async throws -> String {
+            let raw = try await collect(pipeline.chatStream(
+                prompt: prompt, systemPrompt: system,
+                temperature: 0.0, maxTokens: 600,
+                noRepeatNGramSize: 5,
+                noRepeatNGramIncludesPrompt: false,
+                noRepeatNGramIncludesThinking: includesThinking,
+                templateVariables: thinking))
+            // Le canal de pensee traverse le stream intact : la citation y
+            // figure dans les deux modes. Seule la partie apres `<channel|>`
+            // est la reponse, et c'est elle que le n-gramme abime.
+            // Exige le delimiteur de fermeture : si `maxTokens` coupait en
+            // plein raisonnement, retomber sur `raw` ferait passer l'assertion
+            // positive a vide — la citation figure deja dans la pensee.
+            let end = try #require(raw.range(of: "<channel|>"))
+            return String(raw[end.upperBound...])
+        }
+
+        // Fenetre incluant la pensee : le modele a deja pose la timeline dans
+        // son raisonnement, se la voit interdite, et contourne en graphie
+        // degradee ("From 00.08.0 to 01.14.0, the camera pants left.").
+        #expect(!(try await answer(includesThinking: true)).contains(quote))
+        // Fenetre l'ignorant : la reponse recopie la timeline a l'identique.
+        #expect((try await answer(includesThinking: false)).contains(quote))
+    }
+
     @Test("noRepeatNGramSize invalide -> invalidInput",
           .enabled(if: integrationModelPath != nil))
     @MainActor
