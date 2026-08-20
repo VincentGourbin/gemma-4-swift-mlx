@@ -738,7 +738,12 @@ let stream = try pipeline.chatStreamMultimodal(
 Detection is a three-state automaton over token ids, driven by `<|channel>`
 (100), the channel name (`thought` = 45518, `response` = 6275) and `<channel|>`
 (101) — a `response` channel keeps feeding the window, only `thought` is exempt.
-Two details worth knowing:
+Three details worth knowing:
+
+- **No ban applies while inside the thought.** The history is frozen there, so
+  a ban would come from a stale prefix — the last `n-1` tokens from before the
+  channel opened — and would be re-applied at every step of the reasoning.
+  Blocking is suspended for the duration and resumes at `<channel|>`.
 
 - **`<|think|>` does not open the channel.** The chat template emits it at the
   top of the system turn — in the *prompt*, with no `<channel|>` facing it.

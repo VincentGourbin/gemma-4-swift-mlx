@@ -187,8 +187,10 @@ struct NoRepeatNGramIntegrationTests {
             // Le canal de pensee traverse le stream intact : la citation y
             // figure dans les deux modes. Seule la partie apres `<channel|>`
             // est la reponse, et c'est elle que le n-gramme abime.
-            #expect(raw.contains("<|channel>"))
-            guard let end = raw.range(of: "<channel|>") else { return raw }
+            // Exige le delimiteur de fermeture : si `maxTokens` coupait en
+            // plein raisonnement, retomber sur `raw` ferait passer l'assertion
+            // positive a vide — la citation figure deja dans la pensee.
+            let end = try #require(raw.range(of: "<channel|>"))
             return String(raw[end.upperBound...])
         }
 

@@ -92,6 +92,13 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     }
 
     public func process(logits: MLXArray) -> MLXArray {
+        // Dans le canal de pensee exclu, l'historique est gele : le prefixe
+        // resterait fige sur les `n - 1` tokens d'avant l'ouverture du canal et
+        // rebannirait leurs continuations a *chaque* pas du raisonnement, sur
+        // des centaines de tokens sans rapport avec la position courante. Le
+        // contrat est « genere normalement » : on ne bloque rien.
+        guard channelState != .insideThought else { return logits }
+
         let prefix = Array(history.suffix(ngramSize - 1))
         // Prefixe incomplet (debut de sequence) : rien a bloquer.
         guard prefix.count == ngramSize - 1 else { return logits }
@@ -154,11 +161,15 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
         case .awaitingName:
             if token == Gemma4Processor.thoughtChannelNameTokenId {
                 channelState = .insideThought
-            } else {
-                // Canal de reponse (ou nom inattendu) : le contenu compte.
-                channelState = .outside
+                return true
             }
-            return true
+            channelState = .outside
+            // Le nom du canal de reponse est du balisage, il ne compte pas.
+            // Un nom inattendu, en revanche — ou un `<|channel>` egare en
+            // pleine reponse — est du contenu : le compter est le choix
+            // conservateur, sinon on affaiblit la protection anti-boucle
+            // exactement la ou le modele part en vrille.
+            return token == Gemma4Processor.responseChannelNameTokenId
 
         case .insideThought:
             if token == Gemma4Processor.channelEndTokenId {

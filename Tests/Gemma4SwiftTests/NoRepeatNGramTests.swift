@@ -287,6 +287,39 @@ struct NoRepeatNGramTests {
         #expect(out.allSatisfy { $0 == 0 })
     }
 
+    @Test("Dans le canal, aucun blocage : le prefixe gele ne rebannit pas")
+    func testNoBanningWhileInsideThought() {
+        // Historique gele pendant la pensee : sans garde, `process` rebannirait
+        // les continuations du prefixe d'avant l'ouverture a chaque pas.
+        var processor = NoRepeatNGramLogitProcessor(
+            ngramSize: 5, includeThinkingInWindow: false)
+        processor.prompt(MLXArray([Int32(1), 2, 3, 4, 5, 1, 2, 3, 4]))
+        // Hors canal, le prefixe (1,2,3,4) bannit bien 5.
+        #expect(values(processor.process(logits: zeroLogits()))[5] == -Float.infinity)
+
+        feed(&processor, [Self.channelStart, Self.thoughtName])
+        // Dans le canal : plus rien n'est bloque, a chaque pas du raisonnement.
+        #expect(values(processor.process(logits: zeroLogits())).allSatisfy { $0 == 0 })
+        feed(&processor, [42, 43, 44])
+        #expect(values(processor.process(logits: zeroLogits())).allSatisfy { $0 == 0 })
+
+        // A la sortie du canal, le blocage reprend a l'identique.
+        feed(&processor, [Self.channelEnd])
+        #expect(values(processor.process(logits: zeroLogits()))[5] == -Float.infinity)
+    }
+
+    @Test("Nom de canal inattendu : le token suivant reste du contenu compte")
+    func testUnknownChannelNameStillCounts() {
+        // `<|channel>` egare en pleine reponse : ne pas affaiblir la protection
+        // anti-boucle la ou le modele part en vrille.
+        var processor = NoRepeatNGramLogitProcessor(
+            ngramSize: 5, includeThinkingInWindow: false)
+        feed(&processor, [Self.channelStart, 1, 2, 3, 4, 5, 1, 2, 3, 4])
+
+        let out = values(processor.process(logits: zeroLogits()))
+        #expect(out[5] == -Float.infinity)
+    }
+
     @Test("Non-regression : sans thinking, les deux modes sont identiques")
     func testNoThinkingTokensMeansIdenticalBehavior() {
         let sequence: [Int32] = [1, 2, 3, 4, 5, 1, 2, 3, 4]
