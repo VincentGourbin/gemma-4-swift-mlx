@@ -270,7 +270,7 @@ final class AgentStepViewModel: ObservableObject {
         }
 
         guard let cg = imageForModel.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let pixels = try? Gemma4ImageProcessor.processImage(cg)
+              let pixels = try? await Gemma4ImageProcessor.processImage(cg, priority: .userInitiated)
         else {
             step.state = .errored
             step.error = "screenshot -> pixels failed"

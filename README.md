@@ -573,6 +573,62 @@ for try await token in stream {
 let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
 
+### Image preprocessing off the main thread
+
+`Gemma4ImageProcessor.processImage` and `Gemma4UnifiedImageProcessor.processImage`
+are synchronous: decoding (`NSImage` on macOS, `UIImage` on iOS) and resizing
+(CoreGraphics) run **on the calling thread**. Called from a `@MainActor` view model
+they block the main thread — measured at ~10 ms for a 1920×1280 JPEG on an M3 Max,
+most of it the decode that `NSImage` defers until the first `draw`.
+
+Both types expose an `async` overload that runs that work on a detached task:
+
+```swift
+// From a @MainActor context
+let pixels = try await Gemma4ImageProcessor.processImage(
+    url: imageURL,
+    priority: .userInitiated)          // required — no default
+
+let processed = try await Gemma4UnifiedImageProcessor.processImage(
+    url: imageURL,
+    config: visionConfig,
+    priority: .userInitiated)
+```
+
+`priority` has **no default value** on purpose: it is what distinguishes the async
+overload from the synchronous one of the same name, so existing synchronous call
+sites keep resolving to the synchronous version and keep compiling unchanged.
+
+Two things to know before using it:
+
+- **The result is evaluated before it crosses the task boundary.** `MLXArray` is not
+  thread safe — mlx-swift's own documentation states that it is *"not safe to create
+  `c` in one thread and consume/evaluate it in another"* — so returning a lazy graph
+  built on the detached task would be unsound. The array you get back is already
+  materialized: the caller pays no compute, but the GPU cost is paid inside the call
+  rather than at first use.
+- **`Task.detached` does not inherit task-locals.** `withError`,
+  `Device.withDefaultDevice`, `Stream.withNewDefaultStream` and the `MLXRandom` state
+  installed by the caller do not cross into it: preprocessing runs on the global
+  default device, and an MLX error there reaches the global handler (or `fatalError`)
+  instead of your scoped one. If you depend on any of those, call the synchronous
+  overload from a task you control.
+
+Note the async overload does **not**, on its own, silence the Xcode *"User-initiated
+thread waiting on a lower QoS thread"* diagnostic: the Thread Performance Checker
+fires on the QoS pairing, not on whether the waiter is the main thread, and
+`Task.value` escalates the detached task to the awaiting task's priority anyway. What
+it fixes is the main thread being blocked, which is the part that is actually felt.
+
+The video and audio processors (`Gemma4VideoProcessor`, `Gemma4UnifiedVideoProcessor`,
+`Gemma4AudioProcessor`, `Gemma4UnifiedAudioProcessor`) are `async` statics that today
+run off the main actor under SE-0338 semantics. That is a property of the current
+language mode, not an annotation: enabling `NonisolatedNonsendingByDefault`
+(Approachable Concurrency) would run them on the caller's actor, and
+`Gemma4VideoProcessor.processVideo` calls the **synchronous** `processImage` up to 32
+times in a loop. Only the image overloads above survive that flip, because they go
+through `Task.detached`.
+
 ### System role
 
 `chatStream` and `chatStreamMultimodal` both take an optional `systemPrompt`. It is

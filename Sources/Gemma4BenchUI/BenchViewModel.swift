@@ -335,7 +335,7 @@ final class BenchViewModel: ObservableObject {
             // (qui ne supporte pas les pixelValues) via chatStreamMultimodal.
             let stream: AsyncThrowingStream<String, Error>
             if let url = imageURL {
-                let pixels = try Gemma4ImageProcessor.processImage(url: url)
+                let pixels = try await Gemma4ImageProcessor.processImage(url: url, priority: .userInitiated)
                 stream = try pipeline.chatStreamMultimodal(
                     prompt: prompt,
                     pixelValues: pixels,
@@ -429,7 +429,7 @@ final class BenchViewModel: ObservableObject {
         let numImageSoftTokens = config.visionSoftTokensPerImage
         if let url = imageURL {
             do {
-                pixelValues = try Gemma4ImageProcessor.processImage(url: url)
+                pixelValues = try await Gemma4ImageProcessor.processImage(url: url, priority: .userInitiated)
                 diffusionPanel.status = "Image chargee (\(pixelValues!.shape))"
             } catch {
                 diffusionPanel.phase = .error("Image : \(error.localizedDescription)")
