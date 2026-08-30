@@ -47,8 +47,13 @@ final class VQAGameViewModel: ObservableObject {
     @Published var maxQuestions: Int = 20
 
     var questionsAsked: Int { turns.filter { $0.role == .user }.count }
+    /// `!isThinking` fait partie de la condition : `ask(...)` suspend desormais
+    /// sur le preprocessing asynchrone, donc deux envois rapproches lanceraient
+    /// deux generations concurrentes — le `evalLock` de mlx-swift est global et
+    /// l'ABBA documente dans CLAUDE.md fige alors le process.
     func canPlay(registry: ModelRegistry) -> Bool {
-        registry.isDiffusionLoaded && imageURL != nil && !solved && questionsAsked < maxQuestions
+        registry.isDiffusionLoaded && imageURL != nil && !solved
+            && questionsAsked < maxQuestions && !isThinking
     }
 
     private var cachedPixels: MLXArray?
@@ -94,10 +99,14 @@ final class VQAGameViewModel: ObservableObject {
         isThinking = true
         defer { isThinking = false }
 
-        // Pre-process image once
+        // Pre-process image once. `await` libere le main actor : l'utilisateur
+        // peut changer d'image entre-temps, donc on relit `imageURL` au retour
+        // plutot que d'ecraser aveuglement l'invalidation faite par selectImage().
         if cachedPixels == nil {
             do {
-                cachedPixels = try await Gemma4ImageProcessor.processImage(url: url, priority: .userInitiated)
+                let pixels = try await Gemma4ImageProcessor.processImage(url: url, priority: .userInitiated)
+                guard imageURL == url else { return }
+                cachedPixels = pixels
             } catch {
                 turns.append(Turn(role: .model, text: "⚠ Erreur de preprocessing : \(error.localizedDescription)", elapsed: nil, stepsUsed: nil, questionType: nil))
                 return

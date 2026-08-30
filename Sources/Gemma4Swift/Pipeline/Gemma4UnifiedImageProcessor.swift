@@ -77,25 +77,10 @@ public enum Gemma4UnifiedImageProcessor {
             bestH = min(Int(floor(Float(origH) / Float(origW))) * sideMult, maxSideLength)
         }
 
-        // 2) Redimensionner via CG (BGRA -> RGB float).
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * bestW
-        var pixelData = [UInt8](repeating: 0, count: bestH * bytesPerRow)
+        // 2) Redimensionner via CG -> buffer RGB [H, W, 3] UInt8.
+        let raw = try Gemma4CGImageLoader.rgbTensor(from: image, width: bestW, height: bestH)
 
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let context = CGContext(
-            data: &pixelData,
-            width: bestW, height: bestH,
-            bitsPerComponent: 8, bytesPerRow: bytesPerRow,
-            space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        ) else {
-            throw ImageProcessingError.processingFailed
-        }
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(x: 0, y: 0, width: bestW, height: bestH))
-
-        // 3-4) Tout le pipeline RGBA -> normaliser -> patches en operations MLX
+        // 3-4) Tout le pipeline RGB -> normaliser -> patches en operations MLX
         // vectorisees. Pour une image 2K (~4M pixels), on passe de ~16M
         // operations scalaires Swift a quelques kernels MLX (gain ~10-50x).
         let pH = bestH / modelPatch
@@ -103,9 +88,8 @@ public enum Gemma4UnifiedImageProcessor {
         let patchDim = config.patchDim
         let numPatches = pH * pW
 
-        // (a) buffer brut UInt8 [H*W*4] -> [H, W, 4] -> [H, W, 3] (drop alpha)
-        let raw = MLXArray(pixelData).reshaped(bestH, bestW, 4)
-        let rgb = raw[0..., 0..., 0..<3].asType(.float32) / MLXArray(Float(255.0))
+        // (a) rescale vers [0, 1]
+        let rgb = raw.asType(.float32) / MLXArray(Float(255.0))
 
         // (b) normalisation par canal : (x - mean) / std (broadcast sur [3])
         let mean = MLXArray(Self.imageMean)
@@ -150,7 +134,11 @@ public enum Gemma4UnifiedImageProcessor {
     ///
     /// - Parameter priority: priorite de la tache detachee. Sans valeur par defaut,
     ///   pour distinguer cette surcharge de la version synchrone de meme nom et
-    ///   forcer un choix explicite de QoS. Voir
+    ///   forcer un choix explicite de QoS.
+    ///
+    /// - Important: les tableaux sont evalues avant de franchir la frontiere de
+    ///   tache (`MLXArray` n'est pas thread-safe), et `Task.detached` n'herite pas
+    ///   des task-locals de MLX. Details sur
     ///   ``Gemma4ImageProcessor/processImage(url:maxSoftTokens:patchSize:poolingKernelSize:priority:)``.
     public static func processImage(
         url: URL,
@@ -158,7 +146,9 @@ public enum Gemma4UnifiedImageProcessor {
         priority: TaskPriority
     ) async throws -> ProcessedImage {
         try await Task.detached(priority: priority) {
-            try processImage(url: url, config: config)
+            let processed = try processImage(url: url, config: config)
+            eval(processed.patches, processed.positionIds)
+            return processed
         }.value
     }
 
@@ -169,9 +159,10 @@ public enum Gemma4UnifiedImageProcessor {
         config: Gemma4UnifiedVisionConfig,
         priority: TaskPriority
     ) async throws -> ProcessedImage {
-        let source = UncheckedTransfer(image)
-        return try await Task.detached(priority: priority) {
-            try processImage(source.value, config: config)
+        try await Task.detached(priority: priority) {
+            let processed = try processImage(image, config: config)
+            eval(processed.patches, processed.positionIds)
+            return processed
         }.value
     }
 }

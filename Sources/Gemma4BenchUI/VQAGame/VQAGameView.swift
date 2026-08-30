@@ -135,6 +135,7 @@ struct VQAGameView: View {
                         .font(.system(size: 11, weight: .semibold))
                 }
                 .buttonStyle(GlowButtonStyle(color: .purple))
+                .disabled(vm.isThinking)
 
                 if vm.imageURL != nil {
                     Button {
@@ -300,7 +301,10 @@ struct VQAGameView: View {
                             .fill(Color.white.opacity(0.06))
                             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.purple.opacity(0.4), lineWidth: 1))
                     )
-                    .onSubmit { send() }
+                    .onSubmit {
+                        guard vm.canPlay(registry: registry), !vm.isThinking else { return }
+                        send()
+                    }
                 Button { send() } label: {
                     Label(mode == .guess ? "Deviner" : "Demander",
                           systemImage: mode == .guess ? "questionmark.diamond.fill" : "paperplane.fill")
