@@ -87,9 +87,13 @@ struct UnifiedImageProcessorTests {
             makeGradientCGImage(width: 640, height: 320), config: config)
 
         #expect(processed.patches.ndim == 2)
-        #expect(processed.patches.dim(0) == config.maxPatches)
+        // Le tenseur est indexe en patches MODELE (48 px), pas en patches fins
+        // (16 px) : une ligne = un patch de 48 px = un soft token.
+        #expect(processed.patches.dim(0) == config.maxModelPatches)
+        #expect(config.maxModelPatches == config.numSoftTokens)
+        #expect(config.maxPatches == config.maxModelPatches * 9) // unites distinctes
         #expect(processed.patches.dim(1) == config.patchDim) // 48*48*3 = 6912
-        #expect(processed.positionIds.shape == [config.maxPatches, 2])
+        #expect(processed.positionIds.shape == [config.maxModelPatches, 2])
 
         let (pW, pH) = grid(of: processed)
         #expect(pW * pH == processed.validPatches)
@@ -104,7 +108,7 @@ struct UnifiedImageProcessorTests {
             makeGradientCGImage(width: 640, height: 320), config: config)
 
         let valid = processed.validPatches
-        #expect(valid < config.maxPatches) // sinon le test ne prouve rien
+        #expect(valid < config.maxModelPatches) // sinon le test ne prouve rien
 
         let padPatches = processed.patches[valid...]
         #expect(abs(padPatches).max().item(Float.self) == 0.0)
@@ -218,6 +222,51 @@ struct UnifiedImageProcessorTests {
         #expect(pW > 1)                     // le ratio n'est pas ecrase en carre
         #expect(processed.validPatches == pW * pH)
         #expect(processed.validPatches <= config.numSoftTokens)
+    }
+
+    @Test("validPatches ne depasse jamais numSoftTokens, quelle que soit la taille source")
+    func testPatchBudgetInvariantAcrossSizes() throws {
+        // L'invariant qui autorise a padder a numSoftTokens plutot qu'a
+        // maxPatches : le resize vise numSoftTokens * modelPatchSize^2 pixels,
+        // donc au plus numSoftTokens cellules de 48x48. Verifie sur un balayage
+        // plutot que sur un seul cas, les arrondis Float du calcul de facteur
+        // etant le seul endroit ou l'invariant pourrait ceder.
+        let config = try makeConfig()
+
+        // Petites tailles croisees : bornes de cellule (47/48/49), carres et
+        // ratios modestes. Les grandes images sont testees a part, leur
+        // generation scalaire dominant le temps du test.
+        let sides = [1, 7, 47, 48, 49, 96, 337]
+        var cases = sides.flatMap { w in sides.map { h in (w, h) } }
+
+        // Cas larges et ratios extremes, ou l'invariant est le plus tendu :
+        // budget sature, et les deux branches de fallback.
+        cases += [(640, 320), (1920, 1080), (1081, 1080), (2810, 10), (10, 2810), (4001, 3)]
+
+        for (w, h) in cases {
+            let processed = try Gemma4UnifiedImageProcessor.processImage(
+                makeGradientCGImage(width: w, height: h), config: config)
+
+            #expect(
+                processed.validPatches <= config.maxModelPatches,
+                "\(w)x\(h) produit \(processed.validPatches) patches > \(config.maxModelPatches)")
+            #expect(processed.validPatches >= 1, "\(w)x\(h) ne produit aucun patch")
+            // Forme constante quelle que soit l'image : c'est ce qui permet
+            // d'empiler plusieurs images sur l'axe batch.
+            #expect(processed.patches.dim(0) == config.maxModelPatches)
+        }
+    }
+
+    @Test("Un budget video reduit padde a son propre numSoftTokens")
+    func testReducedTokenBudget() throws {
+        // Gemma4UnifiedVideoProcessor derive une config a 70 soft tokens par
+        // frame : le padding doit suivre ce budget, pas celui des images fixes.
+        let config = try makeConfig(numSoftTokens: 70)
+        let processed = try Gemma4UnifiedImageProcessor.processImage(
+            makeGradientCGImage(width: 640, height: 320), config: config)
+
+        #expect(processed.patches.dim(0) == 70)
+        #expect(processed.validPatches <= 70)
     }
 
     // MARK: - Surcharges async

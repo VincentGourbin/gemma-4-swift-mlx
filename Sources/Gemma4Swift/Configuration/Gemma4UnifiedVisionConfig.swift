@@ -52,6 +52,22 @@ public struct Gemma4UnifiedVisionConfig: Codable, Sendable {
     /// Dimension d'un patch flatten : modelPatchSize * modelPatchSize * 3
     public var patchDim: Int { modelPatchSize * modelPatchSize * 3 }
 
-    /// Nombre maximum de patches accepte par le preprocessor.
+    /// Budget de patches **fins** (`patchSize`, 16 px), exprime dans la meme unite
+    /// que le SigLIP de [[Gemma4VisionConfig]].
+    ///
+    /// Ne sert qu'a calculer le budget de pixels du resize
+    /// (`maxPatches * patchSize^2`). **Ce n'est pas un nombre de lignes de
+    /// tenseur** : les patches produits par [[Gemma4UnifiedImageProcessor]] sont
+    /// des patches *modele* de `modelPatchSize` (48 px), soit 9 patches fins
+    /// chacun. Pour un nombre de lignes, utiliser ``maxModelPatches``.
     public var maxPatches: Int { numSoftTokens * poolingKernelSize * poolingKernelSize }
+
+    /// Nombre maximum de patches **modele** (`modelPatchSize`, 48 px) produits
+    /// pour une image, donc le nombre de lignes du tenseur de patches et le
+    /// nombre de soft tokens correspondants — un patch modele = un soft token.
+    ///
+    /// Vaut exactement `numSoftTokens` : le budget de pixels du resize est
+    /// `maxPatches * patchSize^2`, soit `numSoftTokens * modelPatchSize^2` pixels,
+    /// soit au plus `numSoftTokens` cellules de `modelPatchSize^2`.
+    public var maxModelPatches: Int { numSoftTokens }
 }

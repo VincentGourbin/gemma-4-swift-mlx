@@ -64,7 +64,7 @@ public enum Gemma4UnifiedImageProcessor {
         var bestW = Int(floor(factor * Float(origW) / Float(sideMult))) * sideMult
 
         // Fallbacks (image extreme).
-        let maxSideLength = (maxPatches / (config.poolingKernelSize * config.poolingKernelSize)) * sideMult
+        let maxSideLength = config.maxModelPatches * sideMult
         if bestH == 0 && bestW == 0 {
             // Image trop petite : on prend une seule cellule.
             bestH = sideMult
@@ -103,9 +103,16 @@ public enum Gemma4UnifiedImageProcessor {
             .transposed(0, 2, 1, 3, 4)
             .reshaped(numPatches, patchDim)
 
-        // 5) Pad jusqu'a maxPatches (positions -1 pour les paddings).
+        // 5) Pad jusqu'au nombre de patches MODELE (positions -1 pour les
+        // paddings), pas jusqu'a `maxPatches` qui compte des patches fins de
+        // 16 px : une ligne de ce tenseur est un patch de 48 px, donc 9 patches
+        // fins. Padder a 2520 au lieu de 280 gonflait le tenseur x9 (~70 Mo par
+        // image au lieu de ~7,7) et, surtout, faisait tourner
+        // [[Gemma4UnifiedVisionEmbedder]] sur 9x trop de lignes : il s'applique
+        // au tenseur complet, padding inclus, et seul le resultat est compacte
+        // par validPatches en aval.
         let validCount = numPatches
-        let padTarget = maxPatches
+        let padTarget = config.maxModelPatches
         let patchesMLX: MLXArray
         if validCount < padTarget {
             let padding = MLXArray.zeros([padTarget - validCount, patchDim], type: Float.self)
