@@ -47,11 +47,62 @@ public struct Gemma4UnifiedVisionConfig: Codable, Sendable {
         numSoftTokens = try c.decodeIfPresent(Int.self, forKey: .numSoftTokens) ?? 280
         outputProjDims = try c.decodeIfPresent(Int.self, forKey: .outputProjDims) ?? (mmEmbedDim)
         rmsNormEps = try c.decodeIfPresent(Float.self, forKey: .rmsNormEps) ?? 1e-6
+
+        // Les trois dimensions sont decodees independamment, mais le
+        // preprocessor n'est correct que si elles sont coherentes entre elles.
+        // On rejette ici plutot que de laisser trapper plus loin.
+        guard patchSize > 0, poolingKernelSize > 0, modelPatchSize > 0, numSoftTokens > 0 else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: c.codingPath,
+                debugDescription: "Dimensions vision invalides : patch_size=\(patchSize), "
+                    + "pooling_kernel_size=\(poolingKernelSize), "
+                    + "model_patch_size=\(modelPatchSize), num_soft_tokens=\(numSoftTokens). "
+                    + "Toutes doivent etre strictement positives."
+            ))
+        }
+
+        // Identite structurante : [[Gemma4UnifiedImageProcessor]] derive son
+        // budget de pixels de `maxPatches * patchSize^2`, puis decoupe l'image en
+        // cellules de `modelPatchSize^2`. Le nombre de patches modele ne vaut
+        // `numSoftTokens` que si une cellule fait exactement `poolingKernelSize`
+        // patches fins de cote. Sinon la borne reelle devient
+        // `numSoftTokens * (patchSize * poolingKernelSize / modelPatchSize)^2` —
+        // 498 patches pour pooling_kernel_size=4 — alors que le tableau de
+        // positions est dimensionne a `numSoftTokens`.
+        guard modelPatchSize == patchSize * poolingKernelSize else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: c.codingPath,
+                debugDescription: "model_patch_size (\(modelPatchSize)) doit valoir "
+                    + "patch_size * pooling_kernel_size "
+                    + "(\(patchSize) * \(poolingKernelSize) = \(patchSize * poolingKernelSize)). "
+                    + "Le preprocessor derive le nombre de soft tokens de cette identite."
+            ))
+        }
     }
 
     /// Dimension d'un patch flatten : modelPatchSize * modelPatchSize * 3
     public var patchDim: Int { modelPatchSize * modelPatchSize * 3 }
 
-    /// Nombre maximum de patches accepte par le preprocessor.
+    /// Budget de patches **fins** (`patchSize`, 16 px), exprime dans la meme unite
+    /// que le SigLIP de [[Gemma4VisionConfig]].
+    ///
+    /// Ne sert qu'a calculer le budget de pixels du resize
+    /// (`maxPatches * patchSize^2`). **Ce n'est pas un nombre de lignes de
+    /// tenseur** : les patches produits par [[Gemma4UnifiedImageProcessor]] sont
+    /// des patches *modele* de `modelPatchSize` (48 px), soit 9 patches fins
+    /// chacun. Pour un nombre de lignes, utiliser ``maxModelPatches``.
     public var maxPatches: Int { numSoftTokens * poolingKernelSize * poolingKernelSize }
+
+    /// Nombre maximum de patches **modele** (`modelPatchSize`, 48 px) produits
+    /// pour une image, donc le nombre de lignes du tenseur de patches et le
+    /// nombre de soft tokens correspondants — un patch modele = un soft token.
+    ///
+    /// Vaut `numSoftTokens`, ce qui repose sur l'identite
+    /// `modelPatchSize == patchSize * poolingKernelSize` **validee au decodage**
+    /// (cf. `init(from:)`) : le budget de pixels du resize vaut alors
+    /// `numSoftTokens * modelPatchSize^2`, soit au plus `numSoftTokens` cellules.
+    ///
+    /// C'est un plafond, pas une egalite : une image donnee produit
+    /// `validPatches <= maxModelPatches` patches, et le reste est du padding.
+    public var maxModelPatches: Int { numSoftTokens }
 }
