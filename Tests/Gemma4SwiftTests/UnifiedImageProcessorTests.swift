@@ -16,13 +16,18 @@ struct UnifiedImageProcessorTests {
 
     /// Le config n'a qu'un `init(from:)`, donc pas d'init memberwise : on passe
     /// par le decodeur, ce qui exerce au passage le chemin de chargement reel.
-    private func makeConfig(numSoftTokens: Int = 280) throws -> Gemma4UnifiedVisionConfig {
+    private func makeConfig(
+        numSoftTokens: Int = 280,
+        patchSize: Int = 16,
+        poolingKernelSize: Int = 3,
+        modelPatchSize: Int = 48
+    ) throws -> Gemma4UnifiedVisionConfig {
         let json = """
         {
           "model_type": "gemma4_unified_vision",
-          "model_patch_size": 48,
-          "patch_size": 16,
-          "pooling_kernel_size": 3,
+          "model_patch_size": \(modelPatchSize),
+          "patch_size": \(patchSize),
+          "pooling_kernel_size": \(poolingKernelSize),
           "num_soft_tokens": \(numSoftTokens)
         }
         """.data(using: .utf8)!
@@ -43,30 +48,54 @@ struct UnifiedImageProcessorTests {
                 pixelData[i * 4 + 3] = 255
             }
         }
-        let context = CGContext(
-            data: &pixelData,
-            width: width, height: height,
-            bitsPerComponent: 8, bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        )!
-        return context.makeImage()!
+        return pixelData.withUnsafeMutableBytes { raw in
+            CGContext(
+                data: raw.baseAddress,
+                width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )!.makeImage()!
+        }
     }
 
     /// Rejoue le rendu CoreGraphics du processeur a une taille donnee.
+    /// Meme discipline que Gemma4CGImageLoader.rgbTensor : le bitmap est cede a
+    /// CoreGraphics dans une portee `withUnsafeMutableBytes`. Passer `&pixelData`
+    /// ferait echapper un pointeur temporaire hors de l'appel qui l'a cree, ce
+    /// que la doc Swift classe en comportement indefini — et ce serait
+    /// reintroduire dans le test le defaut que le loader de production a corrige.
     private func renderRGBA(_ image: CGImage, width: Int, height: Int) -> [UInt8] {
         let bytesPerRow = 4 * width
         var pixelData = [UInt8](repeating: 0, count: height * bytesPerRow)
-        let context = CGContext(
-            data: &pixelData,
-            width: width, height: height,
-            bitsPerComponent: 8, bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-        )!
-        context.interpolationQuality = .high
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        pixelData.withUnsafeMutableBytes { raw in
+            let context = CGContext(
+                data: raw.baseAddress,
+                width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )!
+            context.interpolationQuality = .high
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
         return pixelData
+    }
+
+    /// Image unie — beaucoup moins couteuse que le degrade, pour les tests qui
+    /// ne lisent que des formes et des compteurs.
+    private func makeSolidCGImage(width: Int, height: Int) -> CGImage {
+        let bytesPerRow = 4 * width
+        var pixelData = [UInt8](repeating: 200, count: height * bytesPerRow)
+        return pixelData.withUnsafeMutableBytes { raw in
+            CGContext(
+                data: raw.baseAddress,
+                width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )!.makeImage()!
+        }
     }
 
     /// Grille de patches deduite des position ids, plutot que de dupliquer la
@@ -107,8 +136,11 @@ struct UnifiedImageProcessorTests {
         let processed = try Gemma4UnifiedImageProcessor.processImage(
             makeGradientCGImage(width: 640, height: 320), config: config)
 
+        // `try #require` et non `#expect` : #expect ne halte pas, et une slice MLX
+        // de zero ligne juste apres avorterait tout le process xctest au lieu de
+        // faire echouer ce seul test.
         let valid = processed.validPatches
-        #expect(valid < config.maxModelPatches) // sinon le test ne prouve rien
+        try #require(valid < config.maxModelPatches) // sinon le test ne prouve rien
 
         let padPatches = processed.patches[valid...]
         #expect(abs(padPatches).max().item(Float.self) == 0.0)
@@ -163,8 +195,14 @@ struct UnifiedImageProcessorTests {
                     }
                 }
             }
+            // Tolerance tres serree plutot qu'egalite exacte : la division par 255
+            // est faite par un kernel Metal d'un cote et par le CPU de l'autre.
+            // 1e-6 reste 3900x plus fin qu'un pas d'octet (1/255), donc toute
+            // erreur d'axe ou de canal est toujours attrapee.
             let actual = processed.patches[py * pW + px].asArray(Float.self)
-            #expect(actual == expected, "patch (\(py), \(px)) ne correspond pas au bloc source")
+            #expect(actual.count == expected.count)
+            let maxDelta = zip(actual, expected).map { abs($0 - $1) }.max() ?? 0
+            #expect(maxDelta < 1e-6, "patch (\(py), \(px)) ne correspond pas au bloc source")
         }
     }
 
@@ -187,26 +225,38 @@ struct UnifiedImageProcessorTests {
         )!.makeImage()!
 
         let processed = try Gemma4UnifiedImageProcessor.processImage(cg, config: config)
-        let firstPatch = processed.patches[0].reshaped(config.modelPatchSize * config.modelPatchSize, 3)
 
-        #expect(processed.patches.min().item(Float.self) >= 0.0)
-        #expect(processed.patches.max().item(Float.self) <= 1.0)
-        #expect(abs(firstPatch[0..., 0] - MLXArray(Float(1.0))).max().item(Float.self) < 1e-5)
-        #expect(abs(firstPatch[0..., 1]).max().item(Float.self) < 1e-5)
-        #expect(abs(firstPatch[0..., 2]).max().item(Float.self) < 1e-5)
+        // Sur TOUS les patches valides, pas seulement le premier : l'image est
+        // unie, donc le reechantillonnage ne peut rien produire d'autre que du
+        // rouge, y compris sur les bords. Et on exclut le padding — l'assertion
+        // `min() >= 0` sur le tenseur entier etait vacue, le padding etant a zero.
+        let mp = config.modelPatchSize
+        let valid = processed.patches[0 ..< processed.validPatches]
+            .reshaped(processed.validPatches * mp * mp, 3)
+
+        #expect(abs(valid[0..., 0] - MLXArray(Float(1.0))).max().item(Float.self) < 1e-6)
+        #expect(abs(valid[0..., 1]).max().item(Float.self) < 1e-6)
+        #expect(abs(valid[0..., 2]).max().item(Float.self) < 1e-6)
     }
 
     // MARK: - Fallbacks aspect-ratio
 
-    @Test("Une image minuscule produit au moins une cellule")
-    func testTinyImage() throws {
+    @Test("Une image plus petite qu'une cellule est agrandie jusqu'au budget")
+    func testTinyImageIsUpscaledToBudget() throws {
+        // Le nom precedent ("produit au moins une cellule") decrivait la branche
+        // de fallback bestH == 0 && bestW == 0, qui est inatteignable, et
+        // n'assertait que des proprietes vraies pour toute entree. Le vrai
+        // comportement est un agrandissement : le resize vise le budget de pixels
+        // quelle que soit la taille source.
         let config = try makeConfig()
         let processed = try Gemma4UnifiedImageProcessor.processImage(
             makeGradientCGImage(width: 8, height: 8), config: config)
 
-        #expect(processed.validPatches >= 1)
         let (pW, pH) = grid(of: processed)
-        #expect(pW >= 1 && pH >= 1)
+        #expect(pW == pH)                                   // source carree
+        #expect(processed.validPatches == pW * pH)
+        #expect(processed.validPatches > config.maxModelPatches / 2,
+                "8x8 devrait saturer le budget par agrandissement, pas rester minuscule")
     }
 
     @Test("Un ratio extreme passe par le fallback sans depasser le budget")
@@ -245,7 +295,7 @@ struct UnifiedImageProcessorTests {
 
         for (w, h) in cases {
             let processed = try Gemma4UnifiedImageProcessor.processImage(
-                makeGradientCGImage(width: w, height: h), config: config)
+                makeSolidCGImage(width: w, height: h), config: config)
 
             #expect(
                 processed.validPatches <= config.maxModelPatches,
@@ -267,6 +317,65 @@ struct UnifiedImageProcessorTests {
 
         #expect(processed.patches.dim(0) == 70)
         #expect(processed.validPatches <= 70)
+    }
+
+    @Test("Une config incoherente est rejetee au decodage")
+    func testInconsistentConfigRejected() throws {
+        // C'est l'identite qui rend `maxModelPatches == numSoftTokens` vraie.
+        // Sans elle la borne reelle est numSoftTokens * (patchSize *
+        // poolingKernelSize / modelPatchSize)^2 : 498 patches modele pour
+        // pooling_kernel_size=4, contre 280 emplacements de position ids.
+        #expect(throws: DecodingError.self) { _ = try makeConfig(poolingKernelSize: 4) }
+        #expect(throws: DecodingError.self) { _ = try makeConfig(modelPatchSize: 32) }
+        #expect(throws: DecodingError.self) { _ = try makeConfig(patchSize: 8) }
+
+        // Dimensions degenerees : padTarget == 0 faisait ecrire l'indice 0 dans
+        // un tableau vide (atteignable via un softTokensPerFrame nul cote video).
+        #expect(throws: DecodingError.self) { _ = try makeConfig(numSoftTokens: 0) }
+        #expect(throws: DecodingError.self) { _ = try makeConfig(poolingKernelSize: 0) }
+
+        // Et les combinaisons coherentes non standard restent acceptees.
+        for (ps, pk) in [(16, 3), (16, 2), (8, 3), (16, 4), (32, 2)] {
+            let config = try makeConfig(
+                patchSize: ps, poolingKernelSize: pk, modelPatchSize: ps * pk)
+            #expect(config.maxModelPatches == config.numSoftTokens)
+        }
+    }
+
+    @Test("L'invariant tient aussi quand on fait varier les tailles de patch")
+    func testInvariantAcrossPatchGeometries() throws {
+        // Le balayage par taille d'image ne bouge que l'axe prouvablement sur.
+        // L'axe qui casse reellement la borne, c'est la geometrie des patches.
+        for (ps, pk) in [(16, 3), (16, 2), (8, 3), (16, 4), (32, 2), (8, 6)] {
+            let config = try makeConfig(
+                numSoftTokens: 280, patchSize: ps, poolingKernelSize: pk,
+                modelPatchSize: ps * pk)
+
+            for (w, h) in [(640, 320), (1920, 1080), (2810, 10), (48, 48)] {
+                let processed = try Gemma4UnifiedImageProcessor.processImage(
+                    makeSolidCGImage(width: w, height: h), config: config)
+
+                #expect(
+                    processed.validPatches <= config.maxModelPatches,
+                    "ps=\(ps) pk=\(pk) sur \(w)x\(h) : \(processed.validPatches) > \(config.maxModelPatches)")
+                #expect(processed.patches.dim(0) == config.maxModelPatches)
+                #expect(processed.patches.dim(1) == config.patchDim)
+            }
+        }
+    }
+
+    @Test("Le resize sature effectivement le budget de pixels")
+    func testResizeMagnitude() throws {
+        // Rien ne fixait l'echelle absolue du resize : diviser targetPx par 9
+        // laissait toute la suite verte, alors que chaque image perdrait 9x sa
+        // resolution. Une grande image doit saturer le budget.
+        let config = try makeConfig()
+        let processed = try Gemma4UnifiedImageProcessor.processImage(
+            makeSolidCGImage(width: 1920, height: 1280), config: config)
+
+        #expect(processed.validPatches >= config.maxModelPatches * 9 / 10,
+                "1920x1280 ne remplit que \(processed.validPatches) / \(config.maxModelPatches) cellules")
+        #expect(processed.validPatches <= config.maxModelPatches)
     }
 
     // MARK: - Surcharges async

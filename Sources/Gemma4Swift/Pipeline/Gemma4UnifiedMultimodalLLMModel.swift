@@ -183,6 +183,22 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
 
     /// Construit les embeddings fusionnes (vision + audio) si du media est en attente.
     /// Retourne nil = mode text-only.
+    /// Nombre de patches valides par image, deduit des position ids (-1 sur le
+    /// padding).
+    ///
+    /// Sert de repli quand l'appelant n'a pas renseigne `pendingValidPatches`.
+    /// L'ancien repli supposait toutes les lignes valides (`patches.dim(1)`) :
+    /// tant que le tenseur etait padde a 2520 lignes pour ~260 utiles, l'erreur
+    /// etait grossiere et se voyait tout de suite. Depuis que le padding vise
+    /// `maxModelPatches` (280), ce meme repli devient plausible et injecterait
+    /// silencieusement une vingtaine de lignes de padding comme si c'etait de
+    /// l'image. Les position ids portent deja l'information : on la lit.
+    private static func validCounts(fromPositionIds posIds: MLXArray, count: Int) -> [Int] {
+        let isValid = (posIds[0..., 0..., 0] .!= MLXArray(Int32(-1))).asType(.int32) // [B, N]
+        let counts = isValid.sum(axis: 1).asArray(Int32.self)
+        return (0 ..< count).map { $0 < counts.count ? Int(counts[$0]) : 0 }
+    }
+
     private func prepareMultimodalEmbeds(_ inputs: MLXArray) -> MLXArray? {
         let hasImage = pendingPixelPatches != nil
         let hasVideo = pendingVideoFramePatches != nil
@@ -198,7 +214,7 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
            let embedder = visionEmbedder,
            let proj = embedVision {
             let numImages = patches.dim(0)
-            let valid = pendingValidPatches ?? Array(repeating: patches.dim(1), count: numImages)
+            let valid = pendingValidPatches ?? Self.validCounts(fromPositionIds: posIds, count: numImages)
 
             // Embedder s'applique sur le tenseur complet (padding inclus, ignore via valid mask).
             var features = embedder(patches, imagePositionIds: posIds) // [B, N_pad, mmEmbedDim]
@@ -234,7 +250,7 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
            let embedder = visionEmbedder,
            let proj = embedVision {
             let numFrames = patches.dim(0)
-            let valid = pendingVideoValidPatches ?? Array(repeating: patches.dim(1), count: numFrames)
+            let valid = pendingVideoValidPatches ?? Self.validCounts(fromPositionIds: posIds, count: numFrames)
 
             var features = embedder(patches, imagePositionIds: posIds)
             features = proj(features)

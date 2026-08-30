@@ -19,11 +19,13 @@ public enum Gemma4UnifiedImageProcessor {
 
     /// Resultat du preprocessing d'une seule image.
     public struct ProcessedImage: @unchecked Sendable {
-        /// [numPatches, patchDim] avec patchDim = modelPatchSize^2 * 3
+        /// `[config.maxModelPatches, patchDim]`, patchDim = modelPatchSize^2 * 3.
+        /// Les lignes au-dela de ``validPatches`` sont du padding a zero.
         public let patches: MLXArray
-        /// [numPatches, 2] = (x_idx, y_idx). -1 = padding.
+        /// `[config.maxModelPatches, 2]` = (x_idx, y_idx), -1 sur le padding.
         public let positionIds: MLXArray
-        /// Nombre de patches valides (avant padding).
+        /// Nombre de lignes reellement issues de l'image, `<= maxModelPatches`.
+        /// C'est aussi le nombre de soft tokens a reserver dans la sequence texte.
         public let validPatches: Int
     }
 
@@ -53,6 +55,9 @@ public enum Gemma4UnifiedImageProcessor {
 
         // 1) aspect_ratio_preserving_resize (port verbatim du Python).
         //    target_px (a patch_size=16) bornne ; on aligne ensuite sur modelPatch.
+        guard image.width > 0, image.height > 0 else {
+            throw ImageProcessingError.processingFailed
+        }
         let origW = image.width
         let origH = image.height
 
@@ -66,7 +71,9 @@ public enum Gemma4UnifiedImageProcessor {
         // Fallbacks (image extreme).
         let maxSideLength = config.maxModelPatches * sideMult
         if bestH == 0 && bestW == 0 {
-            // Image trop petite : on prend une seule cellule.
+            // Defensif : inatteignable sous l'identite validee au decodage, les
+            // deux conditions exigeant simultanement W/H > numSoftTokens et
+            // H/W > numSoftTokens. Conserve pour que le calcul reste total.
             bestH = sideMult
             bestW = sideMult
         } else if bestH == 0 {
@@ -121,7 +128,18 @@ public enum Gemma4UnifiedImageProcessor {
             patchesMLX = patchesValid
         }
 
-        // Positions (x, y) : petit tableau, on garde en Swift (numPatches <= 2520).
+        // Positions (x, y) : petit tableau (<= numSoftTokens entrees), on garde en
+        // Swift.
+        //
+        // `numPatches <= padTarget` decoule de l'identite
+        // `modelPatchSize == patchSize * poolingKernelSize`, validee au decodage
+        // de [[Gemma4UnifiedVisionConfig]]. La garde ci-dessous n'est donc pas
+        // atteignable via le decodeur ; elle est la pour que la surete memoire de
+        // cette boucle ne repose pas sur une invariante situee dans un autre
+        // fichier — sans elle, une config incoherente deborderait le tableau.
+        guard numPatches <= padTarget else {
+            throw ImageProcessingError.processingFailed
+        }
         var positionsArr = [Int32](repeating: -1, count: padTarget * 2)
         for py in 0 ..< pH {
             for px in 0 ..< pW {
