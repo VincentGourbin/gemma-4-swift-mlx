@@ -177,7 +177,7 @@ final class WebAgentLoop: ObservableObject {
             }
             let pixels: MLXArray
             do {
-                pixels = try Gemma4ImageProcessor.processImage(cg)
+                pixels = try await Gemma4ImageProcessor.processImage(cg, priority: .userInitiated)
             } catch {
                 step.error = "processImage: \(error.localizedDescription)"
                 replaceLast(step)

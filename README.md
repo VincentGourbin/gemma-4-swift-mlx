@@ -573,6 +573,43 @@ for try await token in stream {
 let followUp = try await pipeline.continueChat(prompt: "Make it shorter")
 ```
 
+### Image preprocessing off the main thread
+
+`Gemma4ImageProcessor.processImage` and `Gemma4UnifiedImageProcessor.processImage`
+are synchronous: decoding (ImageIO) and resizing (CoreGraphics) run **on the calling
+thread**. Called from a `@MainActor` view model they block the main thread, and the
+wait on CoreGraphics' internal workers also trips the Xcode runtime diagnostic
+*"Thread running at User-initiated quality-of-service class waiting on a lower QoS
+thread running at Default quality-of-service class"*.
+
+Both types expose an `async` overload that runs the whole preprocessing on a detached
+task:
+
+```swift
+// From a @MainActor context
+let pixels = try await Gemma4ImageProcessor.processImage(
+    url: imageURL,
+    priority: .userInitiated)          // required — no default
+
+let processed = try await Gemma4UnifiedImageProcessor.processImage(
+    url: imageURL,
+    config: visionConfig,
+    priority: .userInitiated)
+```
+
+`priority` has **no default value** on purpose: it is what distinguishes the async
+overload from the synchronous one of the same name, so existing synchronous call
+sites keep resolving to the synchronous version and keep compiling unchanged. It
+also forces an explicit QoS decision, which is the whole point of moving the work
+off the caller's thread.
+
+The returned MLX graph stays lazy — no `eval()` is forced — so the semantics are
+identical to the synchronous version, bit for bit.
+
+The video and audio processors (`Gemma4VideoProcessor`, `Gemma4UnifiedVideoProcessor`,
+`Gemma4AudioProcessor`, `Gemma4UnifiedAudioProcessor`) are already `async` and
+`nonisolated`, so they never run on the main actor to begin with.
+
 ### System role
 
 `chatStream` and `chatStreamMultimodal` both take an optional `systemPrompt`. It is

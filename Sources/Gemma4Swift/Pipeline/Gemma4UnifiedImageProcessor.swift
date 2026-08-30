@@ -143,4 +143,35 @@ public enum Gemma4UnifiedImageProcessor {
 
         return ProcessedImage(patches: patchesMLX, positionIds: positionsMLX, validPatches: validCount)
     }
+
+    /// Variante asynchrone de ``processImage(url:config:)`` : deporte le decodage
+    /// ImageIO et le resize CoreGraphics sur une tache detachee, pour ne pas
+    /// bloquer un appelant `@MainActor`.
+    ///
+    /// - Parameter priority: priorite de la tache detachee. Sans valeur par defaut,
+    ///   pour distinguer cette surcharge de la version synchrone de meme nom et
+    ///   forcer un choix explicite de QoS. Voir
+    ///   ``Gemma4ImageProcessor/processImage(url:maxSoftTokens:patchSize:poolingKernelSize:priority:)``.
+    public static func processImage(
+        url: URL,
+        config: Gemma4UnifiedVisionConfig,
+        priority: TaskPriority
+    ) async throws -> ProcessedImage {
+        try await Task.detached(priority: priority) {
+            try processImage(url: url, config: config)
+        }.value
+    }
+
+    /// Variante asynchrone de ``processImage(_:config:)``.
+    /// Voir la surcharge `url:` pour le detail de `priority`.
+    public static func processImage(
+        _ image: CGImage,
+        config: Gemma4UnifiedVisionConfig,
+        priority: TaskPriority
+    ) async throws -> ProcessedImage {
+        let source = UncheckedTransfer(image)
+        return try await Task.detached(priority: priority) {
+            try processImage(source.value, config: config)
+        }.value
+    }
 }

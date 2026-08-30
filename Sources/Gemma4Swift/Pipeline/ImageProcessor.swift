@@ -80,22 +80,70 @@ public enum Gemma4ImageProcessor {
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(x: 0, y: 0, width: bestW, height: bestH))
 
-        // Convertir en [1, 3, H, W] float32 [0, 1]
-        var rChannel = [Float](repeating: 0, count: bestH * bestW)
-        var gChannel = [Float](repeating: 0, count: bestH * bestW)
-        var bChannel = [Float](repeating: 0, count: bestH * bestW)
+        // Convertir en [1, 3, H, W] float32 [0, 1] en operations MLX vectorisees
+        // (meme approche que [[Gemma4UnifiedImageProcessor]]). Au budget max
+        // (2520 patches de 16px = ~645 k pixels) cela remplace ~1,9 M iterations
+        // Swift scalaires et 3 allocations [Float] de 645 k elements par quelques
+        // kernels MLX.
+        let raw = MLXArray(pixelData).reshaped(bestH, bestW, 4)
+        let rgb = raw[0..., 0..., 0 ..< 3].asType(.float32) / MLXArray(Float(255.0))
 
-        for i in 0 ..< bestH * bestW {
-            rChannel[i] = Float(pixelData[i * 4]) / 255.0
-            gChannel[i] = Float(pixelData[i * 4 + 1]) / 255.0
-            bChannel[i] = Float(pixelData[i * 4 + 2]) / 255.0
-        }
+        return rgb.transposed(2, 0, 1).expandedDimensions(axis: 0) // [1, 3, H, W]
+    }
 
-        let r = MLXArray(rChannel).reshaped(1, 1, bestH, bestW)
-        let g = MLXArray(gChannel).reshaped(1, 1, bestH, bestW)
-        let b = MLXArray(bChannel).reshaped(1, 1, bestH, bestW)
+    /// Variante asynchrone de ``processImage(url:maxSoftTokens:patchSize:poolingKernelSize:)``
+    /// qui deporte tout le travail CPU (decodage ImageIO, resize CoreGraphics,
+    /// lecture du buffer) sur une tache detachee.
+    ///
+    /// A utiliser depuis un contexte `@MainActor` : la version synchrone execute
+    /// le decodage et le resize *sur le thread appelant*, donc sur le main thread,
+    /// et son attente sur les workers internes de CoreGraphics declenche en prime
+    /// le diagnostic runtime « User-initiated thread waiting on a lower QoS thread ».
+    ///
+    /// - Parameter priority: priorite de la tache detachee. Volontairement **sans
+    ///   valeur par defaut** : cela distingue sans ambiguite cette surcharge de la
+    ///   version synchrone de meme nom (les appels existants continuent de resoudre
+    ///   vers la version synchrone), et force un choix explicite de QoS.
+    ///
+    /// Le graphe MLX reste paresseux — aucun `eval()` n'est force ici — donc la
+    /// semantique est strictement identique a la version synchrone.
+    public static func processImage(
+        url: URL,
+        maxSoftTokens: Int = 280,
+        patchSize: Int = 16,
+        poolingKernelSize: Int = 3,
+        priority: TaskPriority
+    ) async throws -> MLXArray {
+        let transferred = try await Task.detached(priority: priority) {
+            UncheckedTransfer(try processImage(
+                url: url,
+                maxSoftTokens: maxSoftTokens,
+                patchSize: patchSize,
+                poolingKernelSize: poolingKernelSize
+            ))
+        }.value
+        return transferred.value
+    }
 
-        return concatenated([r, g, b], axis: 1) // [1, 3, H, W]
+    /// Variante asynchrone de ``processImage(_:maxSoftTokens:patchSize:poolingKernelSize:)``.
+    /// Voir la surcharge `url:` pour le detail de `priority`.
+    public static func processImage(
+        _ image: CGImage,
+        maxSoftTokens: Int = 280,
+        patchSize: Int = 16,
+        poolingKernelSize: Int = 3,
+        priority: TaskPriority
+    ) async throws -> MLXArray {
+        let source = UncheckedTransfer(image)
+        let transferred = try await Task.detached(priority: priority) {
+            UncheckedTransfer(try processImage(
+                source.value,
+                maxSoftTokens: maxSoftTokens,
+                patchSize: patchSize,
+                poolingKernelSize: poolingKernelSize
+            ))
+        }.value
+        return transferred.value
     }
 }
 

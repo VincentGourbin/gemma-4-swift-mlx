@@ -99,6 +99,39 @@ struct ImageProcessorTests {
         }
     }
 
+    @Test("La conversion vectorisee preserve l'ordre des canaux RGB")
+    func testChannelOrder() throws {
+        // Image rouge unie : canal 0 a 1.0, canaux 1 et 2 a 0.0.
+        let cgImage = makeTestCGImage(width: 96, height: 96)
+        let result = try Gemma4ImageProcessor.processImage(cgImage)
+
+        let r = result[0, 0].mean().item(Float.self)
+        let g = result[0, 1].mean().item(Float.self)
+        let b = result[0, 2].mean().item(Float.self)
+        #expect(abs(r - 1.0) < 1e-5)
+        #expect(abs(g) < 1e-5)
+        #expect(abs(b) < 1e-5)
+    }
+
+    @Test("La surcharge async produit exactement le meme resultat que la synchrone")
+    func testAsyncMatchesSync() async throws {
+        let cgImage = makeTestCGImage(width: 640, height: 480)
+        let sync = try Gemma4ImageProcessor.processImage(cgImage)
+        let async = try await Gemma4ImageProcessor.processImage(cgImage, priority: .userInitiated)
+
+        #expect(sync.shape == async.shape)
+        let maxDiff = abs(sync - async).max().item(Float.self)
+        #expect(maxDiff == 0.0)
+    }
+
+    @Test("La surcharge async depuis une URL invalide lance la meme erreur")
+    func testAsyncInvalidURL() async throws {
+        let badURL = URL(fileURLWithPath: "/nonexistent/image.png")
+        await #expect(throws: ImageProcessingError.self) {
+            try await Gemma4ImageProcessor.processImage(url: badURL, priority: .utility)
+        }
+    }
+
     @Test("Differents maxSoftTokens produisent des tailles differentes")
     func testDifferentTokenBudgets() throws {
         let cgImage = makeTestCGImage(width: 1024, height: 768)

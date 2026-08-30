@@ -97,7 +97,7 @@ final class VQAGameViewModel: ObservableObject {
         // Pre-process image once
         if cachedPixels == nil {
             do {
-                cachedPixels = try Gemma4ImageProcessor.processImage(url: url)
+                cachedPixels = try await Gemma4ImageProcessor.processImage(url: url, priority: .userInitiated)
             } catch {
                 turns.append(Turn(role: .model, text: "⚠ Erreur de preprocessing : \(error.localizedDescription)", elapsed: nil, stepsUsed: nil, questionType: nil))
                 return
