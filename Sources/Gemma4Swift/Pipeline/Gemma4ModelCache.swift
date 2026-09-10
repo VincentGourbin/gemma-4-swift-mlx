@@ -43,17 +43,32 @@ public enum Gemma4ModelCache {
     }
 
     /// Taille sur disque d'un modele telecharge (en octets), nil si non telecharge
+    ///
+    /// Parcourt via les APIs `atPath:` (et non `URL`-based) car un fichier de poids
+    /// peut avoir ete remplace par un symlink absolu vers un disque externe — le
+    /// symlink lui-meme doit etre resolu avant de lire sa taille, sinon on ne
+    /// rapporte que la taille du lien (quelques octets) plutot que celle de la
+    /// cible.
     public static func diskSize(for model: Gemma4Pipeline.Model) -> Int64? {
         guard let path = localPath(for: model) else { return nil }
         let fm = FileManager.default
-        guard let enumerator = fm.enumerator(at: path, includingPropertiesForKeys: [.fileSizeKey]) else {
+        guard let enumerator = fm.enumerator(atPath: path.path) else {
             return nil
         }
         var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey]),
-               let size = values.fileSize {
-                total += Int64(size)
+        for case let relativePath as String in enumerator {
+            let entryPath = path.appendingPathComponent(relativePath).path
+            guard var attrs = try? fm.attributesOfItem(atPath: entryPath) else { continue }
+            if attrs[.type] as? FileAttributeType == .typeSymbolicLink {
+                let resolved = URL(fileURLWithPath: entryPath).resolvingSymlinksInPath().path
+                guard let resolvedAttrs = try? fm.attributesOfItem(atPath: resolved) else {
+                    // Cible manquante (disque externe non monte) : pas une erreur.
+                    continue
+                }
+                attrs = resolvedAttrs
+            }
+            if let size = attrs[.size] as? Int64 {
+                total += size
             }
         }
         return total > 0 ? total : nil

@@ -46,4 +46,32 @@ struct ModelCacheTests {
     func testDiskSizeNil() {
         #expect(Gemma4ModelCache.diskSize(for: .b31bBf16) == nil)
     }
+
+    @Test("diskSize suit un fichier de poids symlinke vers une cible externe")
+    func testDiskSizeFollowsSymlinkedWeights() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let modelDir = root.appendingPathComponent("mlx-community/gemma-4-31b-it-bf16")
+        try fm.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let configData = Data("{}".utf8)
+        try configData.write(to: modelDir.appendingPathComponent("config.json"))
+
+        // Cible "externe" simulee, en dehors de modelDir, avec une taille connue.
+        let externalTarget = root.appendingPathComponent("external-weights.safetensors")
+        let payload = Data(repeating: 0x42, count: 12_345)
+        try payload.write(to: externalTarget)
+
+        try fm.createSymbolicLink(
+            at: modelDir.appendingPathComponent("model.safetensors"),
+            withDestinationURL: externalTarget
+        )
+
+        Gemma4ModelCache.customModelsDirectory = root
+        defer { Gemma4ModelCache.customModelsDirectory = nil }
+
+        let size = Gemma4ModelCache.diskSize(for: .b31bBf16)
+        #expect(size == Int64(payload.count + configData.count))
+    }
 }
