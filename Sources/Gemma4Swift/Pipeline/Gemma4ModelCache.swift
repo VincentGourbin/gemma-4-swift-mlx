@@ -49,6 +49,13 @@ public enum Gemma4ModelCache {
     /// symlink lui-meme doit etre resolu avant de lire sa taille, sinon on ne
     /// rapporte que la taille du lien (quelques octets) plutot que celle de la
     /// cible.
+    ///
+    /// Resolution volontairement faite via `destinationOfSymbolicLink(atPath:)`
+    /// (readlink brut) plutot que `URL.resolvingSymlinksInPath()` : cette derniere
+    /// ne signale pas l'echec quand la cible est absente (disque externe non
+    /// monte) — elle retourne silencieusement le chemin du lien lui-meme, ce qui
+    /// fait reussir `attributesOfItem(atPath:)` (lstat) contre le lien et fuit sa
+    /// taille de quelques octets au lieu de contribuer 0.
     public static func diskSize(for model: Gemma4Pipeline.Model) -> Int64? {
         guard let path = localPath(for: model) else { return nil }
         let fm = FileManager.default
@@ -57,12 +64,19 @@ public enum Gemma4ModelCache {
         }
         var total: Int64 = 0
         for case let relativePath as String in enumerator {
-            let entryPath = path.appendingPathComponent(relativePath).path
+            let entryURL = path.appendingPathComponent(relativePath)
+            let entryPath = entryURL.path
             guard var attrs = try? fm.attributesOfItem(atPath: entryPath) else { continue }
             if attrs[.type] as? FileAttributeType == .typeSymbolicLink {
-                let resolved = URL(fileURLWithPath: entryPath).resolvingSymlinksInPath().path
-                guard let resolvedAttrs = try? fm.attributesOfItem(atPath: resolved) else {
-                    // Cible manquante (disque externe non monte) : pas une erreur.
+                guard let destination = try? fm.destinationOfSymbolicLink(atPath: entryPath) else {
+                    continue
+                }
+                let resolvedPath = destination.hasPrefix("/")
+                    ? destination
+                    : entryURL.deletingLastPathComponent().appendingPathComponent(destination).path
+                guard fm.fileExists(atPath: resolvedPath),
+                      let resolvedAttrs = try? fm.attributesOfItem(atPath: resolvedPath) else {
+                    // Cible manquante (disque externe non monte) : pas une erreur, contribue 0.
                     continue
                 }
                 attrs = resolvedAttrs

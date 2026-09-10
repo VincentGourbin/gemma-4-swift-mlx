@@ -74,4 +74,33 @@ struct ModelCacheTests {
         let size = Gemma4ModelCache.diskSize(for: .b31bBf16)
         #expect(size == Int64(payload.count + configData.count))
     }
+
+    @Test("diskSize traite un symlink casse (cible absente) comme 0, pas comme une erreur")
+    func testDiskSizeBrokenSymlinkContributesZero() throws {
+        // Regression: URL.resolvingSymlinksInPath() ne signale pas l'echec quand la
+        // cible est absente (disque externe non monte) — elle retourne silencieusement
+        // le chemin du lien lui-meme, ce qui faisait fuiter la taille lstat du lien
+        // (quelques octets) au lieu de contribuer 0. Signale par l'equipe LTX apres
+        // avoir rencontre exactement ce piege dans leur propre fix (ask #4).
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let modelDir = root.appendingPathComponent("mlx-community/gemma-4-31b-it-bf16")
+        try fm.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        let configData = Data("{}".utf8)
+        try configData.write(to: modelDir.appendingPathComponent("config.json"))
+
+        // Symlink pointant vers une cible qui n'existe pas (disque externe debranche).
+        try fm.createSymbolicLink(
+            atPath: modelDir.appendingPathComponent("model.safetensors").path,
+            withDestinationPath: "/nonexistent/external-disk/model.safetensors"
+        )
+
+        Gemma4ModelCache.customModelsDirectory = root
+        defer { Gemma4ModelCache.customModelsDirectory = nil }
+
+        let size = Gemma4ModelCache.diskSize(for: .b31bBf16)
+        #expect(size == Int64(configData.count))
+    }
 }
