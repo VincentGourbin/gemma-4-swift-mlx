@@ -9,9 +9,13 @@ import MLXLLM
 ///
 /// Usage:
 /// ```swift
-/// await Gemma4Registration.register()
-/// // Maintenant MLXLMCommon.loadModelContainer(id: "mlx-community/gemma-4-e2b-it-4bit") fonctionne
+/// let container = try await Gemma4Registration.loadContainer(from: modelDirectory)
 /// ```
+///
+/// N'appelez `register()` a la main que si vous chargez vous-meme. Dans ce cas,
+/// passez par `MLXLLM.LLMModelFactory.shared` et **pas** par la fonction libre
+/// `MLXLMCommon.loadModelContainer(...)` : voir `loadContainer(from:using:multimodal:)`
+/// ci-dessous pour le pourquoi.
 public enum Gemma4Registration {
 
     /// Enregistre les types "gemma4_text", "gemma4", "gemma4_unified_text" et
@@ -53,4 +57,40 @@ public enum Gemma4Registration {
             }
         }
     }
+
+    /// Enregistre les types Gemma 4 puis charge le modele **en forcant
+    /// `LLMModelFactory`**.
+    ///
+    /// A preferer systematiquement a la fonction libre
+    /// `MLXLMCommon.loadModelContainer(from:using:)`.
+    ///
+    /// Pourquoi : la fonction libre passe par `ModelFactoryRegistry.shared`, qui
+    /// essaie `MLXVLM.VLMModelFactory` **avant** `MLXLLM.LLMModelFactory` et retient
+    /// la premiere fabrique qui reussit. Or `register(multimodal:)` ne patche que
+    /// `LLMTypeRegistry.shared` ; l'amont publie ses propres entrees `"gemma4"` et
+    /// `"gemma4_unified"` dans `VLMTypeRegistry.shared`, hors de notre portee (le
+    /// paquet ne lie pas `MLXVLM`). Des qu'un autre module du meme processus lie
+    /// `MLXVLM`, la fabrique VLM gagne la course et renvoie `MLXVLM.Gemma4` au lieu
+    /// de `Gemma4MultimodalLLMModel` — le `as?` de `chatStreamMultimodal` echoue
+    /// alors avec `unsupportedModelFamily`, independamment du `multimodal:` demande.
+    ///
+    /// Court-circuiter `ModelFactoryRegistry` supprime la course a la source et
+    /// reste chirurgical : on ne touche pas aux entrees VLM de l'amont, donc une app
+    /// qui veut deliberement `MLXVLM.Gemma4` le garde.
+    ///
+    /// - Parameters:
+    ///   - directory: repertoire contenant `config.json`, les safetensors et le tokenizer
+    ///   - tokenizerLoader: chargeur de tokenizer (defaut : `Gemma4TokenizerLoader`)
+    ///   - multimodal: si true, `"gemma4"` / `"gemma4_unified"` instancient le
+    ///     wrapper multimodal (vision+audio) ; sinon le path text-only.
+    public static func loadContainer(
+        from directory: URL,
+        using tokenizerLoader: any TokenizerLoader = Gemma4TokenizerLoader(),
+        multimodal: Bool = true
+    ) async throws -> ModelContainer {
+        await register(multimodal: multimodal)
+        return try await LLMModelFactory.shared.loadContainer(
+            from: directory, using: tokenizerLoader)
+    }
+
 }

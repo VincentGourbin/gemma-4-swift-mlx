@@ -68,11 +68,11 @@ struct MtpForward: AsyncParsableCommand {
         print("\n  -> \(drafterDir.path)")
 
         // ============================================================
-        // 2. Charger le target via loadModelContainer (text-only)
+        // 2. Charger le target via Gemma4Registration.loadContainer (text-only)
         // ============================================================
         print("[3/5] Load target (text-only)...")
-        await Gemma4Registration.register(multimodal: false)
-        let container = try await loadModelContainer(from: targetDir, using: Gemma4TokenizerLoader())
+        let container = try await Gemma4Registration.loadContainer(
+            from: targetDir, using: Gemma4TokenizerLoader(), multimodal: false)
         print("  target loaded")
 
         // ============================================================

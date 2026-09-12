@@ -8,7 +8,8 @@ import MLX
 import MLXRandom
 
 /// Pipeline Gemma 4 de haut niveau pour le chat multimodal.
-/// Le chargement du modele est gere a l'exterieur (CLI via macros, app via loadModelContainer).
+/// Le chargement du modele est gere a l'exterieur (CLI via macros, app via
+/// `Gemma4Registration.loadContainer`).
 /// Ce pipeline gere la generation (texte, streaming, multi-turn).
 @MainActor
 @Observable
@@ -281,8 +282,12 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     ///   - multimodal: si true, charge le modele multimodal complet. Defaut: true.
     public func load(from path: URL, multimodal: Bool = true) async throws {
         state = .unloaded
-        await Gemma4Registration.register(multimodal: multimodal)
-        let loaded = try await loadModelContainer(from: path, using: Gemma4TokenizerLoader())
+        // Gemma4Registration.loadContainer et pas la fonction libre
+        // loadModelContainer : celle-ci passe par ModelFactoryRegistry, qui essaie
+        // MLXVLM avant MLXLLM et renverrait MLXVLM.Gemma4 des qu'un autre module du
+        // processus lie MLXVLM. Cf. la doc de loadContainer(from:using:multimodal:).
+        let loaded = try await Gemma4Registration.loadContainer(
+            from: path, using: Gemma4TokenizerLoader(), multimodal: multimodal)
         setContainer(loaded)
     }
 

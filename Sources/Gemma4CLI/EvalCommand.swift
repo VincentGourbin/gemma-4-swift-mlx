@@ -121,9 +121,9 @@ struct EvalMmlu: AsyncParsableCommand {
         }
 
         // Load model
-        await Gemma4Registration.register()
         let url = URL(fileURLWithPath: modelPath)
-        let container = try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+        let container = try await Gemma4Registration.loadContainer(
+            from: url, using: LocalTokenizerLoader(), multimodal: false)
 
         // OTF quant
         if let bits = quantizeBits {

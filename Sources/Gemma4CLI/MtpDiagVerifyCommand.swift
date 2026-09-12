@@ -41,8 +41,8 @@ struct MtpDiagVerify: AsyncParsableCommand {
             modelId: target, token: resolveHFToken(hfToken)
         ) { _ in }
 
-        await Gemma4Registration.register(multimodal: false)
-        let container = try await loadModelContainer(from: targetDir, using: Gemma4TokenizerLoader())
+        let container = try await Gemma4Registration.loadContainer(
+            from: targetDir, using: Gemma4TokenizerLoader(), multimodal: false)
 
         let n = nTokens
         let userPrompt = prompt
