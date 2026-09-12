@@ -82,8 +82,8 @@ struct MtpGenerate: AsyncParsableCommand {
 
         // Load
         print("[2/3] Load target + drafter...")
-        await Gemma4Registration.register(multimodal: false)
-        let container = try await loadModelContainer(from: targetDir, using: Gemma4TokenizerLoader())
+        let container = try await Gemma4Registration.loadContainer(
+            from: targetDir, using: Gemma4TokenizerLoader(), multimodal: false)
 
         // Apply LoRA adapter if requested
         if let adapter = adapterPath {

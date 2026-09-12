@@ -74,9 +74,9 @@ struct MtpTrain: AsyncParsableCommand {
 
         // 1. Load target (text-only)
         print("[1/4] Load target...")
-        await Gemma4Registration.register(multimodal: false)
         let targetURL = URL(fileURLWithPath: target)
-        let container = try await loadModelContainer(from: targetURL, using: Gemma4TokenizerLoader())
+        let container = try await Gemma4Registration.loadContainer(
+            from: targetURL, using: Gemma4TokenizerLoader(), multimodal: false)
 
         // 2. Load drafter (depuis HF + sanitize + verify)
         print("[2/4] Load drafter...")

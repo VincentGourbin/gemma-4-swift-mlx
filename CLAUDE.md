@@ -60,10 +60,25 @@ branch dependency transitively under a semver-tagged package, which makes this r
 unconsumable by any downstream project that depends on a tag.
 
 Since mlx-swift-lm 3.x, upstream ships its **own** Gemma 4 (`"gemma4"`, `"gemma4_text"`,
-`"gemma4_unified"` in both `LLMModelFactory` and `VLMModelFactory`).
-`Gemma4Registration.register()` deliberately overwrites those entries —
+`"gemma4_unified"` in both `LLMTypeRegistry` and `VLMTypeRegistry`).
+`Gemma4Registration.register()` deliberately overwrites the `LLMTypeRegistry` entries —
 `ModelTypeRegistry.registerModelType` is last-write-wins — so it must be called before
 any load, otherwise upstream's text-only implementation silently answers instead.
+
+**It does not, and cannot, overwrite the `VLMTypeRegistry` entries**: this package does
+not link `MLXVLM`. That matters because the free function
+`MLXLMCommon.loadModelContainer(...)` goes through `ModelFactoryRegistry.shared`, whose
+trampoline order is fixed **VLM first, then LLM**, keeping the first factory that
+succeeds (`ModelFactory.swift`, `load(loader:)`). So in any process that also links
+`MLXVLM` — directly or through another package — the free function returns
+`MLXVLM.Gemma4`, not ours, whatever `multimodal:` was asked for. The failure surfaces
+downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
+`as? Gemma4MultimodalLLMModel`, and it is load-order dependent (it only bites once
+`MLXVLM`'s trampoline class is realized), so it can pass once and fail on the next call.
+
+**Always load via `Gemma4Registration.loadContainer(from:using:multimodal:)`**, which
+registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
+`ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
 
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
@@ -94,7 +109,9 @@ The decoder has two layer types with different configurations:
 
 ### Registration System
 
-`Gemma4Registration.register()` registers `"gemma4"` and `"gemma4_text"` model types with mlx-swift-lm's `LLMTypeRegistry`. This enables loading via `loadModelContainer()` and usage with `ChatSession`/`ModelContainer`. Text-only vs multimodal is controlled by `register(multimodal:)`.
+`Gemma4Registration.register()` registers `"gemma4"` and `"gemma4_text"` model types with mlx-swift-lm's `LLMTypeRegistry`. Text-only vs multimodal is controlled by `register(multimodal:)`.
+
+`Gemma4Registration.loadContainer(from:using:multimodal:)` is the entry point to use: it registers, then loads through `LLMModelFactory.shared` so `ModelFactoryRegistry`'s VLM-first ordering can't hand back upstream's `MLXVLM.Gemma4` (see "Dependency pinning"). The resulting `ModelContainer` works with `ChatSession` as usual.
 
 ### Weight Loading
 

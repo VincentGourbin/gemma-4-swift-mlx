@@ -19,15 +19,15 @@ func resolveHFToken(_ token: String?) -> String? {
 /// Charge un modele depuis un chemin local
 func loadLocalModel(path: String) async throws -> ModelContainer {
     let url = URL(fileURLWithPath: path)
-    await Gemma4Registration.register()
-    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+    return try await Gemma4Registration.loadContainer(
+        from: url, using: LocalTokenizerLoader(), multimodal: false)
 }
 
 /// Charge un modele multimodal depuis un chemin local
 func loadLocalMultimodalModel(path: String) async throws -> ModelContainer {
     let url = URL(fileURLWithPath: path)
-    await Gemma4Registration.register(multimodal: true)
-    return try await loadModelContainer(from: url, using: LocalTokenizerLoader())
+    return try await Gemma4Registration.loadContainer(
+        from: url, using: LocalTokenizerLoader(), multimodal: true)
 }
 
 /// Affiche un avertissement si le modele risque de depasser la RAM
