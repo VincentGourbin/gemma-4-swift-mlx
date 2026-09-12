@@ -512,6 +512,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 continuation.yield(text)
                             case .info, .toolCall:
                                 break
+                            @unknown default:
+                                break
                             }
                         }
                     }
@@ -672,6 +674,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             case .chunk(let text):
                                 continuation.yield(text)
                             case .info, .toolCall:
+                                break
+                            @unknown default:
                                 break
                             }
                         }
