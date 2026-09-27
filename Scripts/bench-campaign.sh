@@ -85,7 +85,9 @@ by = collections.defaultdict(list)
 for r in rows: by[r["prompt_tokens"]].append(r)
 worst = 0.0
 for size, rs in sorted(by.items()):
-    for key in ("prefill_tok_s", "decode_tok_s"):
+    # Mediane pour le decodage : la moyenne (decode_tok_s) bouge de 8 % sur quelques
+    # pas lents isoles alors que l'intervalle median bouge de 1,8 % (A/A du 2026-09-27).
+    for key in ("prefill_tok_s", "decode_tok_s_median"):
         v = [float(r[key]) for r in rs]
         spread = (max(v) - min(v)) / max(v) * 100
         worst = max(worst, spread)

@@ -175,7 +175,11 @@ struct Bench: AsyncParsableCommand {
                 "prefill_ms": Self.round(prefillSeconds * 1000),
                 "prefill_tok_s": Self.round(Double(ids.count) / max(prefillSeconds, 1e-9)),
                 "ttft_ms": Self.round((stamps.first ?? 0) * 1000),
+                // Moyenne sur la duree totale (sensible aux pas lents isoles) et debit
+                // median (robuste) : la validation A/A et les comparaisons A/B utilisent le second.
                 "decode_tok_s": Self.round(decodeTokS),
+                "decode_tok_s_median": Self.round(
+                    intervals.isEmpty ? 0 : 1000 / max(Self.percentile(intervals, 0.5), 1e-9)),
                 "step_ms_median": Self.round(Self.percentile(intervals, 0.5)),
                 "step_ms_p90": Self.round(Self.percentile(intervals, 0.9)),
                 "peak_mlx_mb": snapshot.peakMemory / 1_048_576,

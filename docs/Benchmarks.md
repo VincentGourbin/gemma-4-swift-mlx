@@ -44,7 +44,8 @@ Une passe d'échauffement non chronométrée (compilation Metal) précède les p
 |---|---|
 | `prefill_ms`, `prefill_tok_s` | traitement du prompt (`TokenIterator.promptPrefillTime`) |
 | `ttft_ms` | du début de la requête au premier jeton |
-| `decode_tok_s`, `step_ms_median`, `step_ms_p90` | décodage, intervalle entre jetons |
+| `decode_tok_s_median` | débit de décodage tiré de l'intervalle médian : **la** valeur à comparer (A/A, A/B) |
+| `decode_tok_s`, `step_ms_median`, `step_ms_p90` | débit moyen sur la durée totale (sensible aux pas lents isolés : 8 % d'écart A/A observé contre 1,8 % en médiane), intervalles |
 | `peak_mlx_mb`, `active_mlx_mb`, `cache_mlx_mb` | mémoire MLX (pic remis à zéro à chaque point) |
 | `phys_footprint_mb`, `phys_footprint_peak_mb` | empreinte du process (ce que juge jetsam) ; le pic court depuis le lancement, chargement compris |
 | `weights_bw_gbps` | taille des poids × tok/s : **indicateur**, surestimé sur E2B/E4B (tables d'embeddings par couche lues sur quelques lignes par jeton) |
