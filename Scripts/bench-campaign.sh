@@ -91,6 +91,7 @@ for size, rs in sorted(by.items()):
         worst = max(worst, spread)
         print(f"  {size:>5} jetons {key:<14} {v} dispersion {spread:.1f} %")
 print(f"  pire dispersion : {worst:.1f} % ({'OK' if worst <= 3 else 'TROP BRUITE : refaire au repos'})")
+sys.exit(0 if worst <= 3 else 2)
 PY
 fi
 
