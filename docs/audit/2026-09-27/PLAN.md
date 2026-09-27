@@ -194,3 +194,16 @@ Environnement de test : `~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf
 - Remonter le bug `NaiveStreamingDetokenizer` à ml-explore/mlx-swift-lm (issue + éventuelle PR avec le correctif par scalaires) et le suivre avec `track` ?
 - Ouvrir une PR `fix/lot-a-stabilite` → `main` maintenant (release 1.8.0 après lots B-E), ou attendre la fin des lots B-E ?
 
+## Lots B, C, E (code) et K-13 — 2026-09-27 — prêts pour la mesure
+- **K-8b** `44858e01` — chemins TokenIterator sans le défaut du détokeniseur amont (« 🇫 👩 » → « 🇫🇷 👩‍👩‍👧 »).
+- **Lot B** : K-10a `e2dbd142` (1 279 → 289 fichiers suivis, chemins perso retirés), K-10b `bdb57823` (warnings 37 → 2, via le pattern MLX-001), `e89802e6` (CI de compilation, non vérifiée avant la PR), `8bc600c9` (CHANGELOG), K-10c `426293fd`.
+- **K-11** `8bc600c9` — `gemma4-cli bench`. **K-13** `2b3f391a` — préfill par tranches (parité fp32 exacte ; réel : même premier jeton, écart 2,1 %/0,6 %). **K-20/K-14** `7bc3d06b` — 30 profils, `references`, `bench --reference`, `load(profile:)`.
+- **Campagne** `Scripts/bench-campaign.sh` : A/A puis matrice, poids sur le Lexar (disque interne : 10 Go libres).
+- Suite n-gramme : 2 échecs identiques sur `main` (E2B 6 bits) → préexistants, pas de régression.
+
+### Reste à faire avec le GPU libre (dans l'ordre)
+1. `python3 ~/.claude/skills/mac-awake/scripts/awake.py run -- Scripts/bench-campaign.sh --cleanup` (A/A ≤ 3 %, puis matrice) → lignes dans `BENCHMARKS.md`, table de `docs/References.md`.
+2. Portes chiffrées de K-3 (décodage image), K-13 (pic préfill 4k ≤ 50 %, préfill ≥ +5 %), K-14 (footprint lean) à partir de ces lignes, en A/B/B/A contre `main` quand la porte l'exige.
+3. Validations GPU restantes : K-5 `kvBits` sur 26B/31B (couvert par les profils lean), K-6 `describe --quantize-bits 4` sur E2B bf16.
+4. Puis leviers conditionnés par la mesure : K-15 (n-gramme), K-17 (échantillonnage), K-18 (vision), K-16 (résidence), K-19 (conversation), lots G et H.
+
