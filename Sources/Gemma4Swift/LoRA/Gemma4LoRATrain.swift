@@ -140,12 +140,11 @@ public enum Gemma4LoRATrain {
         }
 
         // Entrainement dans le contexte du container
-        nonisolated(unsafe) let capturedTrainData = trainData
-        nonisolated(unsafe) let capturedValidData = validData
+        let capturedTrainData = trainData
+        let capturedValidData = validData
 
         try await container.perform { (context: ModelContext) in
             let model = context.model
-            let tokenizer = context.tokenizer
 
             // Fixer le seed avant l'initialisation LoRA (ref: Python seed=0)
             MLXRandom.seed(0)
@@ -156,11 +155,8 @@ public enum Gemma4LoRATrain {
                 print("Mode: Full Fine-Tuning (tous les poids)")
             } else {
                 // LoRA/DoRA — freeze base + adapter layers
-                guard let languageModel = model as? LanguageModel else {
-                    throw Gemma4LoRAError.incompatibleModel
-                }
                 let _ = try LoRAContainer.from(
-                    model: languageModel,
+                    model: model,
                     configuration: loraConfig
                 )
             }
@@ -250,7 +246,7 @@ public enum Gemma4LoRATrain {
 
             // Training loop custom (ref: mlx-lm train())
             try trainLoRA(
-                model: model as! Module,
+                model: model,
                 trainSamples: trainSamples,
                 validSamples: validSamples,
                 optimizer: optimizer,
@@ -355,7 +351,7 @@ public enum Gemma4LoRATrain {
 
             // Convertir le modele en float32 pour eviter les NaN en bf16
             // sur les sequences longues (>300 tokens avec images)
-            (model as! Module).apply { array in
+            model.apply { array in
                 array.dtype.isFloatingPoint ? array.asType(.float32) : array
             }
             print("Modele converti en float32 pour stabilite numerique")
@@ -365,11 +361,8 @@ public enum Gemma4LoRATrain {
             if isFullFineTune {
                 print("Mode: Full Fine-Tuning multimodal (tous les poids)")
             } else {
-                guard let languageModel = model as? LanguageModel else {
-                    throw Gemma4LoRAError.incompatibleModel
-                }
                 let _ = try LoRAContainer.from(
-                    model: languageModel,
+                    model: model,
                     configuration: loraConfig
                 )
             }
@@ -424,7 +417,7 @@ public enum Gemma4LoRATrain {
             print("Train multimodal: \(capturedTrainData.count) samples (\(audioCount) audio, \(imageCount) image)")
 
             try trainMultimodalLoRA(
-                model: model as! Module,
+                model: model,
                 trainSamples: capturedTrainData,
                 validSamples: capturedValidData,
                 optimizer: optimizer,
@@ -469,11 +462,11 @@ public enum Gemma4LoRATrain {
         testData: [String],
         batchSize: Int = 1
     ) async throws -> Float {
-        try await container.perform { context in
+        await container.perform { context in
             let model = context.model
             let tokenizer = context.tokenizer
             return LoRATrain.evaluate(
-                model: model as! Module,
+                model: model,
                 dataset: testData,
                 tokenizer: tokenizer,
                 batchSize: batchSize,

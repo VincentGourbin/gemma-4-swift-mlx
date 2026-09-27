@@ -127,7 +127,7 @@ public enum Gemma4AudioProcessor {
         }
 
         var isDone = false
-        try converter.convert(to: targetBuffer, error: nil) { _, outStatus in
+        converter.convert(to: targetBuffer, error: nil) { _, outStatus in
             if isDone {
                 outStatus.pointee = .noDataNow
                 return nil

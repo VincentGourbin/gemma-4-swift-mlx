@@ -335,7 +335,7 @@ struct Generate: AsyncParsableCommand {
         }
 
         // 4. Stats GPU
-        print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
+        print("GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.Memory.peakMemory / (1024 * 1024)) Mo pic")
 
         // 5. Generer
         print("\n--- Generation ---")
@@ -369,7 +369,7 @@ struct Generate: AsyncParsableCommand {
             print("Tokens emis: \(stats.emittedTokens)")
             print("Rounds: \(stats.rounds), drafts acceptes: \(stats.acceptedDrafts)/\(stats.totalDrafts) (\(Int(stats.acceptRate * 100))%)")
             print("Temps: \(String(format: "%.2f", genTime))s = \(String(format: "%.1f", tokPerSec)) tok/s")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
             return
         }
 
@@ -397,7 +397,7 @@ struct Generate: AsyncParsableCommand {
         print("Tokens generes: \(tokenCount)")
         print("Temps: \(String(format: "%.2f", genTime))s")
         print("Vitesse: \(String(format: "%.1f", tokPerSec)) tokens/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 }
 
@@ -898,7 +898,7 @@ struct Describe: AsyncParsableCommand {
             print("Tokens: \(tokenCount)")
         }
         print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 
     // MARK: - gemma4_unified (12B) path
@@ -1138,6 +1138,6 @@ struct Describe: AsyncParsableCommand {
         print("\n\n--- Stats ---")
         print("Tokens: \(tokenCount)")
         print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 }

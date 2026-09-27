@@ -112,7 +112,7 @@ final class WebAgentLoop: ObservableObject {
         diffConfig = nil
         diffGenConfig = nil
         diffTokenizer = nil
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
         loadState = .idle
     }
 

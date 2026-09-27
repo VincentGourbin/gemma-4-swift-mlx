@@ -109,7 +109,7 @@ public class VisionModel: Module {
         var hiddenStates = encoder(inputsEmbeds, positions: allPositions, mask: attnMask)
 
         // Pooling
-        let (pooled, poolMask) = pooler(
+        let (pooled, _) = pooler(
             hiddenStates: hiddenStates, patchPositions: allPositions,
             paddingPositions: allPadding
         )

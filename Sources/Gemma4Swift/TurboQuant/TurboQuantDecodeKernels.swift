@@ -11,7 +11,7 @@ import MLXFast
 /// 32 simdgroups × 32 lanes : chaque simdgroup traite des tokens differents,
 /// chaque lane traite un sous-ensemble des dimensions.
 /// Online softmax : pas besoin de materialiser les scores en memoire.
-func makeFusedMSEDecodeKernel(keyBits: Int, valBits: Int) -> MLXFastKernel {
+func makeFusedMSEDecodeKernel(keyBits: Int, valBits: Int) -> MLXFast.MLXFastKernel {
     let kMask = (1 << keyBits) - 1
     let vMask = (1 << valBits) - 1
 
@@ -138,10 +138,10 @@ func makeFusedMSEDecodeKernel(keyBits: Int, valBits: Int) -> MLXFastKernel {
 
 // MARK: - Cached kernel instances
 
-nonisolated(unsafe) private var _fusedMSEDecodeKernels: [String: MLXFastKernel] = [:]
+nonisolated(unsafe) private var _fusedMSEDecodeKernels: [String: MLXFast.MLXFastKernel] = [:]
 private let _kernelLock = NSLock()
 
-func getFusedMSEDecodeKernel(keyBits: Int, valBits: Int) -> MLXFastKernel {
+func getFusedMSEDecodeKernel(keyBits: Int, valBits: Int) -> MLXFast.MLXFastKernel {
     let key = "\(keyBits)_\(valBits)"
     _kernelLock.lock()
     if let cached = _fusedMSEDecodeKernels[key] {

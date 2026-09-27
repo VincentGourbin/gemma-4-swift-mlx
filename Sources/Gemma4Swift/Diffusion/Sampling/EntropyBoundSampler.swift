@@ -67,7 +67,7 @@ public final class EntropyBoundSampler: @unchecked Sendable {
     /// Version compilee de tokenEntropy via MLX.compile.
     /// Le JIT MLX fuse les kernels logSoftmax + exp + multiply + sum.
     /// Shapeless: true permet de varier la batch size sans recompiler.
-    nonisolated(unsafe) static let compiledTokenEntropy: @Sendable (MLXArray) -> MLXArray = MLX.compile(shapeless: true) { logits -> MLXArray in
+    static let compiledTokenEntropy: @Sendable (MLXArray) -> MLXArray = MLX.compile(shapeless: true) { logits -> MLXArray in
         let logProbs = MLXNN.logSoftmax(logits, axis: -1)
         let probs = exp(logProbs)
         let mixed: MLXArray = probs * logProbs

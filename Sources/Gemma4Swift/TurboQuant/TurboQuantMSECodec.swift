@@ -197,7 +197,7 @@ public final class TurboQuantMSECodec: @unchecked Sendable {
 
 /// Kernel Metal pour le scoring MSE : dot product query × packed codebook entries
 /// Utilise simd_sum pour la reduction parallele
-let turboQuantMSEScoreKernel: MLXFastKernel = MLXFast.metalKernel(
+let turboQuantMSEScoreKernel: MLXFast.MLXFastKernel = MLXFast.metalKernel(
     name: "turboquant_mse_score",
     inputNames: ["q_rot", "norms", "packed", "codebook"],
     outputNames: ["out"],
@@ -244,7 +244,7 @@ let turboQuantMSEScoreKernel: MLXFastKernel = MLXFast.metalKernel(
 )
 
 /// Kernel Metal pour weighted sum en espace tourne
-let turboQuantMSEWeightedRotKernel: MLXFastKernel = MLXFast.metalKernel(
+let turboQuantMSEWeightedRotKernel: MLXFast.MLXFastKernel = MLXFast.metalKernel(
     name: "turboquant_mse_weighted_rot",
     inputNames: ["weights", "norms", "packed", "codebook"],
     outputNames: ["out"],

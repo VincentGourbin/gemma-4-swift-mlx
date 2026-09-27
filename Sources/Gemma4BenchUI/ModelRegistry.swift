@@ -95,7 +95,7 @@ final class ModelRegistry: ObservableObject {
         guard busy == nil else { return }
         e4bPipeline?.unload()
         e4bPipeline = nil
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Chargement AR 26B-A4B bf16
@@ -123,7 +123,7 @@ final class ModelRegistry: ObservableObject {
         guard busy == nil else { return }
         arPipeline?.unload()
         arPipeline = nil
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Chargement DiffusionGemma
@@ -172,7 +172,7 @@ final class ModelRegistry: ObservableObject {
         diffConfig = nil
         diffGenConfig = nil
         diffTokenizer = nil
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     /// Decharge TOUT (utile avant de basculer entre modeles lourds).
@@ -184,7 +184,7 @@ final class ModelRegistry: ObservableObject {
         diffConfig = nil
         diffGenConfig = nil
         diffTokenizer = nil
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Estimation RAM

@@ -38,7 +38,7 @@ public enum Gemma4UnifiedVideoProcessor {
         softTokensPerFrame: Int = 70,
         maxFrames: Int = defaultMaxFrames
     ) async throws -> ProcessedVideo {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration)
         let durationSeconds = CMTimeGetSeconds(duration)
 

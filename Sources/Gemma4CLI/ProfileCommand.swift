@@ -318,7 +318,7 @@ struct ProfileSweep: AsyncParsableCommand {
             if let m = context.model as? Gemma4MultimodalLLMModel { return m.config.textConfig.maxPositionEmbeddings }
             return 131072
         }
-        let modelBaseMemMB = Double(MLX.GPU.activeMemory) / (1024 * 1024)
+        let modelBaseMemMB = Double(MLX.Memory.activeMemory) / (1024 * 1024)
 
         // Header
         let separator = String(repeating: "\u{2500}", count: 82)
@@ -478,7 +478,7 @@ struct ProfileSweep: AsyncParsableCommand {
                 print("  \(ctxStr)    \(cfgStr)  \(tpsStr)   \(ttftStr)  \(mlxStr)  \(procStr)  \(genStr)  \(totalStr)")
 
                 // Liberer le cache GPU entre les runs
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
 

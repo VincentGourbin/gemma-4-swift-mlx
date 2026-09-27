@@ -49,7 +49,7 @@ public enum Gemma4OnTheFlyQuantization {
     /// Tous nos modeles concrets (Gemma4LLMModel, *Multimodal*) sont des `Module`.
     /// - Returns: nil si le cast echoue.
     public static func asModule(_ model: LanguageModel) -> Module? {
-        return model as? Module
+        return model
     }
 
     /// Applique la quantification a la volee sur `model`.

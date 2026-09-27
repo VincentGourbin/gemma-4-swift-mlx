@@ -15,7 +15,7 @@ func turboQuantPackedWidth(length: Int, bits: Int) -> Int {
 
 // MARK: - Metal Kernels (lazy init)
 
-private let _packKernel: MLXFastKernel = MLXFast.metalKernel(
+private let _packKernel: MLXFast.MLXFastKernel = MLXFast.metalKernel(
     name: "turboquant_pack_lowbit",
     inputNames: ["values"],
     outputNames: ["out"],
@@ -52,7 +52,7 @@ private let _packKernel: MLXFastKernel = MLXFast.metalKernel(
     """
 )
 
-private let _unpackKernel: MLXFastKernel = MLXFast.metalKernel(
+private let _unpackKernel: MLXFast.MLXFastKernel = MLXFast.metalKernel(
     name: "turboquant_unpack_lowbit",
     inputNames: ["packed"],
     outputNames: ["out"],

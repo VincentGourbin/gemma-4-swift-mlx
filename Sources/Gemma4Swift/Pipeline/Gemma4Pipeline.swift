@@ -237,7 +237,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     }
 
     private var container: ModelContainer?
-    nonisolated(unsafe) private var currentSession: ChatSession?
+    private var currentSession: ChatSession?
 
     // MARK: - Chargement
 
@@ -316,7 +316,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         container = nil
         currentSession = nil
         state = .unloaded
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Generation texte
@@ -473,7 +473,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let ngramCapture = ngramSize
         let ngramIncludesPromptCapture = includePromptInWindow
         let ngramIncludesThinkingCapture = includeThinkingInWindow
-        nonisolated(unsafe) let templateVariablesCapture = templateVariables
+        let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
@@ -615,7 +615,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let ngramCapture = noRepeatNGramSize
         let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
         let ngramIncludesThinkingCapture = noRepeatNGramIncludesThinking
-        nonisolated(unsafe) let templateVariablesCapture = templateVariables
+        let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in

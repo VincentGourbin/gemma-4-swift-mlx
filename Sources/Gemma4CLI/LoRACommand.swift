@@ -81,7 +81,7 @@ extension LoRA {
             // 1. Enregistrer et charger le modele
             print("Chargement du modele: \(modelPath)")
             let container = try await loadLocalModel(path: modelPath)
-            print("Modele charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+            print("Modele charge. GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo")
 
             // 2. Detecter la famille de modele
             let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
@@ -189,7 +189,7 @@ extension LoRA {
             }
 
             print("\nTraining termine.")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
         }
 
         // MARK: - Multimodal training
@@ -197,7 +197,7 @@ extension LoRA {
         func runMultimodal() async throws {
             print("Chargement du modele multimodal: \(modelPath)")
             let container = try await loadLocalMultimodalModel(path: modelPath)
-            print("Modele multimodal charge. GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo")
+            print("Modele multimodal charge. GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo")
 
             let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
             print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
@@ -282,7 +282,7 @@ extension LoRA {
             }
 
             print("\nTraining multimodal termine.")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
         }
 
         /// Pre-traite les samples multimodaux: tokenise le texte, expanse les placeholders,
@@ -594,7 +594,7 @@ extension LoRA {
             print("\n--- Stats ---")
             print("Tokens: \(tokenCount), Temps: \(String(format: "%.2f", elapsed))s")
             print("Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
         }
     }
 }
@@ -761,7 +761,7 @@ extension LoRA {
             print("\n=== Resultats ===")
             print("Accuracy: \(correct)/\(total) (\(String(format: "%.1f", Double(correct) / Double(total) * 100))%)")
             print("Resultats sauvegardes dans \(output)")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
         }
     }
 }

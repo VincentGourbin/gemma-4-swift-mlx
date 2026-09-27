@@ -129,7 +129,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         // Vision: utiliser les embeddings pre-calculees si disponibles (training)
         // ou encoder via le vision tower (inference)
         if let precomputed = pendingImageEmbeddings {
-            var imageFeatures = precomputed.asType(inputsEmbeds.dtype)
+            let imageFeatures = precomputed.asType(inputsEmbeds.dtype)
             let imageMask = inputs .== Int32(config.imageTokenId)
             let imageMaskExpanded = broadcast(expandedDimensions(imageMask, axis: -1), to: inputsEmbeds.shape)
             inputsEmbeds = maskedScatter(input: inputsEmbeds, mask: imageMaskExpanded, source: imageFeatures)

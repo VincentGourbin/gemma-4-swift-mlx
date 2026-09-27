@@ -22,10 +22,7 @@ public enum Gemma4LoRAInference {
     ) async throws {
         let adapter = try LoRAContainer.from(directory: directory)
         try await container.perform { context in
-            guard let model = context.model as? LanguageModel else {
-                throw Gemma4LoRAError.incompatibleModel
-            }
-            try adapter.load(into: model)
+            try adapter.load(into: context.model)
         }
     }
 
@@ -43,10 +40,7 @@ public enum Gemma4LoRAInference {
     ) async throws {
         let adapter = try LoRAContainer.from(directory: directory)
         try await container.perform { context in
-            guard let model = context.model as? LanguageModel else {
-                throw Gemma4LoRAError.incompatibleModel
-            }
-            try adapter.fuse(with: model)
+            try adapter.fuse(with: context.model)
         }
     }
 
@@ -61,8 +55,7 @@ public enum Gemma4LoRAInference {
     ) async throws {
         let adapter = try LoRAContainer.from(directory: directory)
         await container.perform { context in
-            guard let model = context.model as? LanguageModel else { return }
-            adapter.unload(from: model)
+            adapter.unload(from: context.model)
         }
     }
 }

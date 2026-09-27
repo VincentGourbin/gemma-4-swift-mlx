@@ -268,7 +268,7 @@ func evaluateTraining(model: Module, samples: [TrainingBatchIterator.TokenizedSa
     for (_, (batch, lengths)) in TrainingBatchIterator(
         samples: samples, batchSize: batchSize, train: false
     ).enumerated() {
-        let (losses, tokens) = trainingLoss(model: model as! Module, batch: batch, lengths: lengths)
+        let (losses, tokens) = trainingLoss(model: model, batch: batch, lengths: lengths)
         allLosses.append((losses * tokens).item(Float.self))
         tokenCount += tokens.item(Int.self)
     }
@@ -514,7 +514,7 @@ func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSamp
         mmModel.pendingAudioFeatures = nil
         mmModel.pendingAudioMask = nil
 
-        let (losses, tokens) = trainingLoss(model: model as! Module, batch: batch, lengths: lengths)
+        let (losses, tokens) = trainingLoss(model: model, batch: batch, lengths: lengths)
         allLosses.append((losses * tokens).item(Float.self))
         tokenCount += tokens.item(Int.self)
     }
