@@ -164,7 +164,10 @@ struct Download: AsyncParsableCommand {
         let modelsToDownload: [Gemma4Pipeline.Model]
 
         if all {
-            modelsToDownload = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+            // DiffusionGemma (~50 Go, pipeline a part) seulement sur demande explicite.
+            modelsToDownload = Gemma4Pipeline.Model.allCases
+                .filter { !$0.isDiffusion }
+                .sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
         } else if recommended {
             let ram = Gemma4ModelCache.systemRAMGB
             modelsToDownload = Gemma4Pipeline.Model.recommended(forRAMGB: ram)

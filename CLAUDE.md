@@ -96,7 +96,7 @@ re-resolve.
 
 ## Architecture
 
-Swift 6.0 / macOS 14+ / Apple Silicon only. Two products: `Gemma4Swift` library and `gemma4-cli` executable.
+Swift 6.0 / macOS 15+ / Apple Silicon only. Two products: `Gemma4Swift` library and `gemma4-cli` executable.
 
 ### Multimodal Pipeline
 

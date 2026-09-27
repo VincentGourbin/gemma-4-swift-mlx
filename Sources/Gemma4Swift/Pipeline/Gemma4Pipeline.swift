@@ -209,10 +209,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
         }
 
-        /// Modeles recommandes pour la RAM disponible (IT uniquement)
+        /// Modeles recommandes pour la RAM disponible (IT uniquement). DiffusionGemma
+        /// en est exclu : `load` le refuse (pipeline a part, `DiffusionGemmaLoader`).
         public static func recommended(forRAMGB ram: Int) -> [Model] {
             allCases
-                .filter { $0.isInstructionTuned && $0.recommendedRAMGB <= ram }
+                .filter { $0.isInstructionTuned && !$0.isDiffusion && $0.recommendedRAMGB <= ram }
                 .sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
         }
     }

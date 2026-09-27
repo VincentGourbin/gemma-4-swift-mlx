@@ -394,7 +394,7 @@ Sources :
 - Apple M4 Max
 - 96 GB RAM unified
 - 546 GB/s memory bandwidth nominale
-- macOS 14+
+- macOS 15+
 - Swift 6.0
 - mlx-swift 0.31.4
 - mlx-vlm Python 0.6.2

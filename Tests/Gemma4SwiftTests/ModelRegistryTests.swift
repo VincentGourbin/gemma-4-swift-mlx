@@ -119,4 +119,11 @@ struct ModelRegistryTests {
         let for96GB = Gemma4Pipeline.Model.recommended(forRAMGB: 96)
         #expect(for96GB.count > for8GB.count)
     }
+
+    @Test("recommended() n'inclut jamais DiffusionGemma, que load refuse (S-17)")
+    func testRecommendedExcludesDiffusion() {
+        for ram in [8, 16, 32, 64, 96, 128, 512] {
+            #expect(!Gemma4Pipeline.Model.recommended(forRAMGB: ram).contains { $0.isDiffusion })
+        }
+    }
 }
