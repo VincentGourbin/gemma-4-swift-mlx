@@ -250,12 +250,34 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
+    /// Prefill par tranches (voir `Gemma4ChunkedPrefill`). Avec un media en attente,
+    /// les embeddings fusionnes (tours + masked_scatter) sont calcules une fois sur
+    /// tout le prompt, puis le modele de langage avance par tranches d'embeddings ;
+    /// le dernier jeton (texte : fin du gabarit) est rendu au `TokenIterator`.
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
         let promptTokens = input.text.tokens
-        guard promptTokens.shape[0] > 0 else {
+        let promptCount = promptTokens.shape[0]
+        guard promptCount > 0 else {
             let emptyToken = MLXArray(Int32(0))[0 ..< 0]
             return .tokens(.init(tokens: emptyToken))
         }
-        return .tokens(input.text)
+
+        let cacheArray: [KVCache?] = cache.map { $0 as KVCache? }
+        let step = windowSize ?? 512
+        let (inputsEmbeds, perLayerInputs) = prepareMultimodalEmbeds(promptTokens[.newAxis])
+        if let inputsEmbeds {
+            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+                _ = languageModel(
+                    inputsEmbeds: inputsEmbeds[0..., range],
+                    cache: cacheArray,
+                    perLayerInputs: perLayerInputs?[0..., range]
+                )
+            }
+        } else {
+            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+                _ = languageModel(inputs: promptTokens[range][.newAxis], cache: cacheArray)
+            }
+        }
+        return .tokens(input.text[(promptCount - 1)...])
     }
 }

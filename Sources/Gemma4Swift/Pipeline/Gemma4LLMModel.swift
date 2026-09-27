@@ -77,7 +77,8 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
-    /// Prepare les tokens d'entree pour la generation
+    /// Prefill par tranches de `windowSize` (defaut 512) ; seul le dernier jeton est
+    /// rendu au `TokenIterator`, donc le head ne tourne que sur une position.
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
         let promptTokens = input.text.tokens
         let promptCount = promptTokens.shape[0]
@@ -87,6 +88,10 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
             return .tokens(.init(tokens: emptyToken))
         }
 
-        return .tokens(input.text)
+        let cacheArray: [KVCache?] = cache.map { $0 as KVCache? }
+        Gemma4ChunkedPrefill.run(count: promptCount, step: windowSize ?? 512, cache: cache) { range in
+            _ = languageModel(inputs: promptTokens[range][.newAxis], cache: cacheArray)
+        }
+        return .tokens(input.text[(promptCount - 1)...])
     }
 }
