@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import CoreGraphics
 import MLXLMCommon
 @testable import Gemma4Swift
 
@@ -53,5 +54,35 @@ struct StreamingDetokenizerTests {
         withKnownIssue("mlx-swift-lm NaiveStreamingDetokenizer : difference par graphemes") {
             #expect(streamed == tokenizer.decode(tokenIds: ids))
         }
+    }
+
+    /// Bout en bout : les chemins du pipeline qui generent via TokenIterator
+    /// (multimodal, n-gramme) detokenisent eux-memes et rendent le texte intact.
+    @Test("chatStreamMultimodal et chemin n-gramme restituent drapeau, ZWJ et repli octet")
+    @MainActor
+    func testPipelinePathsKeepScalars() async throws {
+        let pipeline = Gemma4Pipeline()
+        try await pipeline.load(from: URL(fileURLWithPath: integrationModelPath!), multimodal: true)
+        let target = "🇫🇷 👩‍👩‍👧 𠀋 𝔘𝔫𝔦"
+        let prompt = "Recopie exactement, sans rien d'autre : \(target)"
+
+        let ctx = try #require(CGContext(
+            data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let pixels = try Gemma4ImageProcessor.processImage(try #require(ctx.makeImage()))
+        var multimodal = ""
+        for try await chunk in try pipeline.chatStreamMultimodal(
+            prompt: prompt, pixelValues: pixels, temperature: 0, maxTokens: 40) { multimodal += chunk }
+        #expect(multimodal.contains(target), "multimodal : \(multimodal)")
+
+        var ngram = ""
+        for try await chunk in try pipeline.chatStream(
+            prompt: prompt, temperature: 0, maxTokens: 40, noRepeatNGramSize: 8,
+            // Fenetre hors prompt : sinon le n-gramme interdit justement la recopie.
+            noRepeatNGramIncludesPrompt: false) { ngram += chunk }
+        // Ce qui departage les detokeniseurs : l'amont rendrait « 🇫 👩 ». La fidelite de
+        // la recopie complete depend du modele (𠀋 parfois omis sur ce chemin).
+        #expect(ngram.contains("🇫🇷") && ngram.contains("👩‍👩‍👧"), "n-gramme : \(ngram)")
     }
 }

@@ -523,22 +523,12 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             prefillStepSize: params.prefillStepSize,
                             maxTokens: maxTokensCapture
                         )
-                        let (stream, _) = MLXLMCommon.generateTask(
+                        await Self.streamText(
+                            iterator: iterator,
                             promptTokenCount: input.text.tokens.size,
-                            modelConfiguration: context.configuration,
-                            tokenizer: context.tokenizer,
-                            iterator: iterator
+                            context: context,
+                            into: continuation
                         )
-                        for await generation in stream {
-                            switch generation {
-                            case .chunk(let text):
-                                continuation.yield(text)
-                            case .info, .toolCall:
-                                break
-                            @unknown default:
-                                break
-                            }
-                        }
                     }
                     continuation.finish()
                 } catch {
@@ -676,11 +666,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             temperature: temperatureCapture,
                             topP: 0.95
                         )
-                        let stream: AsyncStream<Generation>
+                        let iterator: TokenIterator
                         if let ngramSize = ngramCapture {
                             // GenerateParameters ne transporte pas de processor custom :
                             // construire le TokenIterator explicitement.
-                            let iterator = try TokenIterator(
+                            iterator = try TokenIterator(
                                 input: lmInput,
                                 model: context.model,
                                 cache: nil,
@@ -693,27 +683,16 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 prefillStepSize: params.prefillStepSize,
                                 maxTokens: maxTokensCapture
                             )
-                            stream = MLXLMCommon.generateTask(
-                                promptTokenCount: lmInput.text.tokens.size,
-                                modelConfiguration: context.configuration,
-                                tokenizer: context.tokenizer,
-                                iterator: iterator
-                            ).0
                         } else {
-                            stream = try MLXLMCommon.generate(
-                                input: lmInput, parameters: params, context: context
-                            )
+                            iterator = try TokenIterator(
+                                input: lmInput, model: context.model, cache: nil, parameters: params)
                         }
-                        for await generation in stream {
-                            switch generation {
-                            case .chunk(let text):
-                                continuation.yield(text)
-                            case .info, .toolCall:
-                                break
-                            @unknown default:
-                                break
-                            }
-                        }
+                        await Self.streamText(
+                            iterator: iterator,
+                            promptTokenCount: lmInput.text.tokens.size,
+                            context: context,
+                            into: continuation
+                        )
                     }
                     continuation.finish()
                 } catch {
@@ -722,6 +701,33 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 await MainActor.run { self?.state = .ready }
             }
             continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Genere a partir de `iterator` et detokenise nous-memes : jetons bruts de
+    /// mlx-swift-lm (`generateTokenTask`), puis `Gemma4StreamingDetokenizer`.
+    /// Le chemin texte de l'amont passe par `NaiveStreamingDetokenizer`, qui perd les
+    /// scalaires fusionnant avec le grapheme precedent (drapeaux, sequences ZWJ,
+    /// accents combinants). Les chemins `ChatSession` (chat, chatStream par defaut,
+    /// continueChat) n'exposent pas les jetons et gardent ce defaut jusqu'a leur
+    /// remplacement (K-19) ou la correction amont.
+    private nonisolated static func streamText(
+        iterator: consuming TokenIterator,
+        promptTokenCount: Int,
+        context: ModelContext,
+        into continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async {
+        let (tokens, _) = MLXLMCommon.generateTokenTask(
+            promptTokenCount: promptTokenCount,
+            modelConfiguration: context.configuration,
+            tokenizer: context.tokenizer,
+            iterator: iterator
+        )
+        var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
+        for await event in tokens {
+            if case .token(let id) = event, let text = detokenizer.append(token: id) {
+                continuation.yield(text)
+            }
         }
     }
 
