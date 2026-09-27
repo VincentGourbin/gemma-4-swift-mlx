@@ -128,6 +128,9 @@ struct Download: AsyncParsableCommand {
     @Flag(name: .long, help: "Forcer le re-telechargement meme si deja present")
     var force: Bool = false
 
+    @Option(name: .long, help: "Dossier racine des modeles (defaut ~/Library/Caches/models), ex. un disque externe")
+    var modelsDir: String?
+
     /// Mappe les raccourcis vers les IDs complets
     static let shortcuts: [String: String] = [
         // E2B
@@ -161,6 +164,10 @@ struct Download: AsyncParsableCommand {
     ]
 
     func run() async throws {
+        if let modelsDir {
+            Gemma4ModelCache.customModelsDirectory = URL(fileURLWithPath: (modelsDir as NSString).expandingTildeInPath)
+            print("Dossier des modeles : \(Gemma4ModelCache.modelsDirectory.path)")
+        }
         let modelsToDownload: [Gemma4Pipeline.Model]
 
         if all {
