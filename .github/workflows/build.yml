@@ -1,0 +1,28 @@
+# Compilation seulement. Les runners macOS de GitHub ne garantissent pas un GPU
+# Metal utilisable par MLX (mlx-swift et mlx-swift-lm testent sur des runners
+# auto-heberges) : les tests se lancent sur une machine Apple Silicon avec
+# Scripts/run-tests.sh (jamais `xcodebuild test` nu, voir CLAUDE.md).
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: xcodebuild -version
+      - name: Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain || xcodebuild -showComponent MetalToolchain
+      - name: Build library, CLI and test bundle
+        run: |
+          xcodebuild build-for-testing \
+            -scheme Gemma4Swift-Package \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/xcode \
+            -skipMacroValidation
