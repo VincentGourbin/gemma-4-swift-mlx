@@ -42,9 +42,11 @@ public enum Gemma4ModelDownloader {
             modelDir = modelDir.appendingPathComponent(String(part))
         }
 
-        if !force && Gemma4ModelCache.isDownloaded(modelId: modelId) {
+        // Deja present : renvoyer l'emplacement reel, qui peut etre un snapshot du
+        // cache HF plutot que modelsDirectory/org/model.
+        if !force, let existing = Gemma4ModelCache.localPath(modelId: modelId) {
             progress?(.cached(fileCount: 1))
-            return modelDir
+            return existing
         }
 
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)

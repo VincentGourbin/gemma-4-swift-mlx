@@ -39,7 +39,13 @@ public enum Gemma4ModelCache {
 
     /// Chemin local du modele s'il existe, nil sinon
     public static func localPath(for model: Gemma4Pipeline.Model) -> URL? {
-        possiblePaths(for: model.rawValue).first { hasModelFiles(at: $0) }
+        localPath(modelId: model.rawValue)
+    }
+
+    /// Chemin local d'un modele (par ID HuggingFace) s'il est complet, nil sinon.
+    /// Peut etre le cache personnalise ou un snapshot du cache HF.
+    public static func localPath(modelId: String) -> URL? {
+        possiblePaths(for: modelId).first { hasModelFiles(at: $0) }
     }
 
     /// Taille sur disque d'un modele telecharge (en octets), nil si non telecharge
@@ -90,12 +96,40 @@ public enum Gemma4ModelCache {
 
     // MARK: - Private
 
-    private static func hasModelFiles(at path: URL) -> Bool {
+    /// Un modele est complet quand `config.json` est la et que ses poids le sont tous.
+    ///
+    /// Un modele multi-shards publie `model.safetensors.index.json` : chaque shard de
+    /// son `weight_map` doit etre present. Sans cet index, un seul `.safetensors`
+    /// suffisait, et un telechargement coupe au 2e shard passait pour complet
+    /// (les fichiers arrivent dans l'ordre du manifeste, `config.json` en tete) :
+    /// plus de reprise, puis un chargement qui echoue sur des poids manquants.
+    ///
+    /// Un shard qui est un lien symbolique compte comme present meme si sa cible est
+    /// absente (disque externe non monte) : le telechargement est complet, c'est le
+    /// montage qui manque, et le chargement le dira. Le traiter comme manquant ferait
+    /// re-telecharger des dizaines de Go vers le disque interne.
+    static func hasModelFiles(at path: URL) -> Bool {
         let fm = FileManager.default
-        let configExists = fm.fileExists(atPath: path.appendingPathComponent("config.json").path)
-        guard configExists else { return false }
+        guard fm.fileExists(atPath: path.appendingPathComponent("config.json").path) else {
+            return false
+        }
+        let indexURL = path.appendingPathComponent("model.safetensors.index.json")
+        if let data = try? Data(contentsOf: indexURL) {
+            guard let index = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let weightMap = index["weight_map"] as? [String: String],
+                  !weightMap.isEmpty
+            else { return false }
+            return Set(weightMap.values).allSatisfy { isPresent(path.appendingPathComponent($0).path) }
+        }
         let contents = (try? fm.contentsOfDirectory(atPath: path.path)) ?? []
         return contents.contains { $0.hasSuffix(".safetensors") }
+    }
+
+    /// Fichier present, ou lien symbolique (meme pendant).
+    private static func isPresent(_ path: String) -> Bool {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: path) { return true }
+        return (try? fm.destinationOfSymbolicLink(atPath: path)) != nil
     }
 
     private static func possiblePaths(for modelId: String) -> [URL] {
@@ -116,12 +150,17 @@ public enum Gemma4ModelCache {
             .appendingPathComponent(modelFolder)
             .appendingPathComponent("snapshots")
 
-        // Prendre le dernier snapshot (le plus recent)
+        // Prendre le snapshot le plus recent. contentsOfDirectory ne garantit aucun
+        // ordre : on trie par date de modification plutot que de prendre le dernier.
         if let snapshots = try? FileManager.default.contentsOfDirectory(
             at: hfSnapshotsDir,
-            includingPropertiesForKeys: nil
+            includingPropertiesForKeys: [.contentModificationDateKey]
         ) {
-            if let latest = snapshots.last {
+            let modified = { (url: URL) -> Date in
+                (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? .distantPast
+            }
+            if let latest = snapshots.max(by: { modified($0) < modified($1) }) {
                 paths.append(latest)
             }
         }

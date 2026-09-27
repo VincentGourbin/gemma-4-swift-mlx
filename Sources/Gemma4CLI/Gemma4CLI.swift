@@ -213,18 +213,14 @@ struct Download: AsyncParsableCommand {
             print("  ID: \(model.rawValue)")
 
             let startTime = Date()
-            let parts = model.rawValue.split(separator: "/")
-            let destDir = Gemma4ModelCache.modelsDirectory
-                .appendingPathComponent(String(parts[0]))
-                .appendingPathComponent(String(parts[1]))
 
             do {
-                try await LocalModelDownloader.download(
+                try await Gemma4ModelDownloader.download(
                     modelId: model.rawValue,
-                    to: destDir,
-                    token: token
-                ) { pct in
-                    print("\r  Progression: \(Int(pct * 100))%", terminator: "")
+                    token: token,
+                    force: force
+                ) { p in
+                    print("\r  Progression: \(Int(p.fraction * 100))%", terminator: "")
                     fflush(stdout)
                 }
 
