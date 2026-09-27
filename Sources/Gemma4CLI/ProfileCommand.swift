@@ -147,10 +147,13 @@ struct ProfileRun: AsyncParsableCommand {
 
             // 3. KV Cache allocation
             session.beginPhase("3. KV Cache Allocation", category: .kvCache)
-            let params = self.kvBits != nil
-                ? GenerateParameters(kvBits: self.kvBits)
-                : nil
-            let cache = context.model.newCache(parameters: params)
+            // TurboQuant explicite : newCache(parameters:) ne route plus kvBits vers lui.
+            let cache: [any KVCache]
+            if let kvBits = self.kvBits, let gemma = context.model as? Gemma4LLMModel {
+                cache = gemma.languageModel.makeCache(kvBits: Float(kvBits))
+            } else {
+                cache = context.model.newCache(parameters: nil)
+            }
             session.endPhase("3. KV Cache Allocation", category: .kvCache)
 
             // 4. Prefill

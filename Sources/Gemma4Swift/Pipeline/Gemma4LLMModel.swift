@@ -60,9 +60,14 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         return languageModel.forwardCollectingHiddenStates(inputs: inputs, cache: cacheArray)
     }
 
+    /// Caches standard. `parameters.kvBits` n'est volontairement pas lu ici : la
+    /// quantification native du KV est faite par mlx-swift-lm pendant la generation
+    /// (`maybeQuantizeKVCache`, a partir de `quantizedKVStart`), comme le documente
+    /// le README. Le router vers TurboQuant donnait deux implementations differentes
+    /// selon le modele pour un meme parametre. TurboQuant (experimental) reste
+    /// accessible explicitement par `languageModel.makeCache(kvBits:)`.
     public func newCache(parameters: GenerateParameters?) -> [any KVCache] {
-        let kvBits: Float? = parameters?.kvBits != nil ? Float(parameters!.kvBits!) : nil
-        return languageModel.makeCache(kvBits: kvBits)
+        languageModel.makeCache()
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
