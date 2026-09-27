@@ -14,9 +14,10 @@ OUTDIR="benchmarks/results/${QUANT}"
 mkdir -p "$OUTDIR"
 
 # Images/audio de test
-IMG="input_sample.jpg"
-VIDEO_SRC="/Users/vincent/Pictures/FluxforgeStudio/Forge/un logo pour mon app_DF1EAD95/step_3797B1A8.mp4"
-AUDIO_SRC="/Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3"
+IMG="docs/examples/vision-image-description/input_sample.jpg"
+# Video et audio : fichiers locaux, a fournir (sautes s'ils sont absents).
+VIDEO_SRC="${GEMMA4_BENCH_VIDEO:-}"
+AUDIO_SRC="${GEMMA4_BENCH_AUDIO:-}"
 
 # Copier la vidéo temporairement si elle existe
 if [ -f "$VIDEO_SRC" ]; then

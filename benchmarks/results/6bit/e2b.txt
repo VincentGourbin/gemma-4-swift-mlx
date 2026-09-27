@@ -3,7 +3,7 @@ Date: 2026-04-07T17:06:56Z
 
 === Text Generation ===
 Enregistrement du type gemma4_text...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
 Modele charge en 1.4s
 GPU: 3617 Mo actifs, 3617 Mo pic
 
@@ -22,7 +22,7 @@ GPU pic: 3693 Mo
 
 === Vision (single image) ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
 Modele charge.
 Traitement de l'image: input_sample.jpg
   Image preprocessee: [1, 3, 624, 960]
@@ -60,7 +60,7 @@ GPU pic: 5566 Mo
 
 === Video ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
 Modele charge.
 Traitement de la video: /tmp/bench_video.mp4
   Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source
@@ -112,9 +112,9 @@ GPU pic: 6643 Mo
 
 === Audio (transcription) ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
 Modele charge.
-Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+Traitement de l'audio: ~/Downloads/Audio/Audio - Other/Audio_Obama.mp3
   Audio preprocesse: duree 30.0s, 750 tokens
   Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
   Derniers tokens: [506, 2269, 10808, 9951, 528, 5422, 1131, 5422, 1816, 236761, 106, 107, 105, 4368, 107]
@@ -134,9 +134,9 @@ GPU pic: 6642 Mo
 
 === Audio (comprehension) ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-6bit
 Modele charge.
-Traitement de l'audio: /Users/vincent/Downloads/Audio/Audio - Other/Audio_Obama.mp3
+Traitement de l'audio: ~/Downloads/Audio/Audio - Other/Audio_Obama.mp3
   Audio preprocesse: duree 30.0s, 750 tokens
   Premiers tokens: [2, 108, 105, 2364, 107, 256000, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881, 258881]
   Derniers tokens: [563, 506, 4403, 236881, 119281, 969, 506, 1689, 3618, 236761, 106, 107, 105, 4368, 107]
