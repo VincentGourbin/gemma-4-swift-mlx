@@ -150,6 +150,10 @@ func tokenizeTrainingSamples(
 
 /// Training loop qui reproduit exactement le comportement de mlx-lm Python.
 /// Pas de dependance sur LoRATrain upstream.
+/// - Warning: exclusif dans le process (`Gemma4ComputeGate`) : echoue avec
+///   `inferenceInProgress` si une inference du paquet tourne, et toute inference
+///   lancee pendant l'entrainement echoue avec `trainingInProgress`. Un gradient
+///   concurrent d'un forward fige le process (deadlock mlx-swift, voir CLAUDE.md).
 public func trainLoRA(
     model: Module,
     trainSamples: [TrainingBatchIterator.TokenizedSample],
@@ -164,6 +168,10 @@ public func trainLoRA(
     isFullFineTune: Bool = false,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
+    // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
+    // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    try Gemma4ComputeGate.shared.beginTraining()
+    defer { Gemma4ComputeGate.shared.endTraining() }
     // Activer le mode training (ref: Python model.train())
     model.train()
 
@@ -330,6 +338,10 @@ public struct MultimodalBatchIterator: Sequence, IteratorProtocol {
 }
 
 /// Training loop multimodal — set les pending* media avant chaque forward pass
+/// - Warning: exclusif dans le process (`Gemma4ComputeGate`) : echoue avec
+///   `inferenceInProgress` si une inference du paquet tourne, et toute inference
+///   lancee pendant l'entrainement echoue avec `trainingInProgress`. Un gradient
+///   concurrent d'un forward fige le process (deadlock mlx-swift, voir CLAUDE.md).
 public func trainMultimodalLoRA(
     model: Module,
     trainSamples: [MultimodalTokenizedSample],
@@ -343,6 +355,10 @@ public func trainMultimodalLoRA(
     isFullFineTune: Bool = false,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
+    // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
+    // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    try Gemma4ComputeGate.shared.beginTraining()
+    defer { Gemma4ComputeGate.shared.endTraining() }
     model.train()
 
     // Le modele multimodal pour setter les pending properties

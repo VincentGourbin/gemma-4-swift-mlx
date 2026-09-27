@@ -39,6 +39,15 @@ that fine-tunes on a background task while streaming inference can hit the same
 ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
 inference — serialize the two.
 
+`Gemma4ComputeGate.shared` enforces this for the package's own entry points: the
+three gradient loops (`trainLoRA`, `trainMultimodalLoRA`,
+`Gemma4DrafterTraining.trainDrafter`) take it exclusively, and every inference entry
+point of `Gemma4Pipeline` / `Gemma4MTPPipeline` fails fast with `trainingInProgress`
+while a training runs (and training fails with `inferenceInProgress` while an
+inference runs). It is non-blocking by design and cannot see a consumer's direct MLX
+calls (forward on a `ModelContainer`, custom gradients): those must serialize
+themselves. Any new gradient loop or inference entry point must take the gate.
+
 `Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
 (via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
 process). The whole suite then passes in ~1.2s. Drop the wrapper once the

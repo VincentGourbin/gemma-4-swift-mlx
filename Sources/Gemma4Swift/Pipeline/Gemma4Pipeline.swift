@@ -340,6 +340,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         )
         currentSession = session
 
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
         state = .processing
         defer { state = .ready }
 
@@ -411,6 +414,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     for try await token in stream {
                         continuation.yield(token)
@@ -467,6 +477,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     try await container.perform { context in
                         let input: LMInput
@@ -612,6 +629,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     try await container.perform { context in
                         // 1. Chat template (+ tour system si fourni) puis expansion
@@ -708,6 +732,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let session = currentSession else {
             throw Gemma4PipelineError.modelNotLoaded
         }
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
         state = .processing
         defer { state = .ready }
         return try await session.respond(to: prompt)
@@ -725,6 +752,13 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     for try await token in stream {
                         continuation.yield(token)

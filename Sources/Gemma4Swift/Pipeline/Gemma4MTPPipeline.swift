@@ -113,6 +113,9 @@ public actor Gemma4MTPPipeline {
         continuation: AsyncThrowingStream<String, Error>.Continuation
     ) async throws {
         precondition(blockSize >= 2, "blockSize doit etre >= 2 pour faire de la speculation")
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
 
         nonisolated(unsafe) let drafterRef = drafter
         let bs = blockSize

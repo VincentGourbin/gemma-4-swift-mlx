@@ -136,6 +136,10 @@ public enum Gemma4DrafterTraining {
     ///     dans le target (utilises pour extraire la sharedKV)
     ///   - optimizer: typiquement Adam(lr=1e-4)
     ///   - config: hyperparametres
+    /// - Warning: exclusif dans le process (`Gemma4ComputeGate`) : echoue avec
+    ///   `inferenceInProgress` si une inference du paquet tourne, et toute inference
+    ///   lancee pendant l'entrainement echoue avec `trainingInProgress`. Un gradient
+    ///   concurrent d'un forward fige le process (deadlock mlx-swift, voir CLAUDE.md).
     public static func trainDrafter(
         drafter: Gemma4AssistantDraftModel,
         target: Gemma4LanguageModel,
@@ -147,6 +151,10 @@ public enum Gemma4DrafterTraining {
         config: TrainConfig,
         progress: (Int, Float) -> Void = { _, _ in }
     ) throws {
+        // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
+        // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+        try Gemma4ComputeGate.shared.beginTraining()
+        defer { Gemma4ComputeGate.shared.endTraining() }
         target.train(false)   // target en eval mode (frozen)
         target.freeze()
         drafter.train()       // drafter en train mode
