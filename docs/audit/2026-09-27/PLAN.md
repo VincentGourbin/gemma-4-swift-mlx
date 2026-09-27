@@ -58,6 +58,7 @@ Lots A-E : **1.8.0, strictement additive** (aucun défaut modifié, Fluxforge su
 | K-7 | `loadContainer` : fabrique `LLMModelFactory` privée par appel (plus de course sur le registre global) | S-05 | test : 2 chargements concurrents → bons types | S |
 | K-8 | FFT audio sans pointeurs temporaires ; détokenisation en streaming (MTP, CLI) | S-09, S-11 | 0 warning `#TemporaryPointers` ; test UTF-8 multi-octets | S |
 | K-9 | Deadlock ABBA : doc sur les 5 entrées d'entraînement + garde optionnelle `Gemma4ComputeGate` | S-04 | doc présente ; test de la garde (sérialisation) | S-M |
+| K-4b | MTP : écart au greedy standard sur des quasi-égalités, même en contexte court et avec `--sequential-verify` (préexistant) ; trouver la source (préfill, dtype des logits, softcap…), corriger ou retirer « bit-exact » du README | trouvé en K-4 | `mtp-generate --compare` IDENTIQUE sur 256 jetons (prompt court et long), ou README corrigé | M |
 
 ### Lot B — Hygiène (sans risque)
 
@@ -171,3 +172,25 @@ DiffusionGemma (a ses propres préréglages), iOS (pas de cible déclarée), noy
 - Porte observée : <ligne recopiée>
 - Parité : <ligne recopiée>
 ```
+
+### Journal
+
+## Lot A — 2026-09-27 — validé (branche `fix/lot-a-stabilite`)
+Conditions : un `qwen38` Release (8,2 Go) occupait le GPU toute la soirée → **aucun chiffre de vitesse n'est une référence** ; corrections validées par tests (qui échouent sans le correctif) et essais fonctionnels. Suite finale : 234 tests swift-testing + 115 XCTest verts.
+
+- **K-3** `d96bc8e8` — préfill multimodal sans promotion fp32. Porte : cache KV bf16 (test, échoue sans), description E2B 6 bits identique mot pour mot. Gain de vitesse **non mesuré** (machine occupée).
+- **K-1** `bd7c6fff` — streams annulables, `eval` avant traversée. Porte : 3 tests d'intégration verts ; sur l'ancien code, « toujours .processing 3 s après » et l'appel suivant bloqué > 400 s.
+- **K-2** `41d432f0` — complétude multi-shards, `--force`, chemin réel, snapshot HF. Constat réel : deux Mistral-Small-3.2-24B du dossier Fluxforge ont 8 shards sur 10 et passaient pour complets.
+- **K-5** `bcb0cdda` + `4670b9b3` — `kvBits` et couches KV-partagées (crash « keys (1,1,13,16) » sans le correctif) ; `newCache` ne route plus vers TurboQuant. Le premier commit contenait un test instable (seuil sur l'écart max, 1 échec sur 4) corrigé au suivant. **Reste** : validation sur vrai modèle (E2B/E4B, 26B/31B) et mise à jour de la ligne d'état du README.
+- **K-6** `134447b2` — encodeur vision au dtype des poids, `input_proj` quantifié (erreur 19 % → < 5 %). **Reste** : `describe --quantize-bits 4` sur E2B bf16 réel.
+- **K-7** `b69f4312` — fabrique privée par appel. Piège : dictionnaire de closures `@Sendable` → `ModelTypeRegistry(creators:)` compile mais plante à l'exécution.
+- **K-8** `90cef4b5` — FFT sans pointeurs temporaires ; `Gemma4StreamingDetokenizer`. **Bug amont trouvé** : `NaiveStreamingDetokenizer` (mlx-swift-lm) diffère par graphèmes et perd 🇷, les séquences ZWJ, les accents combinants — touche aussi nos `chatStream`. Gardé en `withKnownIssue`. À remonter (ASK).
+- **K-9** `6e12f675` — `Gemma4ComputeGate` non bloquant (3 boucles de gradient exclusives, toutes les entrées d'inférence refusées pendant un entraînement).
+- **K-4** `8d8708d8` — MTP au-delà de la fenêtre : texte corrompu dès le 23e caractère (prompt ~1 000 jetons) → IDENTIQUE. Divergence résiduelle préexistante sur quasi-égalités → **K-4b**.
+
+Environnement de test : `~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16/` = dossier de liens fichier par fichier vers le Lexar (un lien sur le **dossier** entier n'est pas parcouru par le chargeur mlx-swift-lm) ; drafter `google/gemma-4-E2B-it-assistant` téléchargé dans `~/Library/Caches/models/google/`.
+
+## ASK — Lot A — 2026-09-27
+- Remonter le bug `NaiveStreamingDetokenizer` à ml-explore/mlx-swift-lm (issue + éventuelle PR avec le correctif par scalaires) et le suivre avec `track` ?
+- Ouvrir une PR `fix/lot-a-stabilite` → `main` maintenant (release 1.8.0 après lots B-E), ou attendre la fin des lots B-E ?
+
