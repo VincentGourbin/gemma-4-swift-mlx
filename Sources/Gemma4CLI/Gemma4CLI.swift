@@ -856,11 +856,13 @@ struct Describe: AsyncParsableCommand {
             let maxTotalTokens = self.maxTokens * 3
             var visibleTokens = 0
 
+            // Detokenisation incrementale (caracteres UTF-8 repartis sur plusieurs tokens).
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
             for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
 
                 // Filtrer le thinking mode et afficher
-                let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
+                let text = detokenizer.append(token: Int(nextToken)) ?? ""
                 let filtered = tokenFilter.process(tokenId: nextToken, text: text)
                 if !filtered.isEmpty {
                     print(filtered, terminator: "")
@@ -1104,9 +1106,11 @@ struct Describe: AsyncParsableCommand {
             let maxTotalTokens = self.maxTokens * 3
             var visibleTokens = 0
 
+            // Detokenisation incrementale (caracteres UTF-8 repartis sur plusieurs tokens).
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
             for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
-                let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
+                let text = detokenizer.append(token: Int(nextToken)) ?? ""
                 let filtered = tokenFilter.process(tokenId: nextToken, text: text)
                 if !filtered.isEmpty {
                     print(filtered, terminator: "")

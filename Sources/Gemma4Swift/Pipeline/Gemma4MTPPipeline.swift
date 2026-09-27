@@ -169,11 +169,15 @@ public actor Gemma4MTPPipeline {
             var bonus = argMax(prefillOut.logits[0, promptLen - 1, 0...], axis: -1).item(Int32.self)
             var lastHidden = prefillOut.preNormHiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
 
+            // Detokenisation incrementale : un caractere UTF-8 peut s'etaler sur
+            // plusieurs tokens (byte-fallback) ; les decoder un par un le cassait.
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
+
             // Yield le premier token (sauf si c'est deja un EOS)
             if isEOS(bonus, tokenizer: context.tokenizer) {
                 return s
             }
-            try yieldToken(bonus, tokenizer: context.tokenizer, continuation: continuation)
+            yieldToken(bonus, detokenizer: &detokenizer, continuation: continuation)
             s.emittedTokens = 1
             if s.emittedTokens >= maxTok {
                 return s
@@ -277,7 +281,7 @@ public actor Gemma4MTPPipeline {
                         sawEOS = true
                         break
                     }
-                    try yieldToken(tok, tokenizer: context.tokenizer, continuation: continuation)
+                    yieldToken(tok, detokenizer: &detokenizer, continuation: continuation)
                     s.emittedTokens += 1
                     if s.emittedTokens >= maxTok { break }
                 }
@@ -328,11 +332,12 @@ public actor Gemma4MTPPipeline {
 
     private nonisolated func yieldToken(
         _ tokenId: Int32,
-        tokenizer: any Tokenizer,
+        detokenizer: inout Gemma4StreamingDetokenizer,
         continuation: AsyncThrowingStream<String, Error>.Continuation
-    ) throws {
-        let piece = tokenizer.decode(tokenIds: [Int(tokenId)])
-        continuation.yield(piece)
+    ) {
+        if let piece = detokenizer.append(token: Int(tokenId)) {
+            continuation.yield(piece)
+        }
     }
 
     private nonisolated func isEOS(_ tokenId: Int32, tokenizer: any Tokenizer) -> Bool {
