@@ -162,7 +162,12 @@ public actor Gemma4MTPPipeline {
             let inputArr = MLXArray(promptIds.map { Int32($0) }).reshaped(1, -1)
 
             // 2) Cache + prefill (multimodal: pendingX deja set sur le model par caller)
-            let cache = langModel.makeCache()
+            // Caches glissants dimensionnes pour ne jamais tourner pendant le run : un
+            // RotatingKVCache a 512 qui a tourne n'est plus trimmable, trimPromptCache ne
+            // retirait alors rien, et les brouillons rejetes restaient dans le KV (sortie
+            // fausse des que prompt + generation depassait la fenetre).
+            let cache = langModel.makeCache(
+                slidingCapacity: inputArr.dim(1) + maxTok + bs + 1)
             let prefillOut = modelForward(inputArr, cache)
             eval(prefillOut.logits, prefillOut.preNormHiddenStates)
 
@@ -206,7 +211,8 @@ public actor Gemma4MTPPipeline {
                 let sharedKV = extractSharedKV(
                     cache: cache,
                     fullIdx: lastFullCacheIdx,
-                    slidingIdx: lastSlidingCacheIdx
+                    slidingIdx: lastSlidingCacheIdx,
+                    slidingWindow: textCfg.slidingWindow
                 )
 
                 drafterRef.setSharedKV(sharedKV, kvOffset: kvOffset)
@@ -296,7 +302,12 @@ public actor Gemma4MTPPipeline {
                 // garde les (accepted + 1) premiers (bonus + drafts acceptes), trim le reste.
                 let toTrim = bs - 1 - walkRes.accepted
                 if toTrim > 0 {
-                    trimPromptCache(cache, numTokens: toTrim)
+                    let trimmed = trimPromptCache(cache, numTokens: toTrim)
+                    // Un retrait partiel laisserait des jetons faux dans le KV : erreur
+                    // plutot que sortie silencieusement corrompue.
+                    guard trimmed == toTrim else {
+                        throw MTPError.cacheRollbackFailed(expected: toTrim, trimmed: trimmed)
+                    }
                 }
 
                 // Update bonus + lastHidden pour le prochain round
@@ -321,15 +332,25 @@ public actor Gemma4MTPPipeline {
     private nonisolated func extractSharedKV(
         cache: [any KVCache],
         fullIdx: Int,
-        slidingIdx: Int
+        slidingIdx: Int,
+        slidingWindow: Int
     ) -> SharedKVStates {
         let fullState = cache[fullIdx].state
         let slidingState = cache[slidingIdx].state
         precondition(fullState.count >= 2 && slidingState.count >= 2,
                      "Cache state inattendu (full=\(fullState.count), sliding=\(slidingState.count))")
+        // Le cache glissant du run MTP ne tourne pas et garde tout l'historique : le
+        // drafter ne voit que la fenetre, comme avec un cache glissant ordinaire.
+        var slidingKeys = slidingState[0]
+        var slidingValues = slidingState[1]
+        let length = slidingKeys.dim(-2)
+        if length > slidingWindow {
+            slidingKeys = slidingKeys[.ellipsis, (length - slidingWindow)..., 0...]
+            slidingValues = slidingValues[.ellipsis, (length - slidingWindow)..., 0...]
+        }
         return [
             "full_attention": (keys: fullState[0], values: fullState[1]),
-            "sliding_attention": (keys: slidingState[0], values: slidingState[1]),
+            "sliding_attention": (keys: slidingKeys, values: slidingValues),
         ]
     }
 
@@ -358,6 +379,7 @@ public actor Gemma4MTPPipeline {
     public enum MTPError: LocalizedError {
         case unsupportedModel(String)
         case cacheLayoutInvalid
+        case cacheRollbackFailed(expected: Int, trimmed: Int)
 
         public var errorDescription: String? {
             switch self {
@@ -365,6 +387,8 @@ public actor Gemma4MTPPipeline {
                 return "MTP requires Gemma4LLMModel, got \(t)"
             case .cacheLayoutInvalid:
                 return "Cannot find both full_attention and sliding_attention concrete layers — model layout incompatible"
+            case .cacheRollbackFailed(let expected, let trimmed):
+                return "MTP cache rollback removed \(trimmed) of \(expected) rejected draft positions — output would be corrupted"
             }
         }
     }

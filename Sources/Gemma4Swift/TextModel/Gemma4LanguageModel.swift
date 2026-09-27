@@ -171,7 +171,12 @@ public class Gemma4LanguageModel: Module {
     /// Cree les caches KV pour chaque couche concrete (non-partagee)
     /// - Parameter kvBits: si specifie, utilise TurboQuant pour les couches full attention
     ///   Si le modele n'a pas assez de couches full attention, TurboQuant est desactive automatiquement
-    public func makeCache(kvBits: Float? = nil) -> [any KVCache] {
+    /// - Parameter slidingCapacity: capacite minimale des caches glissants. Par defaut
+    ///   la fenetre (`sliding_window`) : le cache tourne, et un `RotatingKVCache` qui a
+    ///   tourne n'est plus « trimmable ». Le decodage speculatif, qui doit retirer les
+    ///   brouillons rejetes, passe la longueur totale du run pour qu'il ne tourne jamais.
+    ///   La fenetre reste imposee par le masque (`createAttentionMask(windowSize:)`).
+    public func makeCache(kvBits: Float? = nil, slidingCapacity: Int? = nil) -> [any KVCache] {
         var caches: [any KVCache] = []
         let layerTypes = config.resolvedLayerTypes
         let concreteLayers = Array(layerTypes[..<config.firstKvSharedLayerIdx])
@@ -194,7 +199,8 @@ public class Gemma4LanguageModel: Module {
                     caches.append(KVCacheSimple())
                 }
             } else {
-                caches.append(MLXLMCommon.RotatingKVCache(maxSize: config.slidingWindow, keep: 0))
+                caches.append(MLXLMCommon.RotatingKVCache(
+                    maxSize: max(config.slidingWindow, slidingCapacity ?? 0), keep: 0))
             }
         }
         return caches
