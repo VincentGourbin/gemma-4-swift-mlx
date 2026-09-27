@@ -113,7 +113,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
 
         // Mode multimodal: construire les embeddings fusionnes
         var inputsEmbeds = languageModel.model.embedTokens(inputs)
-        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: .float32)
+        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: inputsEmbeds.dtype)
 
         // Per-layer inputs (masquer tokens image/audio)
         var perLayerInputs: MLXArray? = nil
