@@ -40,6 +40,9 @@ struct Bench: AsyncParsableCommand {
     @Option(name: .long, help: "Tranche de prefill (GenerateParameters.prefillStepSize)")
     var prefillStep: Int?
 
+    @Option(name: .long, help: "Profil de reference a appliquer (ex. e2b/4bit-lean ; voir `references`)")
+    var reference: String?
+
     @Option(name: .long, help: "Secondes de repos avant chaque point")
     var cooldown: Int = 0
 
@@ -69,16 +72,37 @@ struct Bench: AsyncParsableCommand {
         await container.perform { context in eval(context.model) }
         let loadSeconds = Date().timeIntervalSince(loadStart)
 
+        let profile = try reference.map { id in
+            guard let profile = Gemma4ReferenceProfile.named(id) else {
+                throw ValidationError("profil inconnu : \(id) (voir `gemma4-cli references`)")
+            }
+            return profile
+        }
+        profile?.applyGlobalPolicy()
+
         let pixels: MLXArray? = try image.map { path in
             let pixels = try Gemma4ImageProcessor.processImage(url: URL(fileURLWithPath: path))
             eval(pixels)
             return pixels
         }
         let filler = try promptFile.map { try String(contentsOfFile: $0, encoding: .utf8) } ?? Self.defaultFiller
-        let context = BenchContext.collect(modelURL: modelURL, loadSeconds: loadSeconds)
+        var context = BenchContext.collect(modelURL: modelURL, loadSeconds: loadSeconds)
+        if let profile {
+            context.fields["profile"] = profile.qualifiedID
+            // Les poids mesures doivent etre ceux du profil, sinon la ligne ne le
+            // represente pas (ex. un 6 bits mesure sous un profil 8 bits).
+            let expected = profile.model.rawValue.split(separator: "/").last.map(String.init) ?? ""
+            let matches = modelURL.lastPathComponent == expected
+            context.fields["profile_weights_match"] = matches
+            if !matches {
+                FileHandle.standardError.write(Data(
+                    "⚠ poids \(modelURL.lastPathComponent) ≠ poids du profil \(expected) : ligne marquee profile_weights_match=false\n".utf8))
+            }
+        }
 
         if !noWarmup {
-            _ = try await measure(container: container, promptSize: 32, pixels: pixels, filler: filler, maxTokens: 4)
+            _ = try await measure(
+                container: container, promptSize: 32, pixels: pixels, filler: filler, maxTokens: 4, profile: profile)
         }
 
         let points: [Int] = multimodal ? [0] : sizes
@@ -86,7 +110,8 @@ struct Bench: AsyncParsableCommand {
             for pass in 1 ... max(1, repeats) {
                 if cooldown > 0 { try await Task.sleep(for: .seconds(cooldown)) }
                 var line = try await measure(
-                    container: container, promptSize: size, pixels: pixels, filler: filler, maxTokens: maxTokens)
+                    container: container, promptSize: size, pixels: pixels, filler: filler,
+                    maxTokens: maxTokens, profile: profile)
                 line.merge(context.fields) { current, _ in current }
                 line["pass"] = pass
                 line["label"] = label
@@ -99,7 +124,8 @@ struct Bench: AsyncParsableCommand {
     /// Un point de mesure. `promptSize` = nombre exact de jetons du prompt (mode texte,
     /// sans gabarit de chat) ; ignore en mode image (prompt court fixe + 280 jetons image).
     private func measure(
-        container: ModelContainer, promptSize: Int, pixels: MLXArray?, filler: String, maxTokens: Int
+        container: ModelContainer, promptSize: Int, pixels: MLXArray?, filler: String, maxTokens: Int,
+        profile: Gemma4ReferenceProfile?
     ) async throws -> [String: Any] {
         nonisolated(unsafe) let pixelsCapture = pixels
         let modelPath = self.modelPath
@@ -118,6 +144,8 @@ struct Bench: AsyncParsableCommand {
             }
 
             var parameters = GenerateParameters(maxTokens: maxTokens, temperature: 0)
+            profile?.apply(to: &parameters)
+            // Une option explicite l'emporte sur le profil (balayage d'une variable).
             if let prefillStep { parameters.prefillStepSize = prefillStep }
 
             Memory.clearCache()
@@ -156,6 +184,7 @@ struct Bench: AsyncParsableCommand {
                 "phys_footprint_mb": footprint.current,
                 "phys_footprint_peak_mb": footprint.peak,
                 "prefill_step": parameters.prefillStepSize,
+                "kv_bits": parameters.kvBits ?? 16,
             ]
             // Taille des poids x tok/s : indicateur, pas une mesure. Surestime sur E2B/E4B,
             // dont les tables d'embeddings par couche ne sont lues que sur quelques lignes
@@ -169,7 +198,7 @@ struct Bench: AsyncParsableCommand {
     }
 
     private func emit(_ line: [String: Any]) throws {
-        let data = try JSONSerialization.data(withJSONObject: line, options: [.sortedKeys])
+        let data = try JSONSerialization.data(withJSONObject: line, options: [.sortedKeys, .withoutEscapingSlashes])
         let text = String(decoding: data, as: UTF8.self)
         print(text)
         if let out {
@@ -223,7 +252,7 @@ struct BenchLine: @unchecked Sendable {
 
 /// Contexte commun a toutes les lignes d'un run : machine, commit, dependances.
 struct BenchContext {
-    let fields: [String: Any]
+    var fields: [String: Any]
 
     static func collect(modelURL: URL, loadSeconds: Double) -> BenchContext {
         var fields: [String: Any] = [

@@ -59,7 +59,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         case a4bDiffBf16 = "google/diffusiongemma-26B-A4B-it"
 
         /// Famille du modele
-        public enum Family: String, Sendable {
+        public enum Family: String, Sendable, CaseIterable {
             case e2b, e4b, b31b, a4b, b12b, a4bDiff
         }
 
@@ -240,6 +240,38 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     private var container: ModelContainer?
     private var currentSession: ChatSession?
 
+    /// Profil de reference applique (`nil` = comportement par defaut, inchange).
+    public private(set) var profile: Gemma4ReferenceProfile?
+
+    /// Applique un profil de reference au pipeline deja charge : politique memoire
+    /// de processus tout de suite, `kvBits` / tranche de prefill / vidage du cache a
+    /// chaque generation. `nil` revient au comportement par defaut (les limites
+    /// memoire deja posees restent en place).
+    public func apply(profile: Gemma4ReferenceProfile?) {
+        self.profile = profile
+        profile?.applyGlobalPolicy()
+    }
+
+    /// Charge les poids recommandes d'un profil, puis l'applique.
+    public func load(
+        profile: Gemma4ReferenceProfile,
+        downloadIfNeeded: Bool = false,
+        hfToken: String? = nil,
+        progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
+    ) async throws {
+        try await load(
+            profile.model, multimodal: profile.multimodal,
+            downloadIfNeeded: downloadIfNeeded, hfToken: hfToken, progress: progress)
+        apply(profile: profile)
+    }
+
+    /// Parametres de generation, profil applique s'il y en a un.
+    private func generateParameters(maxTokens: Int, temperature: Float) -> GenerateParameters {
+        var params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        profile?.apply(to: &params)
+        return params
+    }
+
     // MARK: - Chargement
 
     /// Charge un modele Gemma 4, avec telechargement optionnel.
@@ -333,7 +365,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             throw Gemma4PipelineError.modelNotLoaded
         }
 
-        let params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        let params = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let session = ChatSession(
             container,
             instructions: systemPrompt ?? "Tu es un assistant utile.",
@@ -402,7 +434,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             )
         }
 
-        let params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        let params = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let session = ChatSession(
             container,
             instructions: systemPrompt ?? "Tu es un assistant utile.",
@@ -431,6 +463,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
                 await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
                     self?.state = .ready
                 }
             }
@@ -469,8 +502,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         let instructions = systemPrompt ?? "Tu es un assistant utile."
         let promptCapture = prompt
-        let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
+        let paramsCapture = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let ngramCapture = ngramSize
         let ngramIncludesPromptCapture = includePromptInWindow
         let ngramIncludesThinkingCapture = includeThinkingInWindow
@@ -504,11 +537,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             input = try await context.processor.prepare(
                                 input: UserInput(chat: messages))
                         }
-                        let params = GenerateParameters(
-                            maxTokens: maxTokensCapture,
-                            temperature: temperatureCapture,
-                            topP: 0.95
-                        )
+                        let params = paramsCapture
                         let iterator = try TokenIterator(
                             input: input,
                             model: context.model,
@@ -535,7 +564,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 } catch {
                     continuation.finish(throwing: error)
                 }
-                await MainActor.run { self?.state = .ready }
+                await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                    self?.state = .ready
+                }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -609,8 +641,8 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         eval(pixelValues)
         state = .processing
         nonisolated(unsafe) let pixelsCapture = pixelValues
-        let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
+        let paramsCapture = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let promptCapture = prompt
         let systemPromptCapture = systemPrompt
         let ngramCapture = noRepeatNGramSize
@@ -662,11 +694,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
                         // 3. Generation native via TokenIterator (asyncEval + sampler optimal)
                         let lmInput = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
-                        let params = GenerateParameters(
-                            maxTokens: maxTokensCapture,
-                            temperature: temperatureCapture,
-                            topP: 0.95
-                        )
+                        let params = paramsCapture
                         let iterator: TokenIterator
                         if let ngramSize = ngramCapture {
                             // GenerateParameters ne transporte pas de processor custom :
@@ -699,7 +727,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 } catch {
                     continuation.finish(throwing: error)
                 }
-                await MainActor.run { self?.state = .ready }
+                await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                    self?.state = .ready
+                }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
@@ -775,6 +806,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
                 await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
                     self?.state = .ready
                 }
             }

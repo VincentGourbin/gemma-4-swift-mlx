@@ -23,6 +23,13 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- `Gemma4ReferenceProfile` : profils de référence `<bits>bit-<fast|lean>` (5 familles × 4/8/16
+  bits × fast/lean), avec poids recommandés, `kvBits`, tranche de préfill, limites mémoire MLX
+  et vidage du cache après réponse. `Gemma4Pipeline.load(profile:)` et `apply(profile:)` ; sans
+  profil, comportement inchangé. CLI : `gemma4-cli references`, `bench --reference`.
+  Valeurs initiales non mesurées (`docs/References.md`).
+- Préfill par tranches (`prefillStepSize` enfin respecté) et head calculé sur le seul dernier
+  jeton du prompt, texte et multimodal E2B/E4B (Unified inchangé).
 - CLI : `gemma4-cli bench`, instrument de mesure du chemin de génération de la
   bibliothèque (`loadContainer` + `TokenIterator` de mlx-swift-lm, `asyncEval`
   compris) : préfill, TTFT, intervalle par jeton (médiane, p90), pics MLX et
