@@ -68,6 +68,8 @@ public enum Gemma4AudioProcessor {
 
         let features = MLXArray(melData).reshaped(1, T, numMelFilters)
         let mask = MLXArray.zeros([1, T], type: Bool.self)
+        // Materialiser ici : l'appelant consomme ces arrays sur un autre thread.
+        eval(features, mask)
 
         return AudioFeatures(
             features: features,

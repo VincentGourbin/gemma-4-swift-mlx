@@ -125,6 +125,9 @@ public enum Gemma4VideoProcessor {
             }
         }
         let pixelValues = concatenated(padded, axis: 0) // [numFrames, C, H, W]
+        // Materialiser ici : le graphe est construit sur le pool cooperatif et
+        // l'appelant le consomme ailleurs (meme regle que ImageProcessor async).
+        eval(pixelValues)
 
         return VideoFrames(
             pixelValues: pixelValues,

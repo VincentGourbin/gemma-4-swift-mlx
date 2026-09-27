@@ -40,7 +40,7 @@ public actor Gemma4MTPPipeline {
         sequentialVerify: Bool = false
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     try await self.runLoop(
                         prompt: prompt,
@@ -56,6 +56,7 @@ public actor Gemma4MTPPipeline {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -68,7 +69,7 @@ public actor Gemma4MTPPipeline {
         sequentialVerify: Bool = false
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     try await self.runLoop(
                         prompt: "",
@@ -84,6 +85,7 @@ public actor Gemma4MTPPipeline {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -190,6 +192,8 @@ public actor Gemma4MTPPipeline {
 
             // 6) Boucle MTP
             while s.emittedTokens < maxTok {
+                // Le consommateur a lache le stream : onTermination a annule la Task.
+                try Task.checkCancellation()
                 // Lecture des K/V partages depuis le cache (etat valide jusqu'a cache.offset)
                 let kvOffset = cache[lastFullCacheIdx].offset
                 let sharedKV = extractSharedKV(

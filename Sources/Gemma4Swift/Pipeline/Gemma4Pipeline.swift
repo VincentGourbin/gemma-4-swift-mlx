@@ -410,7 +410,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let stream = session.streamResponse(to: prompt)
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
                 do {
                     for try await token in stream {
                         continuation.yield(token)
@@ -423,6 +423,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     self?.state = .ready
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -465,7 +466,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
                 do {
                     try await container.perform { context in
                         let input: LMInput
@@ -528,6 +529,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 }
                 await MainActor.run { self?.state = .ready }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -593,6 +595,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             throw Gemma4PipelineError.invalidInput(
                 "noRepeatNGramSize doit etre >= 1 (recu \(ngramSize))")
         }
+        // L'appelant a pu construire pixelValues sans l'evaluer (processImage
+        // synchrone) : on le materialise sur son thread avant qu'il traverse
+        // vers container.perform. Sans cout si l'array est deja evalue.
+        eval(pixelValues)
         state = .processing
         nonisolated(unsafe) let pixelsCapture = pixelValues
         let temperatureCapture = temperature
@@ -605,7 +611,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         nonisolated(unsafe) let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
                 do {
                     try await container.perform { context in
                         // 1. Chat template (+ tour system si fourni) puis expansion
@@ -691,6 +697,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                 }
                 await MainActor.run { self?.state = .ready }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -717,7 +724,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let stream = session.streamResponse(to: prompt)
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
                 do {
                     for try await token in stream {
                         continuation.yield(token)
@@ -730,6 +737,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     self?.state = .ready
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
