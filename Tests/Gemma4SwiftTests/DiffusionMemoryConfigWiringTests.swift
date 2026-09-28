@@ -52,4 +52,48 @@ struct DiffusionMemoryConfigWiringTests {
         #expect(applied.unloadVisionAfterFirstCanvas)
         #expect(!applied.clearCacheBetweenCanvases)
     }
+
+    /// Poids vision au format sanitise (`encoder.vision_tower.*`, `encoder.embed_vision.*`).
+    private func visionWeights(_ model: DiffusionGemmaForBlockDiffusion) -> [String: MLXArray] {
+        var out: [String: MLXArray] = [:]
+        for (key, value) in model.encoder.parameters().flattened()
+            where key.hasPrefix("vision_tower.") || key.hasPrefix("embed_vision.") {
+            out["encoder." + key] = value
+        }
+        return out
+    }
+
+    @Test("reloadVision restitue les poids apres unloadVision")
+    func testReloadVision() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let model = try modelWithVision()
+            let saved = visionWeights(model).mapValues { $0 + 0 }
+            eval(Array(saved.values))
+            model.encoder.unloadVision()
+            #expect(visionWeights(model).values.allSatisfy { $0.size == 0 })
+            try model.encoder.reloadVision(from: saved)
+            #expect(model.encoder.hasVisionLoaded)
+            let reloaded = visionWeights(model)
+            #expect(reloaded.count == saved.count)
+            for (key, value) in saved {
+                #expect(reloaded[key].map { allClose($0, value).item(Bool.self) } ?? false, "\(key)")
+            }
+        }
+    }
+
+    @Test("image apres dechargement sans dossier du modele : refusee, pas ignoree")
+    func testImageAfterUnloadWithoutDirectoryIsRejected() async throws {
+        let model = try modelWithVision()
+        model.encoder.unloadVision()
+        let pipeline = DiffusionGemmaPipeline(model: model, genConfig: DiffusionGenerationConfig())
+        let count = model.config.visionSoftTokensPerImage
+        let prompt = MLXArray(Array(repeating: Int32(model.config.imageTokenId), count: count)).reshaped(1, count)
+        nonisolated(unsafe) let pixels = MLXArray.zeros([1, 3, 32, 32])
+        let result = await pipeline.generate(promptIds: prompt, pixelValues: pixels, maxBlocks: 1, seed: 0)
+        guard case .invalidInput(let message) = result.stopReason else {
+            Issue.record("attendu invalidInput, obtenu \(result.stopReason)")
+            return
+        }
+        #expect(message.contains("vision dechargee"))
+    }
 }

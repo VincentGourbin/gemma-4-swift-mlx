@@ -20,24 +20,29 @@ public struct DiffusionGemmaContainer: @unchecked Sendable {
     public let generationConfig: DiffusionGenerationConfig
     public let tokenizer: Tokenizer
     public let memoryConfig: DiffusionMemoryConfig
+    /// Dossier du checkpoint : permet de recharger la vision apres un dechargement.
+    public let modelDirectory: URL?
 
     public init(
         model: DiffusionGemmaForBlockDiffusion,
         config: DiffusionGemmaConfig,
         generationConfig: DiffusionGenerationConfig,
         tokenizer: Tokenizer,
-        memoryConfig: DiffusionMemoryConfig
+        memoryConfig: DiffusionMemoryConfig,
+        modelDirectory: URL? = nil
     ) {
         self.model = model
         self.config = config
         self.generationConfig = generationConfig
         self.tokenizer = tokenizer
         self.memoryConfig = memoryConfig
+        self.modelDirectory = modelDirectory
     }
 
     /// Cree un pipeline pret a generer depuis ce container.
     public func makePipeline() -> DiffusionGemmaPipeline {
-        DiffusionGemmaPipeline(model: model, genConfig: generationConfig, memoryConfig: memoryConfig)
+        DiffusionGemmaPipeline(
+            model: model, genConfig: generationConfig, memoryConfig: memoryConfig, modelDirectory: modelDirectory)
     }
 }
 
@@ -117,7 +122,8 @@ public enum DiffusionGemmaRegistration {
             config: config,
             generationConfig: genConfig,
             tokenizer: tokenizer,
-            memoryConfig: memoryConfig
+            memoryConfig: memoryConfig,
+            modelDirectory: directory
         )
     }
 

@@ -64,6 +64,8 @@ public actor DiffusionGemmaPipeline {
     public let stopping: StableConfidentStopping
     /// Politique memoire appliquee pendant la generation (D-10).
     public let memoryConfig: DiffusionMemoryConfig
+    /// Dossier du checkpoint, pour recharger la vision dechargee par un appel precedent.
+    public let modelDirectory: URL?
 
     /// - Parameter memoryConfig: par defaut, comportement anterieur (cache MLX vide
     ///   entre canvases, vision gardee). `DiffusionGemmaContainer.makePipeline()`
@@ -72,11 +74,13 @@ public actor DiffusionGemmaPipeline {
         model: DiffusionGemmaForBlockDiffusion,
         genConfig: DiffusionGenerationConfig,
         memoryConfig: DiffusionMemoryConfig = DiffusionMemoryConfig(
-            mixedPrecision: nil, unloadVisionAfterFirstCanvas: false, clearCacheBetweenCanvases: true)
+            mixedPrecision: nil, unloadVisionAfterFirstCanvas: false, clearCacheBetweenCanvases: true),
+        modelDirectory: URL? = nil
     ) {
         self.model = model
         self.genConfig = genConfig
         self.memoryConfig = memoryConfig
+        self.modelDirectory = modelDirectory
         let vocab = model.config.textConfig.base.vocabSize
         let canvas = model.config.textConfig.canvasLength
         self.sampler = EntropyBoundSampler(
@@ -128,7 +132,8 @@ public actor DiffusionGemmaPipeline {
         }
         defer { Gemma4ComputeGate.shared.endInference() }
 
-        if let problem = validate(promptIds: promptIds, pixelValues: pixelValues) {
+        if let problem = validate(promptIds: promptIds, pixelValues: pixelValues)
+            ?? restoreVisionIfNeeded(pixelValues: pixelValues) {
             let empty = promptIds[0..., promptLen...]
             eval(empty)
             return DiffusionGenerationResult(
@@ -304,6 +309,23 @@ public actor DiffusionGemmaPipeline {
 
     /// Coherence prompt / images (D-09) : sans elle, maskedScatter remplit en boucle
     /// ou laisse des positions image vides, sans erreur.
+    /// `unloadVisionAfterFirstCanvas` decharge la vision pour de bon : sans ce
+    /// rechargement, l'image de l'appel suivant etait ignoree sans erreur (le forward
+    /// saute la vision) et le modele repondait a l'aveugle.
+    private func restoreVisionIfNeeded(pixelValues: MLXArray?) -> String? {
+        guard pixelValues != nil, model.encoder.visionUnloaded else { return nil }
+        guard let modelDirectory else {
+            return "vision dechargee par un appel precedent (unloadVisionAfterFirstCanvas) "
+                + "et dossier du modele inconnu : impossible de la recharger"
+        }
+        do {
+            try model.encoder.reloadVision(from: DiffusionGemmaLoader.loadVisionWeights(from: modelDirectory))
+            return nil
+        } catch {
+            return "rechargement de la vision impossible : \(error)"
+        }
+    }
+
     private func validate(promptIds: MLXArray, pixelValues: MLXArray?) -> String? {
         let imageTokens = (promptIds .== Int32(model.config.imageTokenId)).asType(.int32).sum().item(Int.self)
         guard let pixelValues else {

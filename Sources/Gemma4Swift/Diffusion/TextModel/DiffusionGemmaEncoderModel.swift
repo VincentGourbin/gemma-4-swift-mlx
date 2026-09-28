@@ -65,6 +65,21 @@ public class DiffusionGemmaEncoderModel: Module {
         MLX.Memory.clearCache()
     }
 
+    /// Recharge la vision apres `unloadVision()`, depuis les poids sanitises
+    /// `encoder.vision_tower.*` / `encoder.embed_vision.*`
+    /// (`DiffusionGemmaLoader.loadVisionWeights`). Sans elle, une image fournie apres
+    /// un dechargement serait ignoree : le forward saute la vision (`useVision`).
+    public func reloadVision(from weights: [String: MLXArray]) throws {
+        let prefix = "encoder."
+        let local = weights.compactMap { key, value -> (String, MLXArray)? in
+            key.hasPrefix(prefix) ? (String(key.dropFirst(prefix.count)), value) : nil
+        }
+        try update(parameters: ModuleParameters.unflattened(local), verify: [.noUnusedKeys])
+        if let visionTower { eval(visionTower) }
+        if let embedVision { eval(embedVision) }
+        visionUnloaded = false
+    }
+
     /// Vrai apres `unloadVision()` : la tour vision ne doit plus etre appelee.
     public private(set) var visionUnloaded = false
 

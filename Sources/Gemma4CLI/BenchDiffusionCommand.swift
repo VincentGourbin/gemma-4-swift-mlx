@@ -144,7 +144,12 @@ struct BenchDiffusion: AsyncParsableCommand {
         case .trainingInProgress: stop = "training_in_progress"
         case .invalidInput(let message): stop = "invalid_input: \(message)"
         }
+        // Debut de la reponse : detecte une generation qui ignore l'image (vision
+        // dechargee) ou qui deraille, sans relire les tokens a la main.
+        let generated = result.generatedIds.reshaped(-1).asArray(Int32.self).map(Int.init)
+        let text = container.tokenizer.decode(tokens: generated, skipSpecialTokens: true)
         return [
+            "output_head": String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(160)),
             "mode": "diffusion",
             "prompt_tokens": ids.count,
             "canvases": result.canvases,
