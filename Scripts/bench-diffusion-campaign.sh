@@ -30,7 +30,7 @@ echo "== poids"; [ -f "$DIR/config.json" ] || "$CLI" download diff-bf16 --models
 bench() { # profil charge label
   local extra=(); [ "$2" != d1 ] && extra=(--image "$IMG")
   "$CLI" bench-diffusion --model-path "$DIR" --reference "a4bdiff/$1" --workload "$2" \
-    "${extra[@]}" --cooldown "$COOLDOWN" --repeats "$REPEATS" --label "$3" --out "$OUT"
+    ${extra[@]+"${extra[@]}"} --cooldown "$COOLDOWN" --repeats "$REPEATS" --label "$3" --out "$OUT"
 }
 
 echo "== validation A/A"
