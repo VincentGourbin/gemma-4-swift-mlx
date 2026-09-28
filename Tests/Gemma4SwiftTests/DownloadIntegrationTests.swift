@@ -137,7 +137,25 @@ struct DownloadCoordinatorIntegrationTests {
 // MARK: - Gemma4DownloadManager unit tests
 
 @Suite("Gemma4DownloadManager", .serialized)
-struct DownloadManagerTests {
+final class DownloadManagerTests {
+
+    /// Dossier de modeles jetable : ces tests creaient leurs `test-org/…` dans le vrai
+    /// `~/Library/Caches/models` de la machine (150 dossiers vides trouves le 2026-09-28).
+    private let sandbox: URL
+    private let previousDirectory: URL?
+
+    init() throws {
+        previousDirectory = Gemma4ModelCache.customModelsDirectory
+        sandbox = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gemma4-download-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: sandbox, withIntermediateDirectories: true)
+        Gemma4ModelCache.customModelsDirectory = sandbox
+    }
+
+    deinit {
+        Gemma4ModelCache.customModelsDirectory = previousDirectory
+        try? FileManager.default.removeItem(at: sandbox)
+    }
 
     @Test("status returns .notDownloaded for unknown model with no cached files")
     @MainActor
