@@ -268,7 +268,15 @@ struct BenchContext {
             "os": ProcessInfo.processInfo.operatingSystemVersionString,
         ]
         if let weights = weightsGB(modelURL: modelURL) { fields["weights_gb"] = Bench.round(weights) }
-        if let sha = shell("git", "rev-parse", "--short", "HEAD") { fields["commit"] = sha }
+        // Revision du depot qui contient le binaire (et non du repertoire courant :
+        // comparer `main` a une branche melangeait les deux).
+        let binaryDir = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+            .deletingLastPathComponent().path
+        if let sha = shell("git", "-C", binaryDir, "rev-parse", "--short", "HEAD") {
+            let dirty = shell("git", "-C", binaryDir, "status", "--porcelain", "--untracked-files=no")
+                .map { !$0.isEmpty } ?? false
+            fields["commit"] = dirty ? sha + "+modifs" : sha
+        }
         for (key, value) in dependencyRevisions() { fields[key] = value }
         #if DEBUG
         fields["build"] = "debug"
