@@ -23,6 +23,12 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- `GEMMA4_MODELS_DIR` : racine des modèles déplaçable (ex. disque externe), comme
+  `QWEN38_MODELS_DIR` ; priorité `customModelsDirectory` → variable → `~/Library/Caches/models`,
+  modèles déjà présents dans l'emplacement par défaut toujours trouvés.
+  `Gemma4ModelCache.defaultModelsDirectory`, `environmentModelsDirectory`,
+  `isOnUnmountedVolume(_:)` ; `Gemma4DownloadError.volumeNotMounted` (nouveau cas) : un
+  téléchargement vers un disque externe non monté échoue au lieu d'écrire sur le disque interne.
 - `Gemma4ReferenceProfile` : profils de référence `<bits>bit-<fast|lean>` (5 familles × 4/8/16
   bits × fast/lean), avec poids recommandés, `kvBits`, tranche de préfill, limites mémoire MLX
   et vidage du cache après réponse. `Gemma4Pipeline.load(profile:)` et `apply(profile:)` ; sans

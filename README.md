@@ -42,6 +42,20 @@ xcodebuild -scheme gemma4-cli -configuration Release \
 
 > **Note:** Use `xcodebuild` (not `swift build`) — Metal shader support required by MLX.
 
+### Choose where models live
+
+```bash
+export GEMMA4_MODELS_DIR=/Volumes/YourSSD/models   # default: ~/Library/Caches/models
+```
+
+Order of precedence: `Gemma4ModelCache.customModelsDirectory` (set by an app), then
+`$GEMMA4_MODELS_DIR`, then `~/Library/Caches/models`. Models already present in the default
+location are still found. If the directory sits on an external volume that is not mounted,
+downloads fail with `Gemma4DownloadError.volumeNotMounted` instead of writing to a fake
+`/Volumes/…` folder on the internal disk. `gemma4-cli download --models-dir <dir>` overrides
+it for one command. Link weight **files**, never the model folder itself: the loader does not
+walk a model folder that is a symbolic link.
+
 ### Download a model
 
 ```bash

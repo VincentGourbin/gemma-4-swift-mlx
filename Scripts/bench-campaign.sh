@@ -24,7 +24,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-MODELS="${MODELS:-/Volumes/Lexar/models}"
+MODELS="${MODELS:-${GEMMA4_MODELS_DIR:-/Volumes/Lexar/models}}"
 FAMILIES="${FAMILIES:-e2b e4b 12b a4b 31b}"
 BITS="${BITS:-4bit 8bit bf16}"
 PROMPTS="${PROMPTS:-128,1024,4096}"

@@ -9,8 +9,11 @@ struct ModelCacheTests {
     func testDefaultDirectory() {
         // Reset custom directory
         Gemma4ModelCache.customModelsDirectory = nil
-        let dir = Gemma4ModelCache.modelsDirectory
-        #expect(dir.path.contains("Library/Caches/models"))
+        #expect(Gemma4ModelCache.defaultModelsDirectory.path.contains("Library/Caches/models"))
+        // Sans reglage par code : $GEMMA4_MODELS_DIR s'il est pose (transmis par
+        // Scripts/run-tests.sh), sinon l'emplacement par defaut.
+        let expected = Gemma4ModelCache.environmentModelsDirectory ?? Gemma4ModelCache.defaultModelsDirectory
+        #expect(Gemma4ModelCache.modelsDirectory == expected)
     }
 
     @Test("customModelsDirectory override")

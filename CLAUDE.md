@@ -94,6 +94,14 @@ SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the st
 from `.build/*/checkouts/mlx-swift-lm/.git/packed-refs` (or delete the checkout) and
 re-resolve.
 
+## Where models live
+
+`Gemma4ModelCache.modelsDirectory` = `customModelsDirectory` (apps) → `$GEMMA4_MODELS_DIR`
+(forwarded to tests by `Scripts/run-tests.sh`) → `~/Library/Caches/models`. The internal disk of
+the dev Mac is nearly full: put weights on the external SSD (`GEMMA4_MODELS_DIR=/Volumes/Lexar/models`).
+Downloads refuse an unmounted `/Volumes/<name>`. Tests must never write to the real models
+directory (the download-manager suite uses a temporary one).
+
 ## Architecture
 
 Swift 6.0 / macOS 15+ / Apple Silicon only. Two products: `Gemma4Swift` library and `gemma4-cli` executable.

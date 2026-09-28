@@ -9,13 +9,38 @@ public enum Gemma4ModelCache {
     /// Chemin personnalise pour le stockage des modeles (overridable)
     nonisolated(unsafe) public static var customModelsDirectory: URL?
 
-    /// Repertoire de stockage des modeles
+    /// Repertoire de stockage des modeles, par ordre de priorite :
+    /// 1. `customModelsDirectory` (reglage par code, ex. une app) ;
+    /// 2. `$GEMMA4_MODELS_DIR` (ex. `/Volumes/MonSSD/models`, comme `QWEN38_MODELS_DIR`) ;
+    /// 3. `~/Library/Caches/models`.
     public static var modelsDirectory: URL {
         if let custom = customModelsDirectory {
             return custom
         }
+        return environmentModelsDirectory ?? defaultModelsDirectory
+    }
+
+    /// `~/Library/Caches/models`.
+    public static var defaultModelsDirectory: URL {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         return cacheDir.appendingPathComponent("models", isDirectory: true)
+    }
+
+    /// `$GEMMA4_MODELS_DIR`, `~` developpe ; `nil` si absente ou vide.
+    public static var environmentModelsDirectory: URL? {
+        guard let value = ProcessInfo.processInfo.environment["GEMMA4_MODELS_DIR"], !value.isEmpty else {
+            return nil
+        }
+        return URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+    }
+
+    /// Vrai si `url` est sous `/Volumes/<nom>` et que ce volume n'est pas monte.
+    /// Ecrire la-dessous creerait un faux dossier `/Volumes/<nom>` sur le disque interne
+    /// et y deverserait les poids.
+    public static func isOnUnmountedVolume(_ url: URL) -> Bool {
+        let components = url.standardizedFileURL.pathComponents
+        guard components.count >= 3, components[1] == "Volumes" else { return false }
+        return !FileManager.default.fileExists(atPath: "/Volumes/" + components[2])
     }
 
     /// RAM systeme en Go
@@ -140,6 +165,14 @@ public enum Gemma4ModelCache {
         var customPath = modelsDirectory
         for part in parts { customPath = customPath.appendingPathComponent(String(part)) }
         paths.append(customPath)
+
+        // Racine deplacee (GEMMA4_MODELS_DIR ou customModelsDirectory) : les modeles
+        // deja presents dans l'emplacement par defaut restent trouves (lecture seule).
+        if modelsDirectory.standardizedFileURL != defaultModelsDirectory.standardizedFileURL {
+            var defaultPath = defaultModelsDirectory
+            for part in parts { defaultPath = defaultPath.appendingPathComponent(String(part)) }
+            paths.append(defaultPath)
+        }
 
         // Cache HuggingFace par defaut: ~/.cache/huggingface/hub/models--{org}--{model}/snapshots/*
         // homeDirectoryForCurrentUser n'est pas dispo sur iOS — utiliser NSHomeDirectory()

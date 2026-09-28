@@ -85,3 +85,32 @@ struct ModelCompletenessTests {
         #expect(!Gemma4ModelCache.hasModelFiles(at: dir))
     }
 }
+
+/// Racine des modeles deplacable (GEMMA4_MODELS_DIR, comme QWEN38_MODELS_DIR) et
+/// garde-fou contre un disque externe non monte.
+@Suite("Racine des modeles")
+struct ModelsDirectoryTests {
+
+    @Test("volume non monte detecte, disque interne et volume monte acceptes")
+    func testUnmountedVolume() {
+        #expect(Gemma4ModelCache.isOnUnmountedVolume(
+            URL(fileURLWithPath: "/Volumes/gemma4-absent-\(UUID().uuidString)/models/org/model")))
+        #expect(!Gemma4ModelCache.isOnUnmountedVolume(FileManager.default.temporaryDirectory))
+        #expect(!Gemma4ModelCache.isOnUnmountedVolume(URL(fileURLWithPath: "/Volumes")))
+    }
+
+    @Test("un telechargement vers un volume absent echoue sans rien creer")
+    func testDownloadRefusesUnmountedVolume() async throws {
+        let root = URL(fileURLWithPath: "/Volumes/gemma4-absent-\(UUID().uuidString)/models")
+        let previous = Gemma4ModelCache.customModelsDirectory
+        Gemma4ModelCache.customModelsDirectory = root
+        defer { Gemma4ModelCache.customModelsDirectory = previous }
+        await #expect {
+            try await Gemma4ModelDownloader.download(modelId: "org/model")
+        } throws: { error in
+            if case Gemma4DownloadError.volumeNotMounted = error { return true }
+            return false
+        }
+        #expect(!FileManager.default.fileExists(atPath: root.deletingLastPathComponent().path))
+    }
+}

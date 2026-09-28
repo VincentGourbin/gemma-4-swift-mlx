@@ -9,7 +9,7 @@
 #   python3 ~/.claude/skills/mac-awake/scripts/awake.py run -- Scripts/bench-diffusion-campaign.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-MODELS="${MODELS:-/Volumes/Lexar/models}"
+MODELS="${MODELS:-${GEMMA4_MODELS_DIR:-/Volumes/Lexar/models}}"
 COOLDOWN="${COOLDOWN:-120}"; REPEATS="${REPEATS:-2}"
 PROFILES="${PROFILES:-16bit-fast 16bit-lean 8bit-fast 8bit-lean 4bit-fast 4bit-lean}"
 WORKLOADS="${WORKLOADS:-d1 d2 d3}"
