@@ -245,3 +245,8 @@ puis d2/d3 (`--image`). Ordre (audit-diffusion §E.2) : K-D10 base bf16 D1/D2/D3
 - Quantification couche par couche : pic de chargement 77 → 51 Go (8 bits), 68,7 → 51 Go (4 bits mixte), = bf16 seul (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`).
 - Reste : poids pré-quantifiés (K-D12) pour passer sous 51 Go au chargement ; vérifier `lean` + image (soupçon de vision déchargée trop tôt) ; refaire `4bit-fast` d2 ; ScreenSpot/BFCL.
 - Leçon d'outillage : sous zsh, `$extra` non découpé → `--quant-variant X` passé en un seul argument, 4 passes « échec » silencieuses (stderr jeté). Toujours garder stderr d'une campagne.
+
+### 2026-09-28 nuit — vision rechargée, qualité ScreenSpot
+- Bug : `unloadVisionAfterFirstCanvas` (défaut de `DiffusionMemoryConfig`, profils lean) déchargeait la vision pour de bon ; toute image suivante était ignorée sans erreur. Rechargement à la demande depuis `modelDirectory`, `invalidInput` sinon (`9ffc8871`). Vérifié : `8bit-lean` d2 = 10 passes, même réponse que `fast`.
+- `gemma4-cli eval-screenspot` + `Scripts/quality/screenspot-sample.py` (`5c50f47e`) : bf16 80, 8 bits 78, 4 bits mixte 76, 4 bits uniforme 77 (sur 100). Porte qualité 8 bits tenue ; 4 bits −4 pts, dans le bruit d'un échantillon de 100.
+- Reste diffusion : K-D12 (poids pré-quantifiés, pour passer sous 51 Go au chargement), 4 bits sous 18 Go (preset `aggressive` à mesurer), échantillon ScreenSpot plus large pour trancher le 4 bits.

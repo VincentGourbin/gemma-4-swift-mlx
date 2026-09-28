@@ -131,15 +131,24 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
   | `4bit-sensitive8` (embeddings/tête + self_conditioning en 8 bits) | 44 | 486-523 ms | 11,2-11,7 tok/s | 15 668 Mo | 17 761 Mo |
   | **`4bit-mixed`** (couches 0-3 et 26-29 en 8 bits, sensibles en 8 bits) | **14,5** | **452-454 ms** | **38,5 tok/s** | 18 779 Mo | 20 871 Mo |
 
-  `4bit-mixed` revient au nombre de passes du bf16 et le dépasse en débit ; il manque la porte « pic ≤ 18 Go » d'environ 3 Go. Qualité (ScreenSpot/BFCL) non mesurée.
+  `4bit-mixed` revient au nombre de passes du bf16 et le dépasse en débit ; il manque la porte « pic ≤ 18 Go » d'environ 3 Go. Qualité : voir ScreenSpot plus bas.
 - **Pic de chargement corrigé** : la quantification se fait maintenant couche par couche (chaque couche de l'encodeur quantifiée, évaluée, reprise aussitôt par le décodeur). Pic mesuré (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`) : 8 bits 77,2 → 51,0 Go, 4 bits mixte 68,7 → 51,0 Go, soit le bf16 seul ; mémoire en régime et passes inchangées.
 - **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
-- ⚠ **`lean` + image (d2)** : 4 à 7 passes contre 10 à 17 en `fast`, alors que la seule différence (décharger la vision après le 1er canvas) ne devrait rien changer avec un seul canvas. Soupçon : vision déchargée trop tôt, génération sans l'image. À vérifier sur le texte généré avant de publier ces lignes.
+- ❌ **`lean` + image (d2), lignes ci-dessus invalides** : l'échauffement déchargeait la vision et la passe mesurée ignorait l'image, sans erreur (bug de bibliothèque, pas seulement du bench : tout appel avec image après un déchargement). Corrigé (`9ffc8871`, rechargement à la demande) ; remesuré (`benchmarks/diffusion-vision-reload-20260928.jsonl`) : `8bit-lean` d2 10 passes, même réponse que `8bit-fast`, 25,6 Go actifs contre 26,7.
 - ⚠ `4bit-fast` d2 : les deux passes sont perturbées (un `ollama` actif pendant la mesure) ; à refaire.
-- Qualité (ScreenSpot-100, BFCL-100) non mesurée.
+- **Qualité — ScreenSpot-100** (`gemma4-cli eval-screenspot`, les 100 cas du bench de référence reconstruits par `Scripts/quality/screenspot-sample.py` ; `benchmarks/screenspot-diffusion-20260928.jsonl`). Le bf16 retrouve 80/100 (79 dans la mesure d'origine) :
+
+  | Config | Score | vs bf16 (perdus / gagnés) | Réponses identiques au bf16 | s/cas |
+  |---|---|---|---|---|
+  | bf16 (`16bit-fast`) | **80** | — | 100 | 6,9 |
+  | 8 bits (`8bit-fast`) | 78 | −4 / +2 | 67 | 5,6 |
+  | 4 bits mixte (`4bit-fast`) | 76 | −7 / +3 | 33 | 6,6 |
+  | 4 bits uniforme (`--quant-variant 4bit-uniform`) | 77 | −6 / +3 | 35 | 8,8 |
+
+  8 bits tient la porte (≤ 2 pts). Les 4 bits perdent 3-4 pts : au bord de l'écart-type d'un échantillon de 100 (~4 pts), donc ni tenue ni rejet nets de la porte ; le mixte n'est pas moins bon que l'uniforme et il est 25 % plus rapide par cas. BFCL non relancé : saturé à 95 % pour tous les modèles, il ne départage pas.
 
 **Choisir, en l'état** : `a4bdiff/16bit-*` pour la qualité de référence ; `a4bdiff/8bit-*`
 (~27 Go en régime) ; `a4bdiff/4bit-*` (désormais quantification mixte, ~21 Go, 38,5 tok/s en texte ;
-`bench-diffusion --quant-variant 4bit-uniform` pour l'ancien 4 bits), qualité à confirmer. Tous passent par ~51 Go au chargement
+`bench-diffusion --quant-variant 4bit-uniform` pour l'ancien 4 bits) ; ScreenSpot bf16 80, 8 bits 78, 4 bits 76. Tous passent par ~51 Go au chargement
 (quantification à la volée depuis le bf16) : sous 64 Go de RAM, il faut des poids pré-quantifiés.
 
