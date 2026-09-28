@@ -96,4 +96,40 @@ struct DiffusionPipelineTests {
             #expect(result.totalDecoderSteps == 0)
         }
     }
+
+    @Test("jetons image sans image, ou en nombre faux : refus explicite (D-09)")
+    func testInvalidImageInputs() async throws {
+        try await Device.withDefaultDevice(.cpu) {
+            let pipeline = try TinyDiffusion.pipeline()
+            // 60 = image_token_id du modele minuscule, 4 jetons par image.
+            func withTokens() -> MLXArray { MLXArray([Int32(2), 60, 60, 60, 60, 9]).reshaped(1, 6) }
+            let noImage = await pipeline.generate(promptIds: withTokens(), maxBlocks: 1)
+            guard case .invalidInput = noImage.stopReason else {
+                Issue.record("attendu invalidInput, obtenu \(noImage.stopReason)"); return
+            }
+            #expect(noImage.totalDecoderSteps == 0)
+
+            let twoImages = MLXArray.zeros([2, 3, 32, 32])
+            let mismatch = await pipeline.generate(promptIds: withTokens(), pixelValues: twoImages, maxBlocks: 1)
+            guard case .invalidInput(let message) = mismatch.stopReason else {
+                Issue.record("attendu invalidInput, obtenu \(mismatch.stopReason)"); return
+            }
+            #expect(message.contains("8 attendus"), "\(message)")
+        }
+    }
+}
+
+/// maskedScatter generique, desormais utilise par l'encodeur de diffusion : deux
+/// blocs image separes sont remplis dans l'ordre.
+@Suite("maskedScatter multi-images")
+struct MaskedScatterMultiImageTests {
+    @Test("deux images dans un prompt : chaque bloc recoit sa source, le reste est intact")
+    func testTwoBlocks() {
+        // T = 7 : texte, img, img, texte, img, img, texte ; H = 1.
+        let input = MLXArray([Float(9), 9, 9, 9, 9, 9, 9]).reshaped(1, 7, 1)
+        let mask = MLXArray([false, true, true, false, true, true, false]).reshaped(1, 7, 1)
+        let source = MLXArray([Float(1), 2, 3, 4]).reshaped(2, 2, 1)
+        let out = maskedScatter(input: input, mask: mask, source: source)
+        #expect(out.reshaped(-1).asArray(Float.self) == [9, 1, 2, 9, 3, 4, 9])
+    }
 }

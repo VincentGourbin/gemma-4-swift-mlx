@@ -50,6 +50,9 @@ public enum DiffusionStopReason: Sendable, Equatable {
     /// Refus de `Gemma4ComputeGate` : un entrainement tourne dans le processus
     /// (deadlock mlx-swift gradient x forward). Aucun pas execute.
     case trainingInProgress
+    /// Entree incoherente (ex. nombre de jetons image different de
+    /// `visionSoftTokensPerImage` x nombre d'images). Aucun pas execute.
+    case invalidInput(String)
 }
 
 /// Pipeline de generation DiffusionGemma block-AR.
@@ -116,6 +119,14 @@ public actor DiffusionGemmaPipeline {
                 stopReason: .trainingInProgress)
         }
         defer { Gemma4ComputeGate.shared.endInference() }
+
+        if let problem = validate(promptIds: promptIds, pixelValues: pixelValues) {
+            let empty = promptIds[0..., promptLen...]
+            eval(empty)
+            return DiffusionGenerationResult(
+                generatedIds: empty, fullIds: promptIds, totalDecoderSteps: 0, canvases: 0,
+                stopReason: .invalidInput(problem))
+        }
 
         var key = MLXRandom.key(seed)
         let batchSize = promptIds.dim(0)
@@ -276,6 +287,22 @@ public actor DiffusionGemmaPipeline {
     }
 
     // MARK: - Helpers
+
+    /// Coherence prompt / images (D-09) : sans elle, maskedScatter remplit en boucle
+    /// ou laisse des positions image vides, sans erreur.
+    private func validate(promptIds: MLXArray, pixelValues: MLXArray?) -> String? {
+        let imageTokens = (promptIds .== Int32(model.config.imageTokenId)).asType(.int32).sum().item(Int.self)
+        guard let pixelValues else {
+            return imageTokens == 0
+                ? nil : "\(imageTokens) jeton(s) image dans le prompt mais aucune image fournie"
+        }
+        let expected = pixelValues.dim(0) * model.config.visionSoftTokensPerImage
+        guard imageTokens == expected else {
+            return "\(imageTokens) jeton(s) image dans le prompt pour \(pixelValues.dim(0)) image(s) : "
+                + "\(expected) attendus (\(model.config.visionSoftTokensPerImage) par image)"
+        }
+        return nil
+    }
 
     /// Split d'une cle PRNG en (k_use, k_next). Met a jour la cle courante.
     private func splitKey(key: inout MLXArray) -> (MLXArray, MLXArray) {
