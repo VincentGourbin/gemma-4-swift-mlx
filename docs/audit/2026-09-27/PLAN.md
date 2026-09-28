@@ -213,3 +213,29 @@ Environnement de test : `~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf
 - Correction d'une lecture : le préfill du 12B et du 31B n'est pas anormal. 7 à 9 TFLOPS effectifs sur 12B, 26B-A4B et 31B, identique en 4 et 16 bits = borné par le calcul. T14 (déquantifier pour le préfill) écarté par la mesure.
 - À corriger : `a4b/*-lean` (tranche 256 = −12 à −22 % de préfill) → tranche 512, à vérifier en A/B.
 
+
+## Lot diffusion sans GPU — 2026-09-28 — fait (branche `fix/lot-a-stabilite`)
+Fiches de `audit-diffusion.md` §E.1, une fiche = un commit. Chaque garde-fou échoue sur l'ancien code (vérifié), suite complète verte avant chaque commit (267 tests). Tests diffusion sur CPU : le modèle minuscule plante sur GPU (`Compiled::eval_gpu`, tampon nul), ancien code compris ; non investigué.
+
+| Fiche | SHA | Porte observée | État |
+|---|---|---|---|
+| K-D1 arrêt stable (comparaison avant ajout) | `b80f4ea0` | ancien code : arrêt jamais déclenché au bon pas | faite |
+| K-D4 annulation, porte d'entraînement, eval avant sortie | `f6b30ffc` | ancien : 60 pas malgré l'annulation, 12 pas pendant un entraînement | faite |
+| K-D5 maskedScatter multi-images, validation des entrées | `b063435e` | ancien : B>1 faux, jetons image sans image non refusés | faite |
+| K-D7 entropie calculée une fois par pas | `df29a1e4` | équivalence exacte avec l'ancien chemin | faite |
+| K-D2 fenêtre glissante à l'encodeur, cache tronqué | `4a0b9ccd` | ancien : écart à la référence naïve, plantage masque explicite | faite |
+| K-D16 blocs image bidirectionnels (mode vision) | `fabe68ee` | ancien : sortie = causal pur | faite |
+| K-D3 une copie quantifiée des poids partagés (D-02) | `b326083a` | ancien : tampons distincts encodeur/décodeur | faite |
+| K-D6 DiffusionMemoryConfig câblé, unloadVision sans plantage | `569d68f5` | ancien : `unloadVision` fatal (mutation @ModuleInfo) | faite |
+| K-D9 profils `a4bdiff/{16,8,4}bit-{fast,lean}` | `d9a03081` | tests de profils | faite |
+| K-D8 `gemma4-cli bench-diffusion` | `b94a0e1e` | compile, arguments validés ; non exécuté sur le checkpoint | faite (profile-diffusion non rebranché) |
+| K-D10a chiffres non étayés retirés de la doc | `2442e369` | — | faite |
+
+### Constats de l'audit infirmés ou précisés
+- D-10 « unloadVision pourrait ne pas planter (À VÉRIFIER) » : il plantait bien ; `profile-diffusion` avec image aussi.
+- D-02 reste « MixedPrecisionConfig à étendre aux experts » : déjà couvert par le filtre de D-01 (`2d6dbab5`).
+
+### Reste avec le GPU (K-D10..K-D15)
+Télécharger `google/diffusiongemma-26B-A4B-it` sur le Lexar (vrai dossier), puis base A/A :
+`.build/xcode/Build/Products/Release/gemma4-cli bench-diffusion --model-path /Volumes/Lexar/models/google/diffusiongemma-26B-A4B-it --reference a4bdiff/16bit-fast --workload d1 --cooldown 120 --repeats 2 --label AA --out benchmarks/diffusion-20260928.jsonl`
+puis d2/d3 (`--image`). Ordre (audit-diffusion §E.2) : K-D10 base bf16 D1/D2/D3 avant/après K-D1/K-D2/K-D16 + ScreenSpot-100/BFCL-100 (≥ 77 %) → K-D12 export des packs 4/8 bits → K-D11 quantification corrigée en A/B/B/A (porte 4 bits : pic ≤ 18 Go, pas × forwards −15 %, ScreenSpot ≥ bf16 − 2 pts) → K-D13 leviers un par un → K-D14 matrice 6 profils × D1/D2/D3 → K-D15 balayage des paramètres de pas. Le « avant » de K-D10 demande un binaire construit au commit précédent `b80f4ea0^` (`bench-diffusion` n'y existe pas : le rétroporter dans un worktree ou comparer via `profile-diffusion`).
