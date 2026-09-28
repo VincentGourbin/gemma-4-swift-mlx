@@ -101,11 +101,28 @@ public class DiffusionGemmaEncoderTextModel: Module {
         } else {
             mask = .none
         }
-        let slidingMask = mask
+        // Couches glissantes : fenetre de `slidingWindow` positions (D-05). Leur cache
+        // ne garde que les `slidingWindow - 1` dernieres positions (comme le DynamicCache
+        // Python) : les cles vont de `positionOffset - priorSliding` a `T_total - 1`.
+        let layerTypes = config.resolvedLayerTypes
+        let window = config.slidingWindow
+        let priorSliding = priorCache.flatMap { cache in
+            layerTypes.indices.first { layerTypes[$0] != "full_attention" && cache.entries[$0] != nil }
+                .map { cache.entries[$0]!.keys.dim(2) }
+        } ?? 0
+        let slidingMask: MLXFast.ScaledDotProductAttentionMaskMode
+        if useBidirectionalAttention == "all" || T_total <= 1 {
+            slidingMask = mask
+        } else {
+            let queryPositions = (MLXArray(Int32(positionOffset)) + MLXArray(0 ..< Int32(T_new)))[0..., .newAxis]
+            let keyPositions = (MLXArray(Int32(positionOffset - priorSliding))
+                + MLXArray(0 ..< Int32(priorSliding + T_new)))[.newAxis, 0...]
+            slidingMask = .array((keyPositions .<= queryPositions)
+                .&& ((queryPositions - keyPositions) .< MLXArray(Int32(window))))
+        }
 
         // Cache initial : copie du priorCache si fourni, sinon vide.
         var cache = priorCache ?? EncoderKVCache(numLayers: layers.count)
-        let layerTypes = config.resolvedLayerTypes
 
         for (i, layer) in layers.enumerated() {
             let isGlobal = layerTypes[i] == "full_attention"
@@ -122,14 +139,22 @@ public class DiffusionGemmaEncoderTextModel: Module {
             hiddenStates = output
 
             // Cache : si priorKV present, append. Sinon, set direct.
+            var mergedKeys = newKeys
+            var mergedValues = newValues
             if let prior = priorKV {
-                let mergedKeys = concatenated([prior.keys, newKeys], axis: 2)
-                let mergedValues = concatenated([prior.values, newValues], axis: 2)
-                cache.set(layerIdx: i, keys: mergedKeys, values: mergedValues)
-            } else {
-                cache.set(layerIdx: i, keys: newKeys, values: newValues)
+                mergedKeys = concatenated([prior.keys, newKeys], axis: 2)
+                mergedValues = concatenated([prior.values, newValues], axis: 2)
             }
+            // Couche glissante : ne garder que les `window - 1` dernieres positions.
+            let keep = window - 1
+            if !isGlobal && mergedKeys.dim(2) > keep {
+                let start = mergedKeys.dim(2) - keep
+                mergedKeys = mergedKeys[0..., 0..., start...]
+                mergedValues = mergedValues[0..., 0..., start...]
+            }
+            cache.set(layerIdx: i, keys: mergedKeys, values: mergedValues)
         }
+        cache.offset = T_total
 
         let normed = norm(hiddenStates)
         return DiffusionEncoderOutput(lastHiddenState: normed, kvCache: cache)

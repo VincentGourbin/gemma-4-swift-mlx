@@ -34,13 +34,20 @@ public struct EncoderKVCache: @unchecked Sendable {
         }
     }
 
+    /// Nombre total de positions deja encodees (offset RoPE du jeton suivant). Les
+    /// entrees des couches glissantes ne gardent que les `sliding_window - 1` dernieres :
+    /// leur longueur n'est plus la position courante (D-05).
+    public var offset: Int = 0
+
     public init(numLayers: Int) {
         self.entries = Array(repeating: nil, count: numLayers)
     }
 
-    /// Longueur de cache effective (lue par le decoder pour calculer position_ids).
-    /// Convention : on prend la longueur depuis la premiere couche remplie.
+    /// Positions encodees au total (lue par le decoder pour position_ids et par le
+    /// pipeline pour le prochain delta). `offset` quand l'encodeur l'a pose ; sinon,
+    /// pour un cache construit a la main, la longueur de la premiere couche remplie.
     public var seqLength: Int {
+        if offset > 0 { return offset }
         for entry in entries {
             if let entry = entry {
                 return entry.keys.dim(2)
