@@ -142,7 +142,7 @@ public enum DiffusionOnTheFlyQuantization {
     //   - self_conditioning en 8-bit (modulation soft signals)
     //   - vision_tower en bf16 (skip, sensible et petit)
 
-    public struct MixedPrecisionConfig: Sendable {
+    public struct MixedPrecisionConfig: Sendable, Equatable {
         public var highPrecisionLayers: Set<Int>
         public var highPrecisionBits: Int
         public var lowPrecisionBits: Int

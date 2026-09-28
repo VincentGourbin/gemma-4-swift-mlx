@@ -28,6 +28,9 @@ struct BenchDiffusion: AsyncParsableCommand {
     @Option(name: .long, help: "Profil de reference (a4bdiff/16bit-fast, a4bdiff/4bit-lean, …)")
     var reference: String = "a4bdiff/16bit-fast"
 
+    @Option(name: .long, help: "Variante de quantification a la place de celle du profil : 4bit-sensitive8 (couches 4 bits, embeddings/tete et self_conditioning 8 bits), 4bit-mixed (preset par defaut : couches 0-3 et 26-29 en 8 bits + sensibles en 8 bits)")
+    var quantVariant: String?
+
     @Option(name: .long, help: "Charge : d1 (texte), d2 (image), d3 (contexte long)")
     var workload: Workload = .d1
 
@@ -53,8 +56,17 @@ struct BenchDiffusion: AsyncParsableCommand {
     var noWarmup = false
 
     func run() async throws {
-        guard let profile = DiffusionReferenceProfile.named(reference) else {
+        guard var profile = DiffusionReferenceProfile.named(reference) else {
             throw ValidationError("profil inconnu : \(reference) (voir `gemma4-cli references --family a4bdiff`)")
+        }
+        switch quantVariant {
+        case nil: break
+        case "4bit-sensitive8":
+            profile = profile.withQuantization(.mixed(.init(highPrecisionLayers: [], quantizeSensitiveAtHighPrecision: true)))
+        case "4bit-mixed":
+            profile = profile.withQuantization(.mixed(.default))
+        case let other?:
+            throw ValidationError("variante inconnue : \(other)")
         }
         if workload != .d1 && image == nil {
             throw ValidationError("--image requis pour \(workload.rawValue)")
@@ -68,6 +80,7 @@ struct BenchDiffusion: AsyncParsableCommand {
 
         var context = BenchContext.collect(modelURL: url, loadSeconds: loadSeconds)
         context.fields["profile"] = profile.qualifiedID
+        if let quantVariant { context.fields["quant_variant"] = quantVariant }
         context.fields["profile_weights_match"] =
             url.lastPathComponent == DiffusionReferenceProfile.checkpointID.split(separator: "/").last.map(String.init)
         context.fields["workload"] = workload.rawValue

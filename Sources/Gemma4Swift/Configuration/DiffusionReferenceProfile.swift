@@ -25,6 +25,8 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
         case none
         /// Tout le modele texte (experts compris, routeur en 8 bits), vision en bf16.
         case uniform(bits: Int, groupSize: Int)
+        /// Precision mixte par couche (`applyMixedPrecision`), vision en bf16.
+        case mixed(DiffusionOnTheFlyQuantization.MixedPrecisionConfig)
     }
 
     /// Checkpoint source (bf16 officiel, ~50 Go).
@@ -62,6 +64,16 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
     public func applyGlobalPolicy() {
         if let cacheLimitMB { Memory.cacheLimit = cacheLimitMB * 1_048_576 }
         if let memoryLimitMB { Memory.memoryLimit = memoryLimitMB * 1_048_576 }
+    }
+
+    /// Meme profil avec une autre quantification (mesure de variantes).
+    public func withQuantization(_ quantization: Quantization) -> DiffusionReferenceProfile {
+        DiffusionReferenceProfile(
+            bits: bits, kind: kind, quantization: quantization, includeVision: includeVision,
+            unloadVisionAfterFirstCanvas: unloadVisionAfterFirstCanvas,
+            clearCacheBetweenCanvases: clearCacheBetweenCanvases,
+            cacheLimitMB: cacheLimitMB, memoryLimitMB: memoryLimitMB,
+            estimatedWeightsGB: estimatedWeightsGB, summary: summary)
     }
 
     /// Meme profil sans tour vision.

@@ -49,6 +49,7 @@ struct References: ParsableCommand {
                 switch profile.quantization {
                 case .none: quant = "bf16"
                 case .uniform(let bits, let groupSize): quant = "\(bits) bits g\(groupSize) (routeur 8 bits)"
+                case .mixed(let c): quant = "mixte \(c.lowPrecisionBits)/\(c.highPrecisionBits) bits (\(c.highPrecisionLayers.count) couches en \(c.highPrecisionBits))"
                 }
                 let cache = profile.cacheLimitMB.map { "\($0) Mo" } ?? "MLX"
                 let limit = profile.memoryLimitMB.map { "\($0) Mo" } ?? "-"

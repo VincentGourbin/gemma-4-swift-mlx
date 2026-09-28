@@ -137,6 +137,8 @@ public enum DiffusionGemmaRegistration {
             DiffusionOnTheFlyQuantization.apply(
                 to: container.model, bits: bits, groupSize: groupSize,
                 excludedPathPrefixes: DiffusionOnTheFlyQuantization.multimodalEncoderPrefixes)
+        case .mixed(let config):
+            DiffusionOnTheFlyQuantization.applyMixedPrecision(to: container.model, config: config)
         }
         profile.applyGlobalPolicy()
         return container
