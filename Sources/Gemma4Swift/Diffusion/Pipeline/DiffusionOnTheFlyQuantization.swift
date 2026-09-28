@@ -87,7 +87,7 @@ public enum DiffusionOnTheFlyQuantization {
                 // routeur en 8 bits sous 8 bits comme les packs mlx-community (D-03).
                 guard m is Quantizable, !(m is Quantized) else { return nil }
                 if path.hasSuffix("router.proj") && bits < 8 {
-                    return (groupSize: 64, bits: 8, mode: .affine)
+                    return (groupSize: effectiveGroupSize, bits: 8, mode: .affine)
                 }
                 return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
             },
@@ -103,6 +103,9 @@ public enum DiffusionOnTheFlyQuantization {
                 + "\n"
             FileHandle.standardError.write(Data(msg.utf8))
         }
+
+        // Encodeur et decodeur partagent leurs poids : une seule copie quantifiee (D-02).
+        if let diffusion = model as? DiffusionGemmaForBlockDiffusion { retieEncoderDecoder(diffusion) }
 
         // Materialise les nouveaux poids quantifies
         eval(model)
@@ -220,7 +223,7 @@ public enum DiffusionOnTheFlyQuantization {
                     // Experts MoE compris (D-01) ; routeur en 8 bits (D-03).
                     guard m is Quantizable, !(m is Quantized) else { return nil }
                     if path.hasSuffix("router.proj") && bits < 8 {
-                        return (groupSize: 64, bits: 8, mode: .affine)
+                        return (groupSize: config.groupSize, bits: 8, mode: .affine)
                     }
                     return (groupSize: config.groupSize, bits: bits, mode: .affine)
                 },
@@ -258,11 +261,39 @@ public enum DiffusionOnTheFlyQuantization {
 
         // 4) vision_tower / embed_vision restent en bf16 (volontaire).
 
+        // Encodeur et decodeur partagent leurs poids : une seule copie quantifiee (D-02).
+        retieEncoderDecoder(model)
+
         // Materialise les nouveaux poids + clear cache pour liberer bf16
         eval(model)
         MLX.Memory.clearCache()
 
         return stats
+    }
+
+    /// Re-lie les poids partages encodeur / decodeur apres quantification.
+    ///
+    /// Le sanitizer insere le meme tableau sous `decoder.X` et `encoder.language_model.X`
+    /// (tout sauf `self_conditioning` et `layer_scalar`) : une seule copie en bf16. Mais
+    /// quantifier chaque voie produit un nouveau triplet (poids packes, echelles, biais)
+    /// par voie, donc deux copies. A appeler avant tout `eval` (la quantification est
+    /// paresseuse) : le decodeur reprend les tableaux de l'encodeur et la seconde copie
+    /// n'est jamais calculee. Seules les cles de meme forme et dtype sont reprises.
+    @discardableResult
+    static func retieEncoderDecoder(_ model: DiffusionGemmaForBlockDiffusion) -> Int {
+        let encoder = Dictionary(
+            model.encoder.languageModel.parameters().flattened(), uniquingKeysWith: { a, _ in a })
+        var shared: [(String, MLXArray)] = []
+        for (key, value) in model.decoder.parameters().flattened() {
+            guard !key.hasPrefix("self_conditioning."), !key.hasSuffix("layer_scalar"),
+                  let source = encoder[key], source.shape == value.shape, source.dtype == value.dtype
+            else { continue }
+            shared.append((key, source))
+        }
+        if !shared.isEmpty {
+            model.decoder.update(parameters: ModuleParameters.unflattened(shared))
+        }
+        return shared.count
     }
 }
 
