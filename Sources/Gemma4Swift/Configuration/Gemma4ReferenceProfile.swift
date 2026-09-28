@@ -168,7 +168,9 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
         return Gemma4ReferenceProfile(
             family: family, bits: bits, kind: kind, model: model,
             kvBits: lean && multiKVHeads ? 8 : nil,
-            prefillStepSize: lean ? 256 : 512,
+            // Tranche 256 en lean, sauf 26B-A4B : sur ce MoE elle coute 12 a 22 % de
+            // prefill pour 1 a 5 % de memoire (campagne du 2026-09-27).
+            prefillStepSize: lean && family != .a4b ? 256 : 512,
             cacheLimitMB: macCaches ? 4096 : min(1024, max(256, available / 6)),
             memoryLimitMB: macCaches ? nil : max(4096, available - 2048),
             clearCacheAfterAnswer: lean,

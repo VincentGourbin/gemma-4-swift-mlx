@@ -48,7 +48,7 @@ Machine Mac15,10 (96 Go), Version 27.0 (Build 26A428), build release, commit e5a
 
 **Lecture** (une variable = le profil ; chiffres au repos, validation A/A de l'instrument : 2,9 % au pire) :
 - `lean` coûte ≤ 2 % de préfill et rien en décodage sur E2B, E4B, 12B et 31B, pour 3 à 12 % de mémoire en moins (pic MLX, empreinte).
-- **`a4b/*-lean` est mal réglé** : préfill 4k −12 % (4 bits) à −22 % (bf16) pour 1 à 5 % de mémoire en moins. La tranche de 256 pénalise ce MoE : à revoir (tranche 512).
+- `a4b/*-lean` mesuré avec une tranche de 256 dans la table ci-dessus (préfill −12 à −22 %). **Corrigé** : tranche 512 depuis le 2026-09-28 (A/B : +13 % de préfill, empreinte inchangée, voir BENCHMARKS.md).
 - **Préfill du 12B (~360 tok/s) et du 31B (~130 tok/s) quasi indépendant des bits** : le calcul n'est pas borné par les poids. Suspects : attention pleine à `head_dim` 512 sans noyau fusionné (P-12) ; le 12B (Unified) n'a pas le préfill par tranches (K-13). Prochain levier.
 - Décodage borné par la bande passante des poids : ×1,6 à ×2,7 entre 16 et 4 bits selon la famille.
 - `weights_bw_gbps` n'est qu'un indicateur (surestimé sur E2B/E4B, tables d'embeddings par couche).
@@ -68,7 +68,7 @@ Poids et rôle par famille :
 | Réglage | `fast` | `lean` | Effet |
 |---|---|---|---|
 | `kvBits` | bf16 | 8 bits pour 26B-A4B et 31B | KV quantifié par mlx-swift-lm pendant la génération. Non appliqué sur les chemins avec interdiction de n-grammes. |
-| `prefillStepSize` | 512 | 256 | Taille des tranches de préfill ; le head ne calcule que le dernier jeton. |
+| `prefillStepSize` | 512 | 256 (512 pour 26B-A4B) | Taille des tranches de préfill ; le head ne calcule que le dernier jeton. |
 | `cacheLimitMB` | 4 096 | min(1 024, max(256, dispo/6)) | Cache de buffers MLX. Sans limite, la mémoire du process peut exploser (Qwen38 : 74 Go). |
 | `memoryLimitMB` | — | max(4 096, dispo − 2 048) | Seuil de libération du cache MLX, pas un plafond dur. |
 | `clearCacheAfterAnswer` | non | oui | `Memory.clearCache()` à la fin de chaque réponse. |

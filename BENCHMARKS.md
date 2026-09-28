@@ -490,3 +490,15 @@ E2B 4 bits, cooldown 120 s, ordre A B B A (A = `main` c9543739 + commande `bench
 
 **Portes** : K-13 — préfill ≥ +5 % ✅ (×3,9), décodage inchangé ✅, pic à 4k ≤ 50 % de la base ❌ de peu (58 %). K-3 — décodage image ≥ +5 % ✅ (+23 %), gain cumulé de K-3 (fp32), K-6 (vision bf16) et K-13 (préfill par tranches) : cette comparaison ne les sépare pas.
 
+## `a4b/4bit-lean` : tranche de préfill 256 contre 512 — A/B/B/A — 2026-09-28
+
+Lignes brutes : [`benchmarks/a4b-lean-20260928.jsonl`](benchmarks/a4b-lean-20260928.jsonl) (ordre 256, 512, 512, 256, puis `fast`).
+
+| Variante | Préfill 1k / 4k (tok/s) | Décodage médian 4k | Pic MLX 4k | Empreinte 4k |
+|---|---|---|---|---|
+| lean, tranche 256 | 858-862 / 849-852 | 73,0-73,3 | 14 237 Mo | 15 135 Mo |
+| lean, tranche 512 | 968-970 / 963-964 | 73,2-73,3 | 14 439 Mo | 15 116-15 118 Mo |
+| fast | 985 / 966 | 74,5 | 14 439 Mo | 15 976 Mo |
+
+**Décision** : `a4b/*-lean` passe à une tranche de 512 (+13 % de préfill, empreinte inchangée) ; l'économie de mémoire du profil lean (−5,4 % contre fast) vient des limites de cache, pas de la tranche.
+

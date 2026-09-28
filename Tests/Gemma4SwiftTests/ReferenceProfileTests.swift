@@ -46,7 +46,7 @@ struct ReferenceProfileTests {
                 #expect((profile.cacheLimitMB ?? 0) <= 1024, "\(profile.qualifiedID)")
             }
             #expect(profile.clearCacheAfterAnswer)
-            #expect(profile.prefillStepSize == 256)
+            #expect(profile.prefillStepSize == (profile.family == .a4b ? 512 : 256), "\(profile.qualifiedID)")
         }
     }
 
@@ -55,7 +55,7 @@ struct ReferenceProfileTests {
         let profile = try #require(Gemma4ReferenceProfile.named("a4b/4bit-lean"))
         var params = GenerateParameters(maxTokens: 10)
         profile.apply(to: &params)
-        #expect(params.prefillStepSize == 256)
+        #expect(params.prefillStepSize == 512)
         #expect(params.kvBits == 8)
     }
 
