@@ -92,3 +92,43 @@ poids tiennent sous la moitié de la mémoire disponible, sinon le `lean` le plu
 3. Contrôler la qualité à graine égale contre `16bit-fast`.
 4. Ajouter les lignes à `BENCHMARKS.md` et la décision à
    `docs/knowledge/decisions/reference-profiles.md`.
+
+## DiffusionGemma (`a4bdiff/*`)
+
+Six profils (`gemma4-cli references --family a4bdiff`), quantification à la volée depuis le bf16
+officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
+
+| Profil | Charge | Pas médian (ms) | Passes / canvas | Débit (tok/s) | Mémoire active (Mo) | Empreinte (Mo) |
+|---|---|---|---|---|---|---|
+| `a4bdiff/16bit-fast` | d1 | 502 | 15.0 | 32.7 | 49255 | 51288 |
+| `a4bdiff/16bit-fast` | d2 | 488 | 13.0 | 35.4 | 49263 | 52617 |
+| `a4bdiff/16bit-fast` | d3 | 534 | 12.0 | 33.3 | 49263 | 52989 |
+| `a4bdiff/16bit-lean` | d1 | 504 | 15.0 | 32.5 | 49255 | 51266 |
+| `a4bdiff/16bit-lean` | d2 ⚠ à vérifier | 483 | 5.0 | 85.6 | 48169 | 50115 |
+| `a4bdiff/16bit-lean` | d3 | 538 | 16.0 | 27.4 | 48169 | 50245 |
+| `a4bdiff/8bit-fast` | d1 | 521 | 16.5 | 29.6 | 26682 | 28696 |
+| `a4bdiff/8bit-fast` | d2 | 521 | 10.0 | 43.3 | 26689 | 30015 |
+| `a4bdiff/8bit-fast` | d3 | 543 | 11.0 | 36.1 | 26689 | 30396 |
+| `a4bdiff/8bit-lean` | d1 | 528 | 16.5 | 29.1 | 26682 | 28561 |
+| `a4bdiff/8bit-lean` | d2 ⚠ à vérifier | 524 | 4.0 | 110.1 | 25596 | 27327 |
+| `a4bdiff/8bit-lean` | d3 | 552 | 12.0 | 35.3 | 25596 | 27602 |
+| `a4bdiff/4bit-fast` | d1 | 548 | 43.5 | 10.6 | 14647 | 16726 |
+| `a4bdiff/4bit-fast` | d2 ⚠ perturbé (ollama) | 2017 | 17.0 | 7.5 | 14655 | 18117 |
+| `a4bdiff/4bit-fast` | d3 | 534 | 22.0 | 19.8 | 14655 | 18431 |
+| `a4bdiff/4bit-lean` | d1 | 530 | 43.5 | 10.9 | 14648 | 16563 |
+| `a4bdiff/4bit-lean` | d2 ⚠ à vérifier | 502 | 7.0 | 68.6 | 13561 | 15508 |
+| `a4bdiff/4bit-lean` | d3 | 521 | 24.0 | 19.5 | 13561 | 15499 |
+
+**Lecture** (M3 Max 96 Go, Release, cooldown 120 s, 2 passes ; A/A de l'instrument 0,0 à 0,7 %) :
+- **Mémoire** (après les correctifs `2d6dbab5` experts MoE + `bf93a1ce` partage des modules) : bf16 49,3 Go actifs, 8 bits 26,7 Go (÷1,85), 4 bits 14,6 Go (÷3,4). Avant `bf93a1ce`, la quantification faisait monter la mémoire (8 bits 74,8 Go).
+- **Pas de débruitage** quasi constant (≈ 500-550 ms) quelle que soit la précision : 256 jetons par pas, calcul dominant.
+- **4 bits uniforme** : 2,9× plus de passes en texte (43,5 contre 15), débit 10,6 tok/s contre 32,7. Variantes en cours de mesure (`--quant-variant 4bit-sensitive8`, `4bit-mixed`).
+- **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
+- ⚠ **`lean` + image (d2)** : 4 à 7 passes contre 10 à 17 en `fast`, alors que la seule différence (décharger la vision après le 1er canvas) ne devrait rien changer avec un seul canvas. Soupçon : vision déchargée trop tôt, génération sans l'image. À vérifier sur le texte généré avant de publier ces lignes.
+- ⚠ `4bit-fast` d2 : les deux passes sont perturbées (un `ollama` actif pendant la mesure) ; à refaire.
+- Qualité (ScreenSpot-100, BFCL-100) non mesurée.
+
+**Choisir, en l'état** : `a4bdiff/16bit-*` pour la qualité de référence (≥ 64 Go de RAM),
+`a4bdiff/8bit-*` pour 32-48 Go. Le 4 bits tient en 16-18 Go mais produit 2,9× plus de passes en
+texte : pas recommandé tant que les variantes mixtes n'ont pas tranché.
+
