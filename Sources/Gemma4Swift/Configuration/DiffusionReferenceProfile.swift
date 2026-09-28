@@ -117,14 +117,17 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
         switch bits {
         case .sixteen: quantization = .none; weightsGB = 50
         case .eight: quantization = .uniform(bits: 8, groupSize: 64); weightsGB = 27
-        case .four: quantization = .uniform(bits: 4, groupSize: 64); weightsGB = 15
+        // 4 bits uniforme : 43,5 passes/canvas contre 15 en bf16 (3x plus lent) ; couches
+        // 0-3 et 26-29 en 8 bits : 14,5 passes, 38,5 tok/s, ~19 Go actifs (2026-09-28).
+        case .four: quantization = .mixed(.default); weightsGB = 19
         }
         var notes = ["DiffusionGemma 26B-A4B."]
         if bits != .sixteen {
-            notes.append("Quantification a la volee depuis le bf16 (experts compris, routeur 8 bits, vision bf16).")
+            notes.append("Quantification a la volee depuis le bf16 (experts compris, routeur 8 bits, vision bf16) : ~51 Go au chargement.")
+            if bits == .four { notes.append("Couches 0-3 et 26-29 en 8 bits, le reste en 4.") }
         }
         notes.append(lean ? "Econome : vision dechargee apres le 1er canvas, limites memoire adaptees." : "Rapide : tout resident.")
-        notes.append("Valeurs initiales non mesurees.")
+        notes.append("Vitesse et memoire mesurees en texte (BENCHMARKS.md), qualite non mesuree.")
         return DiffusionReferenceProfile(
             bits: bits, kind: kind, quantization: quantization, includeVision: true,
             unloadVisionAfterFirstCanvas: lean, clearCacheBetweenCanvases: lean,

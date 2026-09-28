@@ -22,7 +22,7 @@ struct DiffusionReferenceProfileTests {
         #expect(bf16.quantization == .none)
         #expect(!bf16.unloadVisionAfterFirstCanvas && !bf16.clearCacheBetweenCanvases)
         let q4 = try #require(DiffusionReferenceProfile.named("4bit-lean"))
-        #expect(q4.quantization == .uniform(bits: 4, groupSize: 64))
+        #expect(q4.quantization == .mixed(.default), "4 bits uniforme : 2,9x plus de passes")
         #expect(q4.unloadVisionAfterFirstCanvas && q4.clearCacheBetweenCanvases)
         #expect(q4.memoryLimitMB != nil)
         let lean16 = try #require(DiffusionReferenceProfile.named("16bit-lean"))
@@ -30,11 +30,12 @@ struct DiffusionReferenceProfileTests {
         #expect(!q4.textOnlyVariant().includeVision)
     }
 
-    @Test("recommended : 96 Go -> 8bit-fast, 64 -> 8bit-fast, 32 -> 4bit-fast, 16 -> 4bit-lean")
+    @Test("recommended : 96 Go -> 8bit-fast, 64 -> 8bit-fast, 40 -> 4bit-fast, 32 et 16 -> 4bit-lean")
     func testRecommended() {
         #expect(DiffusionReferenceProfile.recommended(availableMB: 96 * 1024)?.qualifiedID == "a4bdiff/8bit-fast")
         #expect(DiffusionReferenceProfile.recommended(availableMB: 64 * 1024)?.qualifiedID == "a4bdiff/8bit-fast")
-        #expect(DiffusionReferenceProfile.recommended(availableMB: 32 * 1024)?.qualifiedID == "a4bdiff/4bit-fast")
+        #expect(DiffusionReferenceProfile.recommended(availableMB: 40 * 1024)?.qualifiedID == "a4bdiff/4bit-fast")
+        #expect(DiffusionReferenceProfile.recommended(availableMB: 32 * 1024)?.qualifiedID == "a4bdiff/4bit-lean")
         #expect(DiffusionReferenceProfile.recommended(availableMB: 16 * 1024)?.qualifiedID == "a4bdiff/4bit-lean")
     }
 }

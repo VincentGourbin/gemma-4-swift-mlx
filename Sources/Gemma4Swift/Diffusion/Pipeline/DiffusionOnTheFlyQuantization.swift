@@ -109,8 +109,12 @@ public enum DiffusionOnTheFlyQuantization {
         // quantifies etant ignores. Voir `shareEncoderModules`.
         if let diffusion = model as? DiffusionGemmaForBlockDiffusion {
             let shared = sharedDecoderLeafPaths(diffusion)
-            quantizeTree(diffusion.encoder.languageModel, pathPrefix: "encoder.language_model.")
-            eval(diffusion.encoder.languageModel)
+            let encoder = diffusion.encoder.languageModel
+            quantizeSharedLayerwise(diffusion, shared: shared) { i, layer in
+                quantizeTree(layer, pathPrefix: "encoder.language_model.layers.\(i).")
+            }
+            quantizeTree(encoder, pathPrefix: "encoder.language_model.")
+            eval(encoder)
             shareEncoderModules(diffusion, paths: shared)
         }
         quantizeTree(model, pathPrefix: "")
@@ -256,9 +260,8 @@ public enum DiffusionOnTheFlyQuantization {
         // Chemins du decodeur qui partagent leurs poids avec l'encodeur (avant quantif).
         let shared = sharedDecoderLeafPaths(model)
 
-        // 1) Encoder text layers
-        let encoderTextLayers = model.encoder.languageModel.layers
-        for (i, layer) in encoderTextLayers.enumerated() {
+        // 1) Encoder text layers, chacune reprise aussitot par le decodeur
+        quantizeSharedLayerwise(model, shared: shared) { i, layer in
             let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
             quantizeModule(layer, bits: bits, label: "encoder.language_model.layers.\(i)")
         }
@@ -311,6 +314,35 @@ public enum DiffusionOnTheFlyQuantization {
             if compatible { shared.insert(path) }
         }
         return shared
+    }
+
+    /// Quantifie les couches texte de l'encodeur une a une et donne chacune au decodeur
+    /// des qu'elle est evaluee : le bf16 de la couche n'a alors plus de reference et
+    /// part. Quantifier tout l'encodeur avant de partager gardait le bf16 complet et
+    /// tout le quantifie en meme temps (pic de chargement mesure le 2026-09-28 : 77 Go
+    /// en 8 bits, 65 Go en 4 bits, pour 49 Go de bf16).
+    static func quantizeSharedLayerwise(
+        _ model: DiffusionGemmaForBlockDiffusion,
+        shared: Set<String>,
+        quantizeLayer: (Int, Module) -> Void
+    ) {
+        let decoderLayers = model.decoder.layers
+        for (i, layer) in model.encoder.languageModel.layers.enumerated() where i < decoderLayers.count {
+            quantizeLayer(i, layer)
+            eval(layer)
+            // Mise a jour de la couche elle-meme : `unflattened` sur "layers.i.*" seul ne
+            // reconstruit pas le tableau `layers` (unexpectedStructure).
+            let prefix = "layers.\(i)."
+            let leaves = Dictionary(layer.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+            let replacements = shared.filter { $0.hasPrefix(prefix) }.sorted().compactMap { path -> (String, Module)? in
+                let relative = String(path.dropFirst(prefix.count))
+                return leaves[relative].map { (relative, $0) }
+            }
+            if !replacements.isEmpty {
+                decoderLayers[i].update(modules: ModuleChildren.unflattened(replacements))
+            }
+            MLX.Memory.clearCache()
+        }
     }
 
     /// Donne au decodeur les instances de modules (quantifies) de l'encodeur pour les

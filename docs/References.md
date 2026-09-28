@@ -121,14 +121,25 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
 
 **Lecture** (M3 Max 96 Go, Release, cooldown 120 s, 2 passes ; A/A de l'instrument 0,0 à 0,7 %) :
 - **Mémoire** (après les correctifs `2d6dbab5` experts MoE + `bf93a1ce` partage des modules) : bf16 49,3 Go actifs, 8 bits 26,7 Go (÷1,85), 4 bits 14,6 Go (÷3,4). Avant `bf93a1ce`, la quantification faisait monter la mémoire (8 bits 74,8 Go).
+- **Pic au chargement (avant le correctif couche par couche)** : ~65 Go en 4 bits, ~77 Go en 8 bits, pour 49 Go de bf16 : le bf16 complet et tout le quantifié coexistaient. Voir plus bas.
 - **Pas de débruitage** quasi constant (≈ 500-550 ms) quelle que soit la précision : 256 jetons par pas, calcul dominant.
-- **4 bits uniforme** : 2,9× plus de passes en texte (43,5 contre 15), débit 10,6 tok/s contre 32,7. Variantes en cours de mesure (`--quant-variant 4bit-sensitive8`, `4bit-mixed`).
+- **4 bits uniforme** : 2,9× plus de passes en texte (43,5 contre 15), débit 10,6 tok/s contre 32,7. La cause est la précision des couches extrêmes, pas celle des embeddings (A/B `benchmarks/diffusion-4bit-variants-20260928.jsonl`, d1, 2 passes par variante) :
+
+  | Variante (`--quant-variant`) | Passes/canvas | Pas médian | Débit | Actif MLX | Empreinte |
+  |---|---|---|---|---|---|
+  | 4 bits uniforme | 43,5 | 538-684 ms | 8,4-10,6 tok/s | 14 648 Mo | 16 726 Mo |
+  | `4bit-sensitive8` (embeddings/tête + self_conditioning en 8 bits) | 44 | 486-523 ms | 11,2-11,7 tok/s | 15 668 Mo | 17 761 Mo |
+  | **`4bit-mixed`** (couches 0-3 et 26-29 en 8 bits, sensibles en 8 bits) | **14,5** | **452-454 ms** | **38,5 tok/s** | 18 779 Mo | 20 871 Mo |
+
+  `4bit-mixed` revient au nombre de passes du bf16 et le dépasse en débit ; il manque la porte « pic ≤ 18 Go » d'environ 3 Go. Qualité (ScreenSpot/BFCL) non mesurée.
+- **Pic de chargement corrigé** : la quantification se fait maintenant couche par couche (chaque couche de l'encodeur quantifiée, évaluée, reprise aussitôt par le décodeur). Pic mesuré (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`) : 8 bits 77,2 → 51,0 Go, 4 bits mixte 68,7 → 51,0 Go, soit le bf16 seul ; mémoire en régime et passes inchangées.
 - **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
 - ⚠ **`lean` + image (d2)** : 4 à 7 passes contre 10 à 17 en `fast`, alors que la seule différence (décharger la vision après le 1er canvas) ne devrait rien changer avec un seul canvas. Soupçon : vision déchargée trop tôt, génération sans l'image. À vérifier sur le texte généré avant de publier ces lignes.
 - ⚠ `4bit-fast` d2 : les deux passes sont perturbées (un `ollama` actif pendant la mesure) ; à refaire.
 - Qualité (ScreenSpot-100, BFCL-100) non mesurée.
 
-**Choisir, en l'état** : `a4bdiff/16bit-*` pour la qualité de référence (≥ 64 Go de RAM),
-`a4bdiff/8bit-*` pour 32-48 Go. Le 4 bits tient en 16-18 Go mais produit 2,9× plus de passes en
-texte : pas recommandé tant que les variantes mixtes n'ont pas tranché.
+**Choisir, en l'état** : `a4bdiff/16bit-*` pour la qualité de référence ; `a4bdiff/8bit-*`
+(~27 Go en régime) ; `a4bdiff/4bit-*` (désormais quantification mixte, ~21 Go, 38,5 tok/s en texte ;
+`bench-diffusion --quant-variant 4bit-uniform` pour l'ancien 4 bits), qualité à confirmer. Tous passent par ~51 Go au chargement
+(quantification à la volée depuis le bf16) : sous 64 Go de RAM, il faut des poids pré-quantifiés.
 
