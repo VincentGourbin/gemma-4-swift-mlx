@@ -102,11 +102,15 @@ public enum Gemma4OnTheFlyQuantization {
                         return nil
                     }
                 }
-                // Quantize Linear + Embedding seulement (defaut MLX)
-                if m is Linear || m is Embedding {
-                    return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
+                // Toute couche quantifiable pas encore quantifiee. `m is Linear ||
+                // m is Embedding` (le defaut MLX) laissait les experts MoE en bf16 :
+                // SwitchLinear est Quantizable sans heriter de Linear (26B-A4B, D-01).
+                guard m is Quantizable, !(m is Quantized) else { return nil }
+                // Routeur MoE en 8 bits sous 8 bits, comme les packs mlx-community (D-03).
+                if path.hasSuffix("router.proj") && bits < 8 {
+                    return (groupSize: 64, bits: 8, mode: .affine)
                 }
-                return nil
+                return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
             },
             apply: { layer, gs, b, qmode in
                 quantizedCount += 1

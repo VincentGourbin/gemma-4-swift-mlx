@@ -83,10 +83,13 @@ public enum DiffusionOnTheFlyQuantization {
                         return nil
                     }
                 }
-                if m is Linear || m is Embedding {
-                    return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
+                // Experts MoE compris (SwitchLinear n'herite pas de Linear, D-01) ;
+                // routeur en 8 bits sous 8 bits comme les packs mlx-community (D-03).
+                guard m is Quantizable, !(m is Quantized) else { return nil }
+                if path.hasSuffix("router.proj") && bits < 8 {
+                    return (groupSize: 64, bits: 8, mode: .affine)
                 }
-                return nil
+                return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
             },
             apply: { layer, gs, b, qmode in
                 quantizedCount += 1
@@ -214,10 +217,12 @@ public enum DiffusionOnTheFlyQuantization {
                             return nil
                         }
                     }
-                    if m is Linear || m is Embedding {
-                        return (groupSize: config.groupSize, bits: bits, mode: .affine)
+                    // Experts MoE compris (D-01) ; routeur en 8 bits (D-03).
+                    guard m is Quantizable, !(m is Quantized) else { return nil }
+                    if path.hasSuffix("router.proj") && bits < 8 {
+                        return (groupSize: 64, bits: 8, mode: .affine)
                     }
-                    return nil
+                    return (groupSize: config.groupSize, bits: bits, mode: .affine)
                 },
                 apply: { layer, gs, b, qmode in
                     if b == config.highPrecisionBits {
