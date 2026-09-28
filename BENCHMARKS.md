@@ -540,6 +540,9 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
   | **`4bit-mixed`** (couches 0-3 et 26-29 en 8 bits, sensibles en 8 bits) | **14,5** | **452-454 ms** | **38,5 tok/s** | 18 779 Mo | 20 871 Mo |
 
   `4bit-mixed` revient au nombre de passes du bf16 et le dépasse en débit ; il manque la porte « pic ≤ 18 Go » d'environ 3 Go. Qualité : voir ScreenSpot plus bas.
+- **Suivi 4 bits** (`benchmarks/diffusion-4bit-followup-20260928.jsonl`, 2 passes chacun, sorties identiques entre passes) :
+  - `--quant-variant 4bit-aggressive` (couches 0-1 et 28-29 en 8 bits), d1 : 20,5 passes/canvas, 27,0 tok/s, 17 227 Mo actifs, 19 303 Mo d'empreinte — sous 18 Go en actif seulement, et −30 % de débit contre le mixte pour −1,5 Go : le mixte reste le défaut.
+  - `4bit-fast` (mixte), avec le correctif vision : d2 8 passes, 58,7 tok/s, empreinte 22,2 Go ; d3 9 passes, 47,4 tok/s, 22,6 Go. Remplace les lignes d2 perturbées par ollama.
 - **Pic de chargement corrigé** : la quantification se fait maintenant couche par couche (chaque couche de l'encodeur quantifiée, évaluée, reprise aussitôt par le décodeur). Pic mesuré (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`) : 8 bits 77,2 → 51,0 Go, 4 bits mixte 68,7 → 51,0 Go, soit le bf16 seul ; mémoire en régime et passes inchangées.
 - **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
 - ❌ **`lean` + image (d2), lignes ci-dessus invalides** : l'échauffement déchargeait la vision et la passe mesurée ignorait l'image, sans erreur (bug de bibliothèque, pas seulement du bench : tout appel avec image après un déchargement). Corrigé (`9ffc8871`, rechargement à la demande) ; remesuré (`benchmarks/diffusion-vision-reload-20260928.jsonl`) : `8bit-lean` d2 10 passes, même réponse que `8bit-fast`, 25,6 Go actifs contre 26,7.

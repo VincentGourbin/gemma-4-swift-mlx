@@ -28,7 +28,7 @@ struct BenchDiffusion: AsyncParsableCommand {
     @Option(name: .long, help: "Profil de reference (a4bdiff/16bit-fast, a4bdiff/4bit-lean, …)")
     var reference: String = "a4bdiff/16bit-fast"
 
-    @Option(name: .long, help: "Variante de quantification a la place de celle du profil : 4bit-sensitive8 (couches 4 bits, embeddings/tete et self_conditioning 8 bits), 4bit-mixed (couches 0-3 et 26-29 en 8 bits + sensibles en 8 bits, defaut des profils 4 bits), 4bit-uniform (tout en 4 bits, pour comparer)")
+    @Option(name: .long, help: "Variante de quantification a la place de celle du profil : 4bit-sensitive8 (couches 4 bits, embeddings/tete et self_conditioning 8 bits), 4bit-mixed (couches 0-3 et 26-29 en 8 bits + sensibles en 8 bits, defaut des profils 4 bits), 4bit-uniform (tout en 4 bits, pour comparer), 4bit-aggressive (couches 0-1 et 28-29 en 8 bits)")
     var quantVariant: String?
 
     @Option(name: .long, help: "Charge : d1 (texte), d2 (image), d3 (contexte long)")
@@ -67,6 +67,7 @@ struct BenchDiffusion: AsyncParsableCommand {
             profile = profile.withQuantization(.mixed(.default))
         case "4bit-uniform":
             profile = profile.withQuantization(.uniform(bits: 4, groupSize: 64))
+        case "4bit-aggressive": profile = profile.withQuantization(.mixed(.aggressive))
         case let other?:
             throw ValidationError("variante inconnue : \(other)")
         }

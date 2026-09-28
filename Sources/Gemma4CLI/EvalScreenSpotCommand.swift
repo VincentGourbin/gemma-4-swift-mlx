@@ -58,6 +58,7 @@ struct EvalScreenSpot: AsyncParsableCommand {
         case "4bit-sensitive8":
             profile = profile.withQuantization(.mixed(.init(highPrecisionLayers: [], quantizeSensitiveAtHighPrecision: true)))
         case "4bit-mixed": profile = profile.withQuantization(.mixed(.default))
+        case "4bit-aggressive": profile = profile.withQuantization(.mixed(.aggressive))
         case let other?: throw ValidationError("variante inconnue : \(other)")
         }
         var cases = try JSONDecoder().decode([Case].self, from: Data(contentsOf: URL(fileURLWithPath: meta)))
