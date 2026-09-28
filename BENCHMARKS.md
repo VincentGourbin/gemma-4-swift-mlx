@@ -425,3 +425,50 @@ Tous les scripts vivent dans `BENCHMARKS_python_scripts/` (à ajouter au repo).
 | `fetch_mmlu_pro_cot.py` | `/tmp/mmlu_pro_cot.json` | `TIGER-Lab/MMLU-Pro` avec `cot_content` |
 | `mmlu_python.py` | run éval Python mlx-vlm | logit-based |
 | `mmlu_pro_cot_py.py` | run éval Python CoT | génération + parse |
+
+## Profils de référence — campagne du 2026-09-27
+
+Lignes brutes (une par mesure, jamais modifiées) : [`benchmarks/campaign-20260927-2256.jsonl`](benchmarks/campaign-20260927-2256.jsonl) (210 lignes : 6 A/A + 204 profils). Outil : `gemma4-cli bench` via `Scripts/bench-campaign.sh`.
+
+Machine Mac15,10 (96 Go), Version 27.0 (Build 26A428), build release, commit e5a30020, mlx-swift 0.31.6, mlx-swift-lm 3.31.4, 2026-09-27. Protocole : docs/Benchmarks.md (cooldown 120 s, 2 passes, moyenne des passes ; pic = max).
+
+| Profil | Préfill 128 / 1k / 4k (tok/s) | Décodage médian 128 / 1k / 4k (tok/s) | TTFT 4k (ms) | Pic MLX 4k (Mo) | Empreinte 4k (Mo) | Image : préfill / décodage / pic |
+|---|---|---|---|---|---|---|
+| `e2b/4bit-fast` | 1928 / 5137 / 6088 | 134.5 / 128.0 / 123.6 | 682 | 3086 | 3789 | 1188 / 130.3 / 4271 |
+| `e2b/4bit-lean` | 2071 / 4907 / 5979 | 134.5 / 127.7 / 123.5 | 695 | 2788 | 3540 | 1189 / 129.9 / 4271 |
+| `e2b/8bit-fast` | 1533 / 4952 / 5909 | 87.5 / 84.8 / 81.9 | 710 | 5288 | 6008 | 1180 / 85.7 / 6480 |
+| `e2b/8bit-lean` | 1614 / 4737 / 5840 | 87.8 / 84.9 / 82.7 | 718 | 4996 | 5749 | 1187 / 85.9 / 6480 |
+| `e2b/16bit-fast` | 928 / 3989 / 5632 | 53.6 / 52.2 / 51.3 | 751 | 9295 | 9889 | 925 / 52.8 / 10621 |
+| `e2b/16bit-lean` | 872 / 3757 / 5530 | 53.5 / 52.2 / 51.4 | 765 | 9186 | 9930 | 924 / 52.9 / 10621 |
+| `e4b/4bit-fast` | 949 / 1620 / 1684 | 78.0 / 73.0 / 72.0 | 2447 | 4785 | 5740 | 767 / 77.2 / 5796 |
+| `e4b/4bit-lean` | 949 / 1594 / 1667 | 77.2 / 74.0 / 70.7 | 2472 | 4604 | 5406 | 740 / 75.7 / 5796 |
+| `e4b/8bit-fast` | 804 / 1534 / 1660 | 47.8 / 46.4 / 45.3 | 2494 | 8269 | 9218 | 725 / 47.2 / 9357 |
+| `e4b/8bit-lean` | 822 / 1530 / 1640 | 47.8 / 46.1 / 44.9 | 2523 | 8096 | 8980 | 717 / 47.3 / 9357 |
+| `e4b/16bit-fast` | 515 / 1420 / 1683 | 27.6 / 27.2 / 26.9 | 2477 | 14755 | 15521 | 606 / 27.4 / 16032 |
+| `e4b/16bit-lean` | 541 / 1416 / 1650 | 27.6 / 27.2 / 26.8 | 2525 | 14585 | 15536 | 585 / 27.4 / 16032 |
+| `b12b/4bit-fast` | 307 / 367 / 361 | 36.2 / 34.5 / 34.1 | 11376 | 7633 | 9217 | — |
+| `b12b/4bit-lean` | 306 / 362 / 357 | 36.1 / 34.8 / 34.3 | 11510 | 7360 | 8069 | — |
+| `b12b/8bit-fast` | 283 / 363 / 358 | 20.9 / 20.3 / 19.9 | 11490 | 13196 | 14763 | — |
+| `b12b/8bit-lean` | 284 / 356 / 353 | 21.0 / 20.3 / 20.0 | 11654 | 12893 | 13791 | — |
+| `b12b/16bit-fast` | 255 / 370 / 376 | 11.6 / 11.4 / 11.3 | 10991 | 23639 | 25083 | — |
+| `b12b/16bit-lean` | 256 / 363 / 362 | 11.6 / 11.4 / 11.3 | 11409 | 23391 | 25244 | — |
+| `a4b/4bit-fast` | 416 / 930 / 965 | 81.3 / 77.1 / 74.4 | 4264 | 14439 | 15960 | — |
+| `a4b/4bit-lean` | 570 / 851 / 850 | 81.5 / 76.1 / 73.2 | 4842 | 14237 | 15136 | — |
+| `a4b/8bit-fast` | 375 / 924 / 927 | 50.9 / 48.9 / 47.9 | 4445 | 26465 | 27991 | — |
+| `a4b/8bit-lean` | 421 / 789 / 796 | 50.9 / 48.9 / 47.5 | 5172 | 26185 | 27169 | — |
+| `a4b/16bit-fast` | 161 / 714 / 808 | 32.6 / 31.8 / 31.3 | 5120 | 48938 | 50509 | — |
+| `a4b/16bit-lean` | 167 / 525 / 630 | 32.6 / 31.6 / 31.0 | 6546 | 48758 | 50503 | — |
+| `b31b/4bit-fast` | 123 / 138 / 132 | 15.1 / 14.3 / 13.9 | 31094 | 18607 | 21951 | — |
+| `b31b/4bit-lean` | 123 / 137 / 129 | 14.9 / 14.2 / 13.6 | 31809 | 18249 | 18787 | — |
+| `b31b/8bit-fast` | 115 / 134 / 124 | 8.2 / 8.1 / 7.7 | 33049 | 33172 | 36663 | — |
+| `b31b/8bit-lean` | 114 / 133 / 125 | 8.2 / 8.0 / 7.7 | 32941 | 32832 | 33413 | — |
+| `b31b/16bit-fast` | 108 / 135 / 141 | 4.6 / 4.5 / 4.5 | 29305 | 60512 | 64095 | — |
+| `b31b/16bit-lean` | 109 / 129 / 134 | 4.6 / 4.5 / 4.4 | 30718 | 60144 | 63949 | — |
+
+**Lecture** (une variable = le profil ; chiffres au repos, validation A/A de l'instrument : 2,9 % au pire) :
+- `lean` coûte ≤ 2 % de préfill et rien en décodage sur E2B, E4B, 12B et 31B, pour 3 à 12 % de mémoire en moins (pic MLX, empreinte).
+- **`a4b/*-lean` est mal réglé** : préfill 4k −12 % (4 bits) à −22 % (bf16) pour 1 à 5 % de mémoire en moins. La tranche de 256 pénalise ce MoE : à revoir (tranche 512).
+- **Préfill du 12B (~360 tok/s) et du 31B (~130 tok/s) quasi indépendant des bits** : le calcul n'est pas borné par les poids. Suspects : attention pleine à `head_dim` 512 sans noyau fusionné (P-12) ; le 12B (Unified) n'a pas le préfill par tranches (K-13). Prochain levier.
+- Décodage borné par la bande passante des poids : ×1,6 à ×2,7 entre 16 et 4 bits selon la famille.
+- `weights_bw_gbps` n'est qu'un indicateur (surestimé sur E2B/E4B, tables d'embeddings par couche).
+
