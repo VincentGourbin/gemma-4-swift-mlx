@@ -37,7 +37,7 @@ public struct DiffusionGemmaContainer: @unchecked Sendable {
 
     /// Cree un pipeline pret a generer depuis ce container.
     public func makePipeline() -> DiffusionGemmaPipeline {
-        DiffusionGemmaPipeline(model: model, genConfig: generationConfig)
+        DiffusionGemmaPipeline(model: model, genConfig: generationConfig, memoryConfig: memoryConfig)
     }
 }
 

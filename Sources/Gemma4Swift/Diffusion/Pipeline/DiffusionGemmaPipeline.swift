@@ -62,13 +62,21 @@ public actor DiffusionGemmaPipeline {
     public let sampler: EntropyBoundSampler
     public let temperatureSchedule: LinearTemperatureSchedule
     public let stopping: StableConfidentStopping
+    /// Politique memoire appliquee pendant la generation (D-10).
+    public let memoryConfig: DiffusionMemoryConfig
 
+    /// - Parameter memoryConfig: par defaut, comportement anterieur (cache MLX vide
+    ///   entre canvases, vision gardee). `DiffusionGemmaContainer.makePipeline()`
+    ///   transmet la politique choisie au chargement.
     public init(
         model: DiffusionGemmaForBlockDiffusion,
-        genConfig: DiffusionGenerationConfig
+        genConfig: DiffusionGenerationConfig,
+        memoryConfig: DiffusionMemoryConfig = DiffusionMemoryConfig(
+            mixedPrecision: nil, unloadVisionAfterFirstCanvas: false, clearCacheBetweenCanvases: true)
     ) {
         self.model = model
         self.genConfig = genConfig
+        self.memoryConfig = memoryConfig
         let vocab = model.config.textConfig.base.vocabSize
         let canvas = model.config.textConfig.canvasLength
         self.sampler = EntropyBoundSampler(
@@ -167,12 +175,14 @@ public actor DiffusionGemmaPipeline {
             // (l'encoder text n'a pas de role direct dans le denoising, c'est le
             // KV cache qui est utilise par le decoder cross-attention).
 
-            // Note : on a tente de unloadVision() apres le canvas 0 mais
-            // l'assignment direct sur @ModuleInfo viole l'API MLX et crashe
-            // au canvas suivant ("rather than mutating the Module property
-            // directly"). Solution propre = passer par Module.update(modules:)
-            // avec ModuleChildren. Pour l'instant on laisse vision en RAM
-            // (~600 MB sur 50 GB, negligeable). TODO Phase 10.
+            // Les soft-tokens image sont dans le cache : la tour vision ne sert plus
+            // (politique memoire, D-10). L'ancien commentaire affirmait que le
+            // dechargement plantait au canvas suivant : non reproduit
+            // (DiffusionMemoryConfigWiringTests).
+            if pixelsForCall != nil, memoryConfig.unloadVisionAfterFirstCanvas {
+                eval(encoderCache!.entries.compactMap { $0?.keys } + encoderCache!.entries.compactMap { $0?.values })
+                model.encoder.unloadVision()
+            }
 
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)
@@ -271,7 +281,9 @@ public actor DiffusionGemmaPipeline {
             // 6) Liberation du pic transient du denoising loop (~440 MB observe).
             //    Pattern Flux 2 clearCacheEveryNSteps mais ici entre canvases
             //    (entre steps : neutre testé Phase 5).
-            MLX.Memory.clearCache()
+            if memoryConfig.clearCacheBetweenCanvases {
+                MLX.Memory.clearCache()
+            }
         }
 
         let totalLen = fullIds.dim(1)

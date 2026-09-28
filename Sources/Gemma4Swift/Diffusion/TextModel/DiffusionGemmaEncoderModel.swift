@@ -53,14 +53,24 @@ public class DiffusionGemmaEncoderModel: Module {
     /// le cache). Les forwards suivants peuvent etre incrementaux sur du texte
     /// pur sans vision.
     public func unloadVision() {
-        self._visionTower.wrappedValue = nil
-        self._embedVision.wrappedValue = nil
+        // Affecter nil a la propriete @ModuleInfo est fatal dans MLX (« please use
+        // Model.update(modules:) rather than mutating the Module property directly ») :
+        // c'est ce qui faisait planter le canvas suivant (D-10). On garde les modules et
+        // on remplace leurs parametres par des tableaux vides, ce qui libere les tampons.
+        for module in [visionTower as Module?, embedVision as Module?].compactMap({ $0 }) {
+            let empty = module.parameters().flattened().map { ($0.0, MLXArray.zeros([0])) }
+            module.update(parameters: ModuleParameters.unflattened(empty))
+        }
+        visionUnloaded = true
         MLX.Memory.clearCache()
     }
 
+    /// Vrai apres `unloadVision()` : la tour vision ne doit plus etre appelee.
+    public private(set) var visionUnloaded = false
+
     /// True si le vision_tower est encore charge.
     public var hasVisionLoaded: Bool {
-        visionTower != nil
+        visionTower != nil && !visionUnloaded
     }
 
     /// Forward de l'encoder.
@@ -80,7 +90,7 @@ public class DiffusionGemmaEncoderModel: Module {
         // En mode incremental (priorCache != nil) : on suppose que la vision a
         // ete encodee au premier appel, donc on traite les inputIds comme du
         // texte pur (les nouveaux tokens sont du canvas argmax, pas d'image).
-        let useVision = pixelValues != nil && priorCache == nil
+        let useVision = pixelValues != nil && priorCache == nil && !visionUnloaded
 
         // 1) Mask des positions image_token AVANT de remplacer par pad
         let imageMask = inputIds .== MLXArray(Int32(imageTokenId))
