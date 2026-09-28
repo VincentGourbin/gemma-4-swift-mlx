@@ -62,7 +62,7 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Chemin vers une image à passer au modèle (active le vision_tower). Requires --include-vision pour charger les poids vision.")
     var image: String?
 
-    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Applique apres le load, AVANT la generation. 48 Go -> ~14 Go en 4-bit, 3-4x speedup forwards.")
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Applique apres le load, AVANT la generation. Experts MoE compris ; poids estimes ~15 Go en 4 bits (non mesure, voir bench-diffusion).")
     var quantizeBits: Int?
 
     @Option(name: .customLong("quantize-group-size"), help: "Group size de quantization (defaut 64 pour affine, 32 pour mxfp).")

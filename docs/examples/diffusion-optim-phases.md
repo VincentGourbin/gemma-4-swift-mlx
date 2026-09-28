@@ -1,5 +1,12 @@
 # DiffusionGemma 26B-A4B — Synthèse Optimisations Phases 5-7
 
+> **Avertissement (2026-09-28, audit diffusion D-01)** : pendant ces mesures, la
+> quantification à la volée ignorait les experts MoE (`SwitchLinear`, ~22,8 G paramètres
+> sur 25,8). Les variantes « 4/6/8-bit » et « mixed » ne quantifiaient donc que ~12 % des
+> poids — d'où les « RAM libérée » de 0,1 à 2,5 GB. Les verdicts des phases 5 à 7 sont
+> invalides ; ils seront remplacés par la base `gemma4-cli bench-diffusion`
+> (K-D10..K-D15 de `docs/audit/2026-09-27/audit-diffusion.md`).
+
 ## Configuration de test
 Mac Studio M3 Max 96 GB, prompt "Roman Empire essay" (1024 tokens / 4 canvases), bf16 baseline.
 

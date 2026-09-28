@@ -4,9 +4,12 @@
 // directement un Module (DiffusionGemmaForBlockDiffusion) au lieu
 // d'un LanguageModel.
 //
-// Cible 4-bit : modele passe de 48 Go bf16 a ~14 Go, et chaque
-// forward decoder devient 3-4x plus rapide (kernels MLX optimises
-// pour 4-bit groupwise sur Apple Silicon).
+// Taille estimee (calcul, non mesuree) : ~50 Go bf16, ~27 Go en 8 bits,
+// ~15 Go en 4 bits, experts MoE compris (voir DiffusionReferenceProfile).
+// Avant le correctif D-01 (2026-09-28) les experts SwitchLinear n'etaient
+// PAS quantifies : les mesures anterieures (docs/examples/
+// diffusion-optim-phases.md) ne portaient que sur ~12 % des poids. Aucun
+// gain de vitesse n'est etabli ; a mesurer avec `gemma4-cli bench-diffusion`.
 
 import Foundation
 import MLX
