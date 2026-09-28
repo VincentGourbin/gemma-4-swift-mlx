@@ -202,6 +202,11 @@ struct Bench: AsyncParsableCommand {
     }
 
     private func emit(_ line: [String: Any]) throws {
+        try Self.writeLine(line, to: out)
+    }
+
+    /// Une ligne JSON sur stdout, et en ajout dans `out` si fourni (partage avec bench-diffusion).
+    static func writeLine(_ line: [String: Any], to out: String?) throws {
         let data = try JSONSerialization.data(withJSONObject: line, options: [.sortedKeys, .withoutEscapingSlashes])
         let text = String(decoding: data, as: UTF8.self)
         print(text)
