@@ -37,12 +37,9 @@ public final class StableConfidentStopping: @unchecked Sendable {
     ///   - logits : `[B, T, V]`, float. Logits du denoiser cette etape.
     /// - Returns: `[B]`, bool. True pour les exemples qui ont converge.
     public func shouldStop(argmaxCanvas: MLXArray, logits: MLXArray) -> MLXArray {
-        argmaxHistory.append(argmaxCanvas)
-        if argmaxHistory.count > stabilityThreshold {
-            argmaxHistory.removeFirst()
-        }
-
-        // Stable : tous les argmax dans l'historique == argmax courant.
+        // Stable : l'argmax courant est egal aux `stabilityThreshold` argmax PRECEDENTS.
+        // Python compare avant de mettre l'historique a jour (`roll` puis ecriture) ;
+        // ajouter d'abord rendait « stable » toujours vrai avec le seuil par defaut 1 (D-04).
         let stable: MLXArray
         if argmaxHistory.count < stabilityThreshold {
             // Pas assez d'historique : on ne peut pas dire stable.
@@ -54,6 +51,11 @@ public final class StableConfidentStopping: @unchecked Sendable {
                 allEqual = allEqual .&& (argmaxHistory[i] .== argmaxCanvas)
             }
             stable = allEqual.all(axis: -1)  // [B]
+        }
+
+        argmaxHistory.append(argmaxCanvas)
+        if argmaxHistory.count > stabilityThreshold {
+            argmaxHistory.removeFirst()
         }
 
         // Confident : mean(entropy, axis=-1) < confidence_threshold
