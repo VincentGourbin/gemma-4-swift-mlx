@@ -118,6 +118,9 @@ public class DiffusionGemmaEncoderModel: Module {
         }
 
         // 5) Forward du language_model avec priorCache si fourni
-        return languageModel(inputsEmbeds: inputsEmbeds, priorCache: priorCache)
+        // Blocs image bidirectionnels en mode "vision" (D-06).
+        return languageModel(
+            inputsEmbeds: inputsEmbeds, priorCache: priorCache,
+            visionTokenMask: useVision ? imageMask : nil)
     }
 }

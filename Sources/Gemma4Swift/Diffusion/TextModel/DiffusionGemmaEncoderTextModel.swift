@@ -10,8 +10,8 @@
 //   3. mask = bidir total ou causal selon use_bidirectional_attention
 //      - "all"  -> mask = .none (= softmax sur tout, bidirectionnel total)
 //      - sinon  -> mask causal
-//      Note Phase 3 : pour "vision", l'overlay block-bidir n'est pas implemente
-//      cote encoder (cela demande un mm_token_type_ids). Fallback causal.
+//      Pour "vision" : causal + overlay bidirectionnel dans chaque bloc image
+//      contigu (visionTokenMask, meme overlay que le 12B Unified ; D-06).
 //   4. Loop layers, collect K/V dans EncoderKVCache
 //   5. Norm finale
 
@@ -71,10 +71,14 @@ public class DiffusionGemmaEncoderTextModel: Module {
     ///   - priorCache : si fourni, on encode SEULEMENT les nouveaux tokens.
     ///     Le K/V cache est etendu avec append. positionOffset = priorCache.seqLength.
     /// - Returns: DiffusionEncoderOutput avec cache mis a jour (priorCache + nouveaux).
+    /// - Parameter visionTokenMask: `[B, T_new]` bool, positions image du delta. Avec
+    ///   `use_bidirectional_attention == "vision"`, l'attention est bidirectionnelle a
+    ///   l'interieur de chaque bloc image contigu (D-06, meme overlay que le 12B Unified).
     public func callAsFunction(
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
-        priorCache: EncoderKVCache? = nil
+        priorCache: EncoderKVCache? = nil,
+        visionTokenMask: MLXArray? = nil
     ) -> DiffusionEncoderOutput {
         var hiddenStates: MLXArray
         if let inputsEmbeds = inputsEmbeds {
@@ -121,12 +125,39 @@ public class DiffusionGemmaEncoderTextModel: Module {
                 .&& ((queryPositions - keyPositions) .< MLXArray(Int32(window))))
         }
 
+        // Blocs image bidirectionnels (mode "vision") : OU avec l'overlay « meme bloc ».
+        // Les blocs sont dans le delta courant (l'image n'est encodee qu'au premier
+        // appel) ; les colonnes du cache anterieur ne recoivent pas d'overlay.
+        var fullMask = mask
+        var windowMask = slidingMask
+        if useBidirectionalAttention == "vision", let visionTokenMask, T_new > 1 {
+            let blocks = Gemma4BidirectionalMask.blockSequenceIds(visionMask: visionTokenMask)
+            var overlay = Gemma4BidirectionalMask.overlay(blockSequenceIds: blocks)  // [B, T_new, T_new]
+            let B = overlay.dim(0)
+            overlay = overlay[0..., .newAxis, 0..., 0...]                              // [B, 1, T_new, T_new]
+            func compose(_ base: MLXFast.ScaledDotProductAttentionMaskMode, priorColumns: Int)
+                -> MLXFast.ScaledDotProductAttentionMaskMode
+            {
+                let causal: MLXArray
+                switch base {
+                case .array(let array): causal = array
+                default: causal = MLXLMCommon.createCausalMask(n: T_new, offset: priorColumns)
+                }
+                let padded = priorColumns > 0
+                    ? concatenated([MLXArray.zeros([B, 1, T_new, priorColumns], type: Bool.self), overlay], axis: -1)
+                    : overlay
+                return .array(causal[.newAxis, .newAxis] .|| padded)
+            }
+            fullMask = compose(mask, priorColumns: positionOffset)
+            windowMask = compose(slidingMask, priorColumns: priorSliding)
+        }
+
         // Cache initial : copie du priorCache si fourni, sinon vide.
         var cache = priorCache ?? EncoderKVCache(numLayers: layers.count)
 
         for (i, layer) in layers.enumerated() {
             let isGlobal = layerTypes[i] == "full_attention"
-            let layerMask = isGlobal ? mask : slidingMask
+            let layerMask = isGlobal ? fullMask : windowMask
 
             let priorKV = priorCache?.entries[i].map { (keys: $0.keys, values: $0.values) }
 

@@ -92,4 +92,46 @@ struct DiffusionSlidingWindowTests {
             #expect(relativeError(explicit, implicit) < 1e-4)
         }
     }
+
+    @Test("mode vision : attention bidirectionnelle dans chaque bloc image, causale ailleurs (D-06)")
+    func testVisionBlocksBidirectional() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let model = try model()
+            let lm = model.encoder.languageModel
+            // 12 jetons : texte, bloc image [2,5], texte, bloc image [8,9], texte.
+            let isImage: [Bool] = [false, false, true, true, true, true, false, false, true, true, false, false]
+            let n = isImage.count
+            let tokens = ids(n)
+            let vision = MLXArray(isImage).reshaped(1, n)
+
+            // Reference : causal (ou causal + fenetre) OU meme bloc image.
+            var block = [Int](repeating: -1, count: n)
+            var current = -1
+            for t in 0 ..< n where isImage[t] {
+                if t == 0 || !isImage[t - 1] { current += 1 }
+                block[t] = current
+            }
+            var full = [Bool](), window = [Bool]()
+            for q in 0 ..< n {
+                for k in 0 ..< n {
+                    let same = block[q] >= 0 && block[q] == block[k]
+                    full.append(k <= q || same)
+                    window.append((k <= q && q - k < Self.window) || same)
+                }
+            }
+            let fullMask = MLXArray(full).reshaped(n, n)
+            let windowMask = MLXArray(window).reshaped(n, n)
+            var h = lm.embedTokens(tokens) * MLXArray(lm.embedScale)
+            for (i, layer) in lm.layers.enumerated() {
+                let isGlobal = lm.config.resolvedLayerTypes[i] == "full_attention"
+                h = layer(h, mask: .array(isGlobal ? fullMask : windowMask), positionOffset: 0, priorKV: nil).output
+            }
+            let ref = lm.norm(h)
+
+            let out = lm(inputs: tokens, visionTokenMask: vision).lastHiddenState
+            #expect(relativeError(ref, out) < 1e-4, "avec overlay")
+            let causalOnly = lm(inputs: tokens).lastHiddenState
+            #expect(relativeError(ref, causalOnly) > 1e-3, "sans masque vision, la sortie doit differer")
+        }
+    }
 }
