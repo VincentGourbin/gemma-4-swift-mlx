@@ -36,6 +36,20 @@ public struct DiffusionGenerationResult: @unchecked Sendable {
     public let totalDecoderSteps: Int
     /// Nombre de canvases utilises.
     public let canvases: Int
+    /// Pourquoi la generation s'est arretee.
+    public let stopReason: DiffusionStopReason
+}
+
+/// Raison de fin d'une generation DiffusionGemma.
+public enum DiffusionStopReason: Sendable, Equatable {
+    /// EOS atteint ou `maxBlocks` canvases generes.
+    case completed
+    /// La Task appelante a ete annulee : le resultat ne contient que les canvases
+    /// deja commits (le canvas en cours est abandonne).
+    case cancelled
+    /// Refus de `Gemma4ComputeGate` : un entrainement tourne dans le processus
+    /// (deadlock mlx-swift gradient x forward). Aucun pas execute.
+    case trainingInProgress
 }
 
 /// Pipeline de generation DiffusionGemma block-AR.
@@ -92,6 +106,17 @@ public actor DiffusionGemmaPipeline {
         onCanvas: ((Int, MLXArray) -> Void)? = nil,
         onStep: ((_ canvasIdx: Int, _ step: Int, _ argmaxCanvas: MLXArray) -> Void)? = nil
     ) -> DiffusionGenerationResult {
+        let promptLen = promptIds.dim(1)
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift, D-07).
+        do { try Gemma4ComputeGate.shared.beginInference() } catch {
+            let empty = promptIds[0..., promptLen...]
+            eval(empty)
+            return DiffusionGenerationResult(
+                generatedIds: empty, fullIds: promptIds, totalDecoderSteps: 0, canvases: 0,
+                stopReason: .trainingInProgress)
+        }
+        defer { Gemma4ComputeGate.shared.endInference() }
+
         var key = MLXRandom.key(seed)
         let batchSize = promptIds.dim(0)
         let eosSet = Set(genConfig.eosTokenIds.map { Int32($0) })
@@ -105,6 +130,7 @@ public actor DiffusionGemmaPipeline {
         // - Canvas N+1 : on encode juste les 256 nouveaux tokens (argmax du canvas N)
         //   et on append au cache. Pas de re-encode du prompt initial.
         var encoderCache: EncoderKVCache? = nil
+        var cancelled = false
 
         for canvasIdx in 0 ..< maxBlocks {
             // 1) Encoder forward incremental
@@ -148,6 +174,13 @@ public actor DiffusionGemmaPipeline {
             // 3) Inner denoising loop : steps decroissants
             var stepsExecuted = 0
             for step in (1 ... genConfig.maxDenoisingSteps).reversed() {
+                // Annulation verifiee a chaque pas, avant le forward (D-07) : un
+                // consommateur qui abandonne libere le modele en moins d'un pas.
+                if Task.isCancelled {
+                    cancelled = true
+                    break
+                }
+
                 // a) decoder forward
                 let logits = model.denoiseStep(
                     canvasIds: canvas,
@@ -167,7 +200,12 @@ public actor DiffusionGemmaPipeline {
 
                 // Streaming step-by-step : observer la convergence du denoising.
                 // Equivalent du `streamer.put_draft(argmax_canvas)` Python.
-                onStep?(canvasIdx, step, argmaxCanvas)
+                // Evalue avant de le confier a l'appelant (D-08) ; seulement si
+                // quelqu'un observe, la sync du pas l'aurait calcule de toute facon.
+                if let onStep {
+                    eval(argmaxCanvas)
+                    onStep(canvasIdx, step, argmaxCanvas)
+                }
 
                 // d) accept / stopping / renoise
                 canvas = sampler.accept(
@@ -204,6 +242,8 @@ public actor DiffusionGemmaPipeline {
             }
 
             totalSteps += stepsExecuted
+            // Canvas en cours abandonne : on ne commit que ce qui est termine.
+            if cancelled { break }
             canvasesUsed += 1
 
             // 4) Commit canvas
@@ -221,15 +261,17 @@ public actor DiffusionGemmaPipeline {
             MLX.Memory.clearCache()
         }
 
-        let promptLen = promptIds.dim(1)
         let totalLen = fullIds.dim(1)
         let generatedIds = fullIds[0..., promptLen ..< totalLen]
+        // Le resultat sort de l'actor : materialise ici (D-08).
+        eval(generatedIds, fullIds)
 
         return DiffusionGenerationResult(
             generatedIds: generatedIds,
             fullIds: fullIds,
             totalDecoderSteps: totalSteps,
-            canvases: canvasesUsed
+            canvases: canvasesUsed,
+            stopReason: cancelled ? .cancelled : .completed
         )
     }
 
