@@ -207,3 +207,9 @@ Environnement de test : `~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf
 3. Validations GPU restantes : K-5 `kvBits` sur 26B/31B (couvert par les profils lean), K-6 `describe --quantize-bits 4` sur E2B bf16.
 4. Puis leviers conditionnés par la mesure : K-15 (n-gramme), K-17 (échantillonnage), K-18 (vision), K-16 (résidence), K-19 (conversation), lots G et H.
 
+## Mesures — 2026-09-28 — campagne des profils et portes
+- Campagne `22902cf7` : 30 profils mesurés (A/A 2,9 %), table dans `docs/References.md`.
+- Portes (A/B/B/A contre `main`, E2B 4 bits) : **K-13** préfill 4k ×3,9, TTFT ÷4,6, décodage inchangé ; pic −42 % (porte −50 % manquée de peu). **K-3** décodage image +23 % (cumul K-3 + K-6 + K-13).
+- Correction d'une lecture : le préfill du 12B et du 31B n'est pas anormal. 7 à 9 TFLOPS effectifs sur 12B, 26B-A4B et 31B, identique en 4 et 16 bits = borné par le calcul. T14 (déquantifier pour le préfill) écarté par la mesure.
+- À corriger : `a4b/*-lean` (tranche 256 = −12 à −22 % de préfill) → tranche 512, à vérifier en A/B.
+

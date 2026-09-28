@@ -472,3 +472,21 @@ Machine Mac15,10 (96 Go), Version 27.0 (Build 26A428), build release, commit e5a
 - Décodage borné par la bande passante des poids : ×1,6 à ×2,7 entre 16 et 4 bits selon la famille.
 - `weights_bw_gbps` n'est qu'un indicateur (surestimé sur E2B/E4B, tables d'embeddings par couche).
 
+## Portes K-3 / K-13 — `main` contre la branche, A/B/B/A — 2026-09-28
+
+E2B 4 bits, cooldown 120 s, ordre A B B A (A = `main` c9543739 + commande `bench` seule, B = branche 22902cf7). Lignes brutes : [`benchmarks/gates-20260928.jsonl`](benchmarks/gates-20260928.jsonl) (label `gate-A` / `gate-B` ; le champ `commit` y vaut 22902cf7 pour les deux : il lit le dépôt courant, pas le binaire).
+
+| Point | Mesure | A (`main`) | B (branche) | Effet |
+|---|---|---|---|---|
+| texte 4 096 | préfill (tok/s) | 1 582 / 1 585 | 6 147 / 6 121 | ×3,9 |
+| texte 4 096 | TTFT (ms) | 3 098 / 3 093 | 676 / 679 | ÷4,6 |
+| texte 4 096 | pic MLX / empreinte (Mo) | 5 351 / 6 529 | 3 086 / 3 789 | −42 % / −42 % |
+| texte 4 096 | décodage médian (tok/s) | 122,0 / 124,2 | 120,7 / 123,6 | bruit |
+| texte 1 024 | préfill (tok/s) | 1 459 / 2 079 | 4 961 / 5 052 | ×2,4 à ×3,4 |
+| texte 1 024 | pic MLX (Mo) | 3 699 | 2 964 | −20 % |
+| image | décodage médian (tok/s) | 104,9 / 106,1 | 130,0 / 130,1 | +23 % |
+| image | préfill (tok/s) / TTFT (ms) | 767-776 / 470-478 | 1 181-1 191 / 259-263 | +53 % / −45 % |
+| image | empreinte (Mo) | 6 433 | 5 088 | −21 % |
+
+**Portes** : K-13 — préfill ≥ +5 % ✅ (×3,9), décodage inchangé ✅, pic à 4k ≤ 50 % de la base ❌ de peu (58 %). K-3 — décodage image ≥ +5 % ✅ (+23 %), gain cumulé de K-3 (fp32), K-6 (vision bf16) et K-13 (préfill par tranches) : cette comparaison ne les sépare pas.
+
