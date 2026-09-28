@@ -14,7 +14,15 @@ struct DiffusionQuantizationTieTests {
     /// le sanitizer (hors self_conditioning et layer_scalar).
     private func tiedModel() throws -> DiffusionGemmaForBlockDiffusion {
         let model = try TinyDiffusion.model()
-        DiffusionOnTheFlyQuantization.retieEncoderDecoder(model)
+        // Comme le sanitizer : le decodeur reprend les tableaux bf16 de l'encodeur
+        // (hors self_conditioning et layer_scalar).
+        let encoder = Dictionary(model.encoder.languageModel.parameters().flattened(), uniquingKeysWith: { a, _ in a })
+        let tied = model.decoder.parameters().flattened().compactMap { key, value -> (String, MLXArray)? in
+            guard !key.hasPrefix("self_conditioning."), !key.hasSuffix("layer_scalar"),
+                  let source = encoder[key], source.shape == value.shape else { return nil }
+            return (key, source)
+        }
+        model.decoder.update(parameters: ModuleParameters.unflattened(tied))
         return model
     }
 

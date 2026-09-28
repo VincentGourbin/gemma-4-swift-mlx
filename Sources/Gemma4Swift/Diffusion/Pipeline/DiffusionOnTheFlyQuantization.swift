@@ -60,9 +60,11 @@ public enum DiffusionOnTheFlyQuantization {
         let mlxMode = mode.mlxMode
 
         var skipped: [String] = []
+        func quantizeTree(_ root: Module, pathPrefix: String) {
         MLXNN.quantize(
-            model: model,
-            filter: { path, m -> (groupSize: Int, bits: Int, mode: QuantizationMode)? in
+            model: root,
+            filter: { relativePath, m -> (groupSize: Int, bits: Int, mode: QuantizationMode)? in
+                let path = pathPrefix + relativePath
                 for prefix in excludedPathPrefixes {
                     if path.hasPrefix(prefix) || path.contains(".\(prefix).") {
                         return nil
@@ -99,6 +101,19 @@ public enum DiffusionOnTheFlyQuantization {
                 return quantizeSingle(layer: layer, groupSize: gs, bits: b, mode: qmode)
             }
         )
+        }
+
+        // Encodeur et decodeur partagent leurs poids (D-02) : quantifier l'encodeur,
+        // le materialiser, puis donner au decodeur les MEMES instances de modules ;
+        // ensuite seulement le reste (self_conditioning, tours…), les modules deja
+        // quantifies etant ignores. Voir `shareEncoderModules`.
+        if let diffusion = model as? DiffusionGemmaForBlockDiffusion {
+            let shared = sharedDecoderLeafPaths(diffusion)
+            quantizeTree(diffusion.encoder.languageModel, pathPrefix: "encoder.language_model.")
+            eval(diffusion.encoder.languageModel)
+            shareEncoderModules(diffusion, paths: shared)
+        }
+        quantizeTree(model, pathPrefix: "")
         if !skipped.isEmpty {
             let msg = "[DiffusionQuant] \(skipped.count) modules skip (last_dim non divisible par \(effectiveGroupSize)) :\n"
                 + skipped.prefix(5).map { "  - \($0)" }.joined(separator: "\n")
@@ -106,9 +121,6 @@ public enum DiffusionOnTheFlyQuantization {
                 + "\n"
             FileHandle.standardError.write(Data(msg.utf8))
         }
-
-        // Encodeur et decodeur partagent leurs poids : une seule copie quantifiee (D-02).
-        if let diffusion = model as? DiffusionGemmaForBlockDiffusion { retieEncoderDecoder(diffusion) }
 
         // Materialise les nouveaux poids quantifies
         eval(model)
@@ -241,6 +253,9 @@ public enum DiffusionOnTheFlyQuantization {
             )
         }
 
+        // Chemins du decodeur qui partagent leurs poids avec l'encodeur (avant quantif).
+        let shared = sharedDecoderLeafPaths(model)
+
         // 1) Encoder text layers
         let encoderTextLayers = model.encoder.languageModel.layers
         for (i, layer) in encoderTextLayers.enumerated() {
@@ -248,24 +263,27 @@ public enum DiffusionOnTheFlyQuantization {
             quantizeModule(layer, bits: bits, label: "encoder.language_model.layers.\(i)")
         }
 
-        // 2) Decoder layers (memes index, partagent les poids tied avec encoder)
+        if config.quantizeSensitiveAtHighPrecision {
+            quantizeModule(model.encoder.languageModel.embedTokens, bits: config.highPrecisionBits, label: "encoder.embed_tokens")
+        }
+
+        // 2) Le decodeur reprend les modules quantifies de l'encodeur (memes instances,
+        //    meme precision par couche) : une seule copie en memoire (D-02).
+        eval(model.encoder.languageModel)
+        shareEncoderModules(model, paths: shared)
+
+        // 3) Ce qui reste propre au decodeur (modules deja quantifies ignores).
         let decoderLayers = model.decoder.layers
         for (i, layer) in decoderLayers.enumerated() {
             let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
             quantizeModule(layer, bits: bits, label: "decoder.layers.\(i)")
         }
-
-        // 3) Sensible : embed_tokens + self_conditioning en highPrecision si demande
         if config.quantizeSensitiveAtHighPrecision {
             quantizeModule(model.decoder.embedTokens, bits: config.highPrecisionBits, label: "decoder.embed_tokens")
-            quantizeModule(model.encoder.languageModel.embedTokens, bits: config.highPrecisionBits, label: "encoder.embed_tokens")
             quantizeModule(model.decoder.selfConditioning, bits: config.highPrecisionBits, label: "decoder.self_conditioning")
         }
 
         // 4) vision_tower / embed_vision restent en bf16 (volontaire).
-
-        // Encodeur et decodeur partagent leurs poids : une seule copie quantifiee (D-02).
-        retieEncoderDecoder(model)
 
         // Materialise les nouveaux poids + clear cache pour liberer bf16
         eval(model)
@@ -274,29 +292,41 @@ public enum DiffusionOnTheFlyQuantization {
         return stats
     }
 
-    /// Re-lie les poids partages encodeur / decodeur apres quantification.
-    ///
-    /// Le sanitizer insere le meme tableau sous `decoder.X` et `encoder.language_model.X`
-    /// (tout sauf `self_conditioning` et `layer_scalar`) : une seule copie en bf16. Mais
-    /// quantifier chaque voie produit un nouveau triplet (poids packes, echelles, biais)
-    /// par voie, donc deux copies. A appeler avant tout `eval` (la quantification est
-    /// paresseuse) : le decodeur reprend les tableaux de l'encodeur et la seconde copie
-    /// n'est jamais calculee. Seules les cles de meme forme et dtype sont reprises.
+    /// Chemins des modules feuilles du decodeur partages avec l'encodeur. Contrat du
+    /// sanitizer (`DiffusionWeightSanitizer`) : le meme tableau est insere sous
+    /// `decoder.X` et `encoder.language_model.X` pour tout sauf `self_conditioning` et
+    /// `layer_scalar` (qui n'est pas un module feuille). Garde-fou : memes cles, formes
+    /// et dtypes. A appeler sur le modele bf16 charge, avant toute quantification.
+    static func sharedDecoderLeafPaths(_ model: DiffusionGemmaForBlockDiffusion) -> Set<String> {
+        let encoderLeaves = Dictionary(
+            model.encoder.languageModel.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+        var shared = Set<String>()
+        for (path, module) in model.decoder.leafModules().flattened() where !path.hasPrefix("self_conditioning") {
+            guard let source = encoderLeaves[path], type(of: source) == type(of: module) else { continue }
+            let mine = module.parameters().flattened()
+            let theirs = Dictionary(source.parameters().flattened(), uniquingKeysWith: { a, _ in a })
+            let compatible = !mine.isEmpty && mine.count == theirs.count && mine.allSatisfy { key, array in
+                theirs[key].map { $0.shape == array.shape && $0.dtype == array.dtype } ?? false
+            }
+            if compatible { shared.insert(path) }
+        }
+        return shared
+    }
+
+    /// Donne au decodeur les instances de modules (quantifies) de l'encodeur pour les
+    /// chemins partages. Partager les **modules**, et non les tableaux : relier les
+    /// tableaux quantifies gardait les 49 Go de bf16 d'origine en memoire (mesure sur le
+    /// vrai checkpoint le 2026-09-28 : 74,8 Go actifs en 8 bits ; avec les modules
+    /// partages : 26,7 Go). A appeler apres avoir quantifie ET evalue l'encodeur.
     @discardableResult
-    static func retieEncoderDecoder(_ model: DiffusionGemmaForBlockDiffusion) -> Int {
-        let encoder = Dictionary(
-            model.encoder.languageModel.parameters().flattened(), uniquingKeysWith: { a, _ in a })
-        var shared: [(String, MLXArray)] = []
-        for (key, value) in model.decoder.parameters().flattened() {
-            guard !key.hasPrefix("self_conditioning."), !key.hasSuffix("layer_scalar"),
-                  let source = encoder[key], source.shape == value.shape, source.dtype == value.dtype
-            else { continue }
-            shared.append((key, source))
+    static func shareEncoderModules(_ model: DiffusionGemmaForBlockDiffusion, paths: Set<String>) -> Int {
+        let encoderLeaves = Dictionary(
+            model.encoder.languageModel.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+        let replacements = paths.sorted().compactMap { path in encoderLeaves[path].map { (path, $0) } }
+        if !replacements.isEmpty {
+            model.decoder.update(modules: ModuleChildren.unflattened(replacements))
         }
-        if !shared.isEmpty {
-            model.decoder.update(parameters: ModuleParameters.unflattened(shared))
-        }
-        return shared.count
+        return replacements.count
     }
 }
 
