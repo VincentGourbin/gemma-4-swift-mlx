@@ -10,8 +10,12 @@ Sources lues : `Sources/Gemma4Swift/Diffusion/**` (23 fichiers, 2 792 lignes), `
 `docs/audit/2026-09-27/{PLAN,audit-performance,scan}.md`, `docs/References.md`, `Gemma4ReferenceProfile.swift`,
 le catalogue `~/.claude/skills/mlx-swift-audit/references/{techniques,measurement,profiles-standard}.md`,
 YuE2 (`docs/References.md`, `docs/Benchmarks.md`, `docs/knowledge/log.md`, `Synthesis/CachedNAR.swift`),
-la référence Python HF (`transformers/models/diffusion_gemma/{generation,modular}_diffusion_gemma.py`, lue
-par WebFetch : extraits cités, relecture ligne à ligne **À VÉRIFIER**), `config.json` du pack AR
+la référence Python HF (`transformers/models/diffusion_gemma/{generation,modular}_diffusion_gemma.py` ; copie
+locale lue dans `~/Developpements/h3-swift-mlx/.local-runs/parity-venv/lib/python3.12/site-packages/transformers/` :
+arrêt `generation_diffusion_gemma.py:521-530` (comparaison **puis** `roll`), encodeur `modular_diffusion_gemma.py:758, 778`
+(`DynamicCache(config=…)`, `create_sliding_window_causal_mask`), `cache_utils.py:190, 230-232`
+(`DynamicSlidingWindowLayer` ne garde que les `sliding_window − 1` derniers jetons) — D-04 et D-05 sont donc
+VÉRIFIÉS contre la référence), `config.json` du pack AR
 `gemma-4-26b-a4b-it-4bit` (Lexar) pour les dimensions (même squelette que DiffusionGemma).
 
 Légende : **VÉRIFIÉ** = lu dans le code (fichier:ligne) ou dans une mesure publiée du dépôt ;
