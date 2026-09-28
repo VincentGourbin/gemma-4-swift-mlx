@@ -92,9 +92,22 @@ public final class EntropyBoundSampler: @unchecked Sendable {
         denoiserCanvas: MLXArray,
         logits: MLXArray
     ) -> MLXArray {
-        let entropy = useCompiledEntropy
-            ? Self.compiledTokenEntropy(logits)
-            : Self.tokenEntropy(logits)  // [B, T]
+        accept(currentCanvas: currentCanvas, denoiserCanvas: denoiserCanvas, entropy: entropy(of: logits))
+    }
+
+    /// Entropie par position selon `useCompiledEntropy`. A calculer une fois par pas et
+    /// a passer a `accept(…entropy:)` et `StableConfidentStopping.shouldStop(…entropy:)` :
+    /// les deux la recalculaient sur les logits `[B, T, V]` (D-12).
+    public func entropy(of logits: MLXArray) -> MLXArray {
+        useCompiledEntropy ? Self.compiledTokenEntropy(logits) : Self.tokenEntropy(logits)
+    }
+
+    /// `accept` a partir d'une entropie deja calculee (`entropy(of:)`), `[B, T]`.
+    public func accept(
+        currentCanvas: MLXArray,
+        denoiserCanvas: MLXArray,
+        entropy: MLXArray
+    ) -> MLXArray {
 
         // Tri ascendant par entropie le long de T
         let sortedIdx = argSort(entropy, axis: -1)        // [B, T]

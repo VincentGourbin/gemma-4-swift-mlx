@@ -37,6 +37,12 @@ public final class StableConfidentStopping: @unchecked Sendable {
     ///   - logits : `[B, T, V]`, float. Logits du denoiser cette etape.
     /// - Returns: `[B]`, bool. True pour les exemples qui ont converge.
     public func shouldStop(argmaxCanvas: MLXArray, logits: MLXArray) -> MLXArray {
+        shouldStop(argmaxCanvas: argmaxCanvas, entropy: EntropyBoundSampler.tokenEntropy(logits))
+    }
+
+    /// Variante a partir de l'entropie par position deja calculee (`[B, T]`), pour ne
+    /// pas la recalculer sur les logits a chaque pas (D-12).
+    public func shouldStop(argmaxCanvas: MLXArray, entropy: MLXArray) -> MLXArray {
         // Stable : l'argmax courant est egal aux `stabilityThreshold` argmax PRECEDENTS.
         // Python compare avant de mettre l'historique a jour (`roll` puis ecriture) ;
         // ajouter d'abord rendait « stable » toujours vrai avec le seuil par defaut 1 (D-04).
@@ -59,7 +65,6 @@ public final class StableConfidentStopping: @unchecked Sendable {
         }
 
         // Confident : mean(entropy, axis=-1) < confidence_threshold
-        let entropy = EntropyBoundSampler.tokenEntropy(logits)  // [B, T]
         let meanEntropy = entropy.mean(axis: -1)                // [B]
         let confident = meanEntropy .< MLXArray(confidenceThreshold)
 

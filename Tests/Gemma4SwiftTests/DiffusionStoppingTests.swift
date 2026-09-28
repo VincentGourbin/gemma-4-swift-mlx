@@ -45,4 +45,24 @@ struct DiffusionStoppingTests {
         s.reset()
         #expect(!stop(s, [1]))
     }
+
+    @Test("entropie fournie : meme decision et meme canvas que le recalcul sur les logits (D-12)")
+    func testSharedEntropyEquivalence() {
+        MLXRandom.seed(11)
+        let logits = MLXRandom.normal([1, 6, 16]) * 3
+        let argmax = argMax(logits, axis: -1).asType(.int32)
+        let a = StableConfidentStopping(stabilityThreshold: 1, confidenceThreshold: 2)
+        let b = StableConfidentStopping(stabilityThreshold: 1, confidenceThreshold: 2)
+        let sampler = EntropyBoundSampler(entropyBound: 0.5, vocabSize: 16, canvasLength: 6)
+        let entropy = sampler.entropy(of: logits)
+        for _ in 0 ..< 2 {
+            let viaLogits = a.shouldStop(argmaxCanvas: argmax, logits: logits)
+            let viaEntropy = b.shouldStop(argmaxCanvas: argmax, entropy: entropy)
+            #expect(viaLogits.asArray(Bool.self) == viaEntropy.asArray(Bool.self))
+        }
+        let current = MLXArray.zeros([1, 6], type: Int32.self)
+        let oldCanvas = sampler.accept(currentCanvas: current, denoiserCanvas: argmax, logits: logits)
+        let newCanvas = sampler.accept(currentCanvas: current, denoiserCanvas: argmax, entropy: entropy)
+        #expect(oldCanvas.asArray(Int32.self) == newCanvas.asArray(Int32.self))
+    }
 }

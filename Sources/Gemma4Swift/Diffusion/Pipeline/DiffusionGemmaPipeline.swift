@@ -219,14 +219,16 @@ public actor DiffusionGemmaPipeline {
                 }
 
                 // d) accept / stopping / renoise
+                // Entropie calculee une fois, partagee par accept et l'arret (D-12).
+                let entropy = sampler.entropy(of: scaled)
                 canvas = sampler.accept(
                     currentCanvas: canvas,
                     denoiserCanvas: denoiserCanvas,
-                    logits: scaled
+                    entropy: entropy
                 )
 
                 stepsExecuted += 1
-                let shouldStop = stopping.shouldStop(argmaxCanvas: argmaxCanvas, logits: scaled)
+                let shouldStop = stopping.shouldStop(argmaxCanvas: argmaxCanvas, entropy: entropy)
                 if shouldStop.all().item(Bool.self) {
                     break
                 }
