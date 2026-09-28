@@ -9,12 +9,14 @@ struct References: ParsableCommand {
         abstract: "Liste les profils de reference <bits>bit-<fast|lean> et leurs reglages"
     )
 
-    @Option(name: .long, help: "Famille : e2b, e4b, b12b, a4b, b31b")
+    @Option(name: .long, help: "Famille : e2b, e4b, b12b, a4b, b31b, a4bdiff (diffusion)")
     var family: String?
 
     func run() throws {
         let families: [Gemma4Pipeline.Model.Family]
-        if let family {
+        if family == "a4bdiff" {
+            families = []
+        } else if let family {
             guard let parsed = Gemma4Pipeline.Model.Family(rawValue: family) else {
                 throw ValidationError("famille inconnue : \(family)")
             }
@@ -35,6 +37,25 @@ struct References: ParsableCommand {
                 print("  poids   : \(profile.model.rawValue) (~\(Int(profile.model.estimatedSizeGB)) Go)")
                 print("  reglages: KV \(kv), prefill \(profile.prefillStepSize), cache \(cache), seuil \(limit), "
                     + "vidage apres reponse \(profile.clearCacheAfterAnswer ? "oui" : "non")")
+                print("  \(profile.summary)")
+            }
+            print()
+        }
+        if family == nil || family == "a4bdiff" {
+            let recommendedDiffusion = DiffusionReferenceProfile.recommended(availableMB: available)
+            for profile in DiffusionReferenceProfile.all {
+                let mark = profile == recommendedDiffusion ? " ← conseille ici" : ""
+                let quant: String
+                switch profile.quantization {
+                case .none: quant = "bf16"
+                case .uniform(let bits, let groupSize): quant = "\(bits) bits g\(groupSize) (routeur 8 bits)"
+                }
+                let cache = profile.cacheLimitMB.map { "\($0) Mo" } ?? "MLX"
+                let limit = profile.memoryLimitMB.map { "\($0) Mo" } ?? "-"
+                print("\(profile.qualifiedID)\(mark)")
+                print("  poids   : \(DiffusionReferenceProfile.checkpointID) -> \(quant) (~\(Int(profile.estimatedWeightsGB)) Go)")
+                print("  reglages: vision dechargee apres canvas 0 \(profile.unloadVisionAfterFirstCanvas ? "oui" : "non"), "
+                    + "cache \(cache), seuil \(limit), vidage entre canvases \(profile.clearCacheBetweenCanvases ? "oui" : "non")")
                 print("  \(profile.summary)")
             }
             print()

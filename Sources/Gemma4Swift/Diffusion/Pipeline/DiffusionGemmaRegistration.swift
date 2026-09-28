@@ -121,6 +121,27 @@ public enum DiffusionGemmaRegistration {
         )
     }
 
+    /// Charge le bf16 officiel et applique un profil de reference : quantification a la
+    /// volee (experts compris, routeur 8 bits, vision bf16), vision, politique memoire.
+    /// Additif : `load(from:memoryConfig:includeVision:)` reste.
+    public static func load(
+        from directory: URL,
+        profile: DiffusionReferenceProfile
+    ) async throws -> DiffusionGemmaContainer {
+        let container = try await load(
+            from: directory, memoryConfig: profile.memoryConfig, includeVision: profile.includeVision)
+        switch profile.quantization {
+        case .none:
+            break
+        case .uniform(let bits, let groupSize):
+            DiffusionOnTheFlyQuantization.apply(
+                to: container.model, bits: bits, groupSize: groupSize,
+                excludedPathPrefixes: DiffusionOnTheFlyQuantization.multimodalEncoderPrefixes)
+        }
+        profile.applyGlobalPolicy()
+        return container
+    }
+
     /// RAM systeme en GB pour auto-selection du preset.
     public static var systemRAMGB: Int {
         Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
