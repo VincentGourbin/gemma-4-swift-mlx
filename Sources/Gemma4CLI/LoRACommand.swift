@@ -107,59 +107,8 @@ extension LoRA {
                 (context: ModelContext) -> ([[Int]], [[Int]]) in
                 let tok = context.tokenizer
 
-                func tokenizeFile(name: String) throws -> [[Int]] {
-                    let url = dataURL.appending(component: "\(name).jsonl")
-                    let lines = try String(contentsOf: url, encoding: .utf8)
-                        .components(separatedBy: .newlines)
-
-                    struct ChatMsg: Codable {
-                        let messages: [ChatMessage]?
-                        let text: String?
-                    }
-
-                    // A-06 : chaque rejet est compte et signale (numero de ligne + raison).
-                    var rejected: [String] = []
-                    defer {
-                        if !rejected.isEmpty {
-                            print("\(name).jsonl : \(rejected.count) ligne(s) rejetee(s)")
-                            for reason in rejected.prefix(10) { print("  - \(reason)") }
-                            if rejected.count > 10 { print("  … +\(rejected.count - 10)") }
-                        }
-                    }
-                    return try lines.enumerated().compactMap { index, raw -> [Int]? in
-                        let line = raw.trimmingCharacters(in: .whitespaces)
-                        guard !line.isEmpty else { return nil }
-                        let sample: ChatMsg
-                        do {
-                            sample = try JSONDecoder().decode(ChatMsg.self, from: Data(line.utf8))
-                        } catch {
-                            rejected.append("ligne \(index + 1) : JSON invalide ou champs inattendus")
-                            return nil
-                        }
-
-                        if let msgs = sample.messages, !msgs.isEmpty {
-                            // Chat format: tokeniser DIRECTEMENT via applyChatTemplate
-                            let msgDicts = msgs.map { ["role": $0.role, "content": $0.content] }
-                            var ids = try tok.applyChatTemplate(messages: msgDicts)
-                            // Retirer les 3 derniers tokens (add_generation_prompt: <|turn>model\n)
-                            if ids.count >= 3 {
-                                let last3 = Array(ids.suffix(3))
-                                if last3 == [105, 4368, 107] { // <|turn> model \n
-                                    ids = Array(ids.dropLast(3))
-                                }
-                            }
-                            ids = Gemma4Processor.strippingTemplateArtifacts(ids)
-                            return ids
-                        } else if let text = sample.text {
-                            return tok.encode(text: text)
-                        }
-                        rejected.append("ligne \(index + 1) : ni `messages` ni `text`")
-                        return nil
-                    }
-                }
-
-                let train = try tokenizeFile(name: "train")
-                let valid = try tokenizeFile(name: "valid")
+                let train = try tokenizeTrainingFile(dataURL.appending(component: "train.jsonl"), tokenizer: tok)
+                let valid = try tokenizeTrainingFile(dataURL.appending(component: "valid.jsonl"), tokenizer: tok)
                 return (train, valid)
             }
 
@@ -352,45 +301,17 @@ extension LoRA {
                     )
                 }
 
-                // Tokeniser le texte (sans placeholders — applyChatTemplate les escape)
-                let sampleText = sample.text
-                var tokens: [Int] = try await container.perform { (context: ModelContext) -> [Int] in
-                    var ids = context.tokenizer.encode(text: sampleText)
-                    return Gemma4Processor.strippingTemplateArtifacts(ids)
+                // A-03 / A-04 : ids directs au format de l'inference (marqueurs dans le tour
+                // user, joints par \n), sans aller-retour decode -> encode.
+                guard let messages = sample.messages else {
+                    throw ValidationError("exemple multimodal sans messages")
                 }
-
-                // Trouver le point d'injection: juste apres <|turn>user\n
-                // Token IDs: 105=<|turn>, 2364=user, 107=\n
-                // On cherche la PREMIERE occurrence (le user prompt)
-                var insertionIdx: Int? = nil
-                for j in 0 ..< tokens.count - 2 {
-                    if tokens[j] == 105 && tokens[j + 1] == 2364 && tokens[j + 2] == 107 {
-                        insertionIdx = j + 3  // juste apres user\n
-                        break
-                    }
-                }
-
-                // Injecter les tokens image (boi + image_token*280 + eoi)
-                if pixelValues != nil, let idx = insertionIdx {
-                    let imgId = Int(Gemma4Processor.imageTokenId)
-                    let boiId = Int(Gemma4Processor.boiTokenId)
-                    let eoiId = Int(Gemma4Processor.eoiTokenId)
-                    var mediaTokens = [boiId]
-                    mediaTokens.append(contentsOf: Array(repeating: imgId, count: 280))
-                    mediaTokens.append(eoiId)
-                    tokens.insert(contentsOf: mediaTokens, at: idx)
-                    insertionIdx = idx + mediaTokens.count  // avancer le point d'insertion
-                }
-
-                // Injecter les tokens audio (boa + audio_token*N + eoa)
-                if let af = audioFeatures, let idx = insertionIdx {
-                    let audId = Int(Gemma4Processor.audioTokenId)
-                    let boaId = Int(Gemma4Processor.boaTokenId)
-                    let eoaId = Int(Gemma4Processor.eoaTokenId)
-                    var mediaTokens = [boaId]
-                    mediaTokens.append(contentsOf: Array(repeating: audId, count: af.numTokens))
-                    mediaTokens.append(eoaId)
-                    tokens.insert(contentsOf: mediaTokens, at: idx)
+                let hasImage = pixelValues != nil
+                let audioTokens = audioFeatures?.numTokens
+                let tokens: [Int] = try await container.perform { (context: ModelContext) -> [Int] in
+                    try Gemma4Processor.multimodalTrainingIds(
+                        messages: messages, hasImage: hasImage, audioTokens: audioTokens,
+                        tokenizer: context.tokenizer)
                 }
 
                 // Calculer le prompt offset (apres expansion)
@@ -437,6 +358,9 @@ extension LoRA {
         @Option(name: .long, help: "Taille du batch")
         var batchSize: Int = 1
 
+        @Flag(name: .long, help: "Perte sur la reponse seulement (comme train --mask-prompt) : comparable a la val loss")
+        var maskPrompt: Bool = false
+
         func run() async throws {
             print("Chargement du modele: \(modelPath)")
             let container = try await loadLocalModel(path: modelPath)
@@ -448,28 +372,14 @@ extension LoRA {
             )
 
             let dataURL = URL(fileURLWithPath: data)
-            let testData = try await container.perform { context -> [String] in
-                let tok = context.tokenizer
-                let genPromptSuffix = "<|turn>model\n"
-                let formatter: ([[String: String]]) throws -> String = { messages in
-                    let ids = Gemma4Processor.strippingTemplateArtifacts(
-                        try tok.applyChatTemplate(messages: messages))
-                    var text = tok.decode(tokenIds: ids)
-                    if text.hasSuffix(genPromptSuffix) {
-                        text = String(text.dropLast(genPromptSuffix.count))
-                    }
-                    return text
-                }
-                return try loadGemma4TrainingData(directory: dataURL, name: "test", chatFormatter: formatter)
+            let testTokens = try await container.perform { context -> [[Int]] in
+                try tokenizeTrainingFile(dataURL.appending(component: "test.jsonl"), tokenizer: context.tokenizer)
             }
-            print("Test: \(testData.count) samples")
+            print("Test: \(testTokens.count) samples")
 
             print("Evaluation...")
-            let loss = try await Gemma4LoRATrain.evaluate(
-                container: container,
-                testData: testData,
-                batchSize: batchSize
-            )
+            let loss = try await Gemma4LoRATrain.evaluateMasked(
+                container: container, samples: testTokens, maskPrompt: maskPrompt, batchSize: batchSize)
 
             print("Test loss: \(String(format: "%.4f", loss))")
             print("Test perplexite: \(String(format: "%.4f", exp(loss)))")
@@ -774,5 +684,58 @@ extension LoRA {
             print("Resultats sauvegardes dans \(output)")
             print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
         }
+    }
+}
+
+/// Ids directs d'un JSONL d'entrainement (`messages` ou `text`) : gabarit sans suffixe de
+/// generation ni artefacts, rejets comptes et signales (A-06). Partage par train et eval.
+func tokenizeTrainingFile(_ url: URL, tokenizer tok: any MLXLMCommon.Tokenizer) throws -> [[Int]] {
+    let name = url.deletingPathExtension().lastPathComponent
+    let lines = try String(contentsOf: url, encoding: .utf8)
+        .components(separatedBy: .newlines)
+
+    struct ChatMsg: Codable {
+        let messages: [ChatMessage]?
+        let text: String?
+    }
+
+    // A-06 : chaque rejet est compte et signale (numero de ligne + raison).
+    var rejected: [String] = []
+    defer {
+        if !rejected.isEmpty {
+            print("\(name).jsonl : \(rejected.count) ligne(s) rejetee(s)")
+            for reason in rejected.prefix(10) { print("  - \(reason)") }
+            if rejected.count > 10 { print("  … +\(rejected.count - 10)") }
+        }
+    }
+    return try lines.enumerated().compactMap { index, raw -> [Int]? in
+        let line = raw.trimmingCharacters(in: .whitespaces)
+        guard !line.isEmpty else { return nil }
+        let sample: ChatMsg
+        do {
+            sample = try JSONDecoder().decode(ChatMsg.self, from: Data(line.utf8))
+        } catch {
+            rejected.append("ligne \(index + 1) : JSON invalide ou champs inattendus")
+            return nil
+        }
+
+        if let msgs = sample.messages, !msgs.isEmpty {
+            // Chat format: tokeniser DIRECTEMENT via applyChatTemplate
+            let msgDicts = msgs.map { ["role": $0.role, "content": $0.content] }
+            var ids = try tok.applyChatTemplate(messages: msgDicts)
+            // Retirer les 3 derniers tokens (add_generation_prompt: <|turn>model\n)
+            if ids.count >= 3 {
+                let last3 = Array(ids.suffix(3))
+                if last3 == [105, 4368, 107] { // <|turn> model \n
+                    ids = Array(ids.dropLast(3))
+                }
+            }
+            ids = Gemma4Processor.strippingTemplateArtifacts(ids)
+            return ids
+        } else if let text = sample.text {
+            return tok.encode(text: text)
+        }
+        rejected.append("ligne \(index + 1) : ni `messages` ni `text`")
+        return nil
     }
 }

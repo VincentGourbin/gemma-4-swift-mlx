@@ -126,6 +126,34 @@ public enum Gemma4LoRATrain {
         return (result, truncated)
     }
 
+    /// Exemple d'entrainement : frontiere prompt / reponse au dernier `<|turn>model\n`
+    /// si `maskPrompt`, sinon 0. `nil` si moins de 2 jetons.
+    public static func trainingSample(_ tokens: [Int], maskPrompt: Bool) -> TrainingBatchIterator.TokenizedSample? {
+        guard tokens.count > 1 else { return nil }
+        var offset = 0
+        if maskPrompt {
+            for i in 0 ..< tokens.count - 1 where tokens[i] == 105 && tokens[i + 1] == 4368 {
+                offset = i + 3
+            }
+        }
+        return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+    }
+
+    /// Perte moyenne par jeton sur des ids directs, **meme masquage et meme boucle que la
+    /// validation de l'entrainement** (A-03 : `evaluate` amont re-encodait du texte et ne
+    /// masquait pas le prompt, donc n'etait pas comparable a la val loss).
+    public static func evaluateMasked(
+        container: ModelContainer, samples: [[Int]], maskPrompt: Bool, batchSize: Int = 1
+    ) async throws -> Float {
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
+        return await container.perform { context in
+            let prepared = samples.compactMap { trainingSample($0, maskPrompt: maskPrompt) }
+            context.model.train(false)
+            return evaluateTraining(model: context.model, samples: prepared, batchSize: batchSize)
+        }
+    }
+
     /// `full` n'a de sens que si les poids ne sont pas quantifies (A-07).
     static func checkFullFineTune(_ model: Module) throws {
         if model.leafModules().flattened().contains(where: { $0.1 is Quantized }) {

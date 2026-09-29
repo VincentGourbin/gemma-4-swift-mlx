@@ -243,6 +243,51 @@ public struct Gemma4Processor {
         return expanded
     }
 
+    /// Ids d'un exemple d'entrainement multimodal au **format exact de l'inference**
+    /// (A-03 / A-04) : marqueurs `<|image|>` puis `<|audio|>` en tete du premier tour
+    /// user, joints au texte par `\n` comme `describe` et `multimodalChatIds` ; gabarit
+    /// rendu en ids directs (pas d'aller-retour texte), sans suffixe de generation ni
+    /// artefacts ; marqueurs developpes (`boi + image x N + eoi`, `boa + audio x M + eoa`).
+    /// Un media sans tour user est une erreur (il etait garde sans positions).
+    public static func multimodalTrainingIds(
+        messages: [[String: String]],
+        hasImage: Bool,
+        audioTokens: Int?,
+        tokenizer: any Tokenizer,
+        numImageTokens: Int = 280
+    ) throws -> [Int] {
+        var messages = messages
+        if hasImage || audioTokens != nil {
+            guard let user = messages.firstIndex(where: { $0["role"] == "user" }) else {
+                throw Gemma4PipelineError.invalidInput("exemple avec media mais sans tour user")
+            }
+            var parts: [String] = []
+            if hasImage { parts.append(imageToken) }
+            if audioTokens != nil { parts.append(audioToken) }
+            parts.append(messages[user]["content"] ?? "")
+            messages[user]["content"] = parts.joined(separator: "\n")
+        }
+        var ids = try tokenizer.applyChatTemplate(messages: messages, tools: nil, additionalContext: nil)
+        if ids.suffix(3) == [Int(turnStartTokenId), 4368, Int(newlineTokenId)] { ids.removeLast(3) }
+        ids = strippingTemplateArtifacts(ids)
+
+        var expanded: [Int] = []
+        for id in ids {
+            if id == Int(imageTokenId) {
+                expanded.append(Int(boiTokenId))
+                expanded.append(contentsOf: repeatElement(Int(imageTokenId), count: numImageTokens))
+                expanded.append(Int(eoiTokenId))
+            } else if id == Int(audioTokenId), let n = audioTokens {
+                expanded.append(Int(boaTokenId))
+                expanded.append(contentsOf: repeatElement(Int(audioTokenId), count: n))
+                expanded.append(Int(eoaTokenId))
+            } else {
+                expanded.append(id)
+            }
+        }
+        return expanded
+    }
+
     /// Equivalent texte de `multimodalChatIds` : meme rendu de chat template,
     /// memes reparations d'artefacts, sans marqueur image.
     ///
