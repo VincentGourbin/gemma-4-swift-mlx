@@ -39,6 +39,11 @@ public enum DiffusionGemmaLoader {
         from directory: URL,
         includeVision: Bool = false
     ) throws -> (model: DiffusionGemmaForBlockDiffusion, config: DiffusionGemmaConfig) {
+        // Pack pre-quantifie (K-D12) : charge quantifie, sans lire de bf16.
+        if DiffusionPrequantizedPack.isPack(directory) {
+            let pack = try DiffusionPrequantizedPack.load(from: directory, includeVision: includeVision)
+            return (pack.model, pack.config)
+        }
         let config = try loadConfig(from: directory)
         let model = DiffusionGemmaForBlockDiffusion(config)
         try loadWeights(into: model, from: directory, includeVision: includeVision)

@@ -84,8 +84,11 @@ struct BenchDiffusion: AsyncParsableCommand {
         var context = BenchContext.collect(modelURL: url, loadSeconds: loadSeconds)
         context.fields["profile"] = profile.qualifiedID
         if let quantVariant { context.fields["quant_variant"] = quantVariant }
-        context.fields["profile_weights_match"] =
-            url.lastPathComponent == DiffusionReferenceProfile.checkpointID.split(separator: "/").last.map(String.init)
+        // Un pack n'est charge que si sa quantification est celle du profil (sinon erreur).
+        let isPack = DiffusionPrequantizedPack.isPack(url)
+        context.fields["weights_source"] = isPack ? "prequantized" : "bf16-on-the-fly"
+        context.fields["profile_weights_match"] = isPack
+            || url.lastPathComponent == DiffusionReferenceProfile.checkpointID.split(separator: "/").last.map(String.init)
         context.fields["workload"] = workload.rawValue
         context.fields["load_peak_mlx_mb"] = Memory.peakMemory / 1_048_576
 

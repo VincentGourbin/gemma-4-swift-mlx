@@ -92,8 +92,8 @@ public enum DiffusionGemmaRegistration {
             throw LoadError.configLoadFailed(error)
         }
 
-        // 2) Mixed precision si demandee
-        if let mp = memoryConfig.mixedPrecision {
+        // 2) Mixed precision si demandee (un pack est deja quantifie)
+        if let mp = memoryConfig.mixedPrecision, !DiffusionPrequantizedPack.isPack(directory) {
             _ = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: model, config: mp)
         }
 
@@ -134,6 +134,18 @@ public enum DiffusionGemmaRegistration {
         from directory: URL,
         profile: DiffusionReferenceProfile
     ) async throws -> DiffusionGemmaContainer {
+        // Pack pre-quantifie : sa quantification doit etre celle du profil.
+        if DiffusionPrequantizedPack.isPack(directory) {
+            let manifest = try DiffusionPrequantizedPack.readManifest(directory)
+            guard manifest.quantization == profile.quantization.signature else {
+                throw DiffusionPrequantizedPack.PackError.quantizationMismatch(
+                    pack: manifest.quantization, profile: profile.quantization.signature)
+            }
+            let container = try await load(
+                from: directory, memoryConfig: profile.memoryConfig, includeVision: profile.includeVision)
+            profile.applyGlobalPolicy()
+            return container
+        }
         let container = try await load(
             from: directory, memoryConfig: profile.memoryConfig, includeVision: profile.includeVision)
         switch profile.quantization {

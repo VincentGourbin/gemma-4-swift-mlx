@@ -27,6 +27,18 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
         case uniform(bits: Int, groupSize: Int)
         /// Precision mixte par couche (`applyMixedPrecision`), vision en bf16.
         case mixed(DiffusionOnTheFlyQuantization.MixedPrecisionConfig)
+
+        /// Identifiant stable, ecrit dans un pack pre-quantifie et compare au chargement.
+        public var signature: String {
+            switch self {
+            case .none: return "none"
+            case .uniform(let bits, let groupSize): return "uniform-\(bits)bit-g\(groupSize)"
+            case .mixed(let c):
+                let layers = c.highPrecisionLayers.sorted().map(String.init).joined(separator: ",")
+                return "mixed-\(c.lowPrecisionBits)/\(c.highPrecisionBits)bit-g\(c.groupSize)-layers[\(layers)]"
+                    + (c.quantizeSensitiveAtHighPrecision ? "-sensitive" : "")
+            }
+        }
     }
 
     /// Checkpoint source (bf16 officiel, ~50 Go).
