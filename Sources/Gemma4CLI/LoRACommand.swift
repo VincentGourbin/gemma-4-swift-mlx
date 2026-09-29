@@ -12,7 +12,7 @@ struct LoRA: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "lora",
         abstract: "Fine-tuning LoRA/QLoRA pour Gemma 4",
-        subcommands: [Train.self, Eval.self, Fuse.self, LoRAGenerate.self, BenchMultimodal.self]
+        subcommands: [Train.self, Profiles.self, Eval.self, Fuse.self, LoRAGenerate.self, BenchMultimodal.self]
     )
 }
 
@@ -96,6 +96,12 @@ extension LoRA {
         @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
         var profile: Bool = false
 
+        @Option(name: .long, help: "Profil d'entrainement (ex. lora-16bit-fast ; voir `lora profiles`) : fixe rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation")
+        var reference: String?
+
+        @Flag(name: .long, help: "Avec --reference : accepter un profil candidat pas encore mesure (campagne K-33)")
+        var allowUnmeasured: Bool = false
+
         @Flag(name: .long, help: "Mode multimodal: charge le modele complet (vision+audio) et traite les champs image/audio du JSONL")
         var multimodal: Bool = false
 
@@ -147,7 +153,7 @@ extension LoRA {
             guard let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) else {
                 throw ValidationError("--fine-tune-type inconnu : \(fineTuneType) (lora, dora ou full)")
             }
-            let config = Gemma4LoRATrain.TrainingConfig(
+            var config = Gemma4LoRATrain.TrainingConfig(
                 fineTuneType: ftType,
                 loraRank: rank,
                 loraScale: scale,
@@ -172,13 +178,14 @@ extension LoRA {
                 memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil,
                 gradientCheckpointing: gradCheckpoint
             )
+            try applyReference(to: &config, family: family)
 
             print("\n--- Debut du training ---")
             let masking = config.maskPrompt ? " + response masking" : ""
             let clipInfo = config.gradClipMaxNorm > 0 ? ", grad_clip: \(config.gradClipMaxNorm)" : ""
-            print("Mode: \(ftType.rawValue)\(masking), Rank: \(rank), Scale: \(scale), LR: \(learningRate)\(clipInfo)")
-            print("Batch: \(batchSize), Iterations: \(iterations)")
-            print("Couches: \(numLayers ?? family.defaultNumLayers)")
+            print("Mode: \(config.fineTuneType.rawValue)\(masking), Rank: \(config.loraRank), Scale: \(config.loraScale), LR: \(config.learningRate)\(clipInfo)")
+            print("Batch: \(config.batchSize), Iterations: \(iterations)")
+            print("Couches: \(config.numLayers ?? family.defaultNumLayers)")
             print("Sortie: \(output)")
             print("---\n")
 
@@ -194,6 +201,46 @@ extension LoRA {
 
             print("\nTraining termine.")
             print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
+        }
+
+        /// `--reference` : pose le profil d'entrainement ; ses reglages l'emportent sur les
+        /// options correspondantes, et c'est affiche.
+        func applyReference(
+            to config: inout Gemma4LoRATrain.TrainingConfig, family: Gemma4LoRADefaults.ModelFamily
+        ) throws {
+            guard let reference else { return }
+            guard let profile = Gemma4TrainingProfile.candidates.first(where: {
+                $0.qualifiedID == reference || ($0.id == reference && $0.loraFamily == family)
+            }) else {
+                let ids = Gemma4TrainingProfile.candidates.filter { $0.loraFamily == family }.map(\.id)
+                throw ValidationError("profil d'entrainement inconnu pour \(family.rawValue) : \(reference) (connus : \(ids.joined(separator: ", ")))")
+            }
+            guard profile.loraFamily == family else {
+                throw ValidationError("\(profile.qualifiedID) vise \(profile.loraFamily.rawValue), le modele est \(family.rawValue)")
+            }
+            if profile.measurement == nil && !allowUnmeasured {
+                throw ValidationError("\(profile.qualifiedID) n'est pas encore mesure : --allow-unmeasured pour l'utiliser quand meme")
+            }
+            if config.fineTuneType != .lora {
+                throw ValidationError("--reference est un profil LoRA : incompatible avec --fine-tune-type \(config.fineTuneType.rawValue)")
+            }
+            let bits = Self.baseBits(of: URL(fileURLWithPath: modelPath))
+            if bits != Int(profile.bits.rawValue) {
+                print("Attention : \(profile.qualifiedID) est mesure sur une base \(profile.bits.rawValue) bits, ce modele est en \(bits) bits.")
+            }
+            profile.apply(to: &config)
+            print("Profil \(profile.qualifiedID)\(profile.measurement == nil ? " (NON MESURE)" : "") : \(profile.summary)")
+            print("  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.")
+        }
+
+        /// Largeur des poids de base lue dans `config.json` (16 si non quantifie).
+        static func baseBits(of directory: URL) -> Int {
+            guard let data = try? Data(contentsOf: directory.appendingPathComponent("config.json")),
+                  let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let quantization = (config["quantization"] ?? config["quantization_config"]) as? [String: Any],
+                  let bits = quantization["bits"] as? Int
+            else { return 16 }
+            return bits
         }
 
         // MARK: - Multimodal training
@@ -253,7 +300,7 @@ extension LoRA {
             guard let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) else {
                 throw ValidationError("--fine-tune-type inconnu : \(fineTuneType) (lora, dora ou full)")
             }
-            let config = Gemma4LoRATrain.TrainingConfig(
+            var config = Gemma4LoRATrain.TrainingConfig(
                 fineTuneType: ftType,
                 loraRank: rank,
                 loraScale: scale,
@@ -278,12 +325,14 @@ extension LoRA {
                 multimodalFloat32: fp32Model,
                 gradientCheckpointing: gradCheckpoint
             )
+            try applyReference(to: &config, family: family)
+            config.batchSize = 1
 
             print("\n--- Debut du training multimodal ---")
             let masking = config.maskPrompt ? " + response masking" : ""
-            print("Mode: \(ftType.rawValue)\(masking), Rank: \(rank), Scale: \(scale), LR: \(learningRate)")
+            print("Mode: \(config.fineTuneType.rawValue)\(masking), Rank: \(config.loraRank), Scale: \(config.loraScale), LR: \(config.learningRate)")
             print("Batch: 1 (multimodal), Iterations: \(iterations)")
-            print("Couches: \(numLayers ?? family.defaultNumLayers)")
+            print("Couches: \(config.numLayers ?? family.defaultNumLayers)")
             print("Sortie: \(output)")
             print("---\n")
 
@@ -370,6 +419,27 @@ extension LoRA {
 // MARK: - Eval
 
 extension LoRA {
+    /// `lora profiles` : matrice des profils d'entrainement, mesures ou non.
+    struct Profiles: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Liste les profils d'entrainement (K-33) et leurs mesures")
+
+        func run() throws {
+            for profile in Gemma4TrainingProfile.candidates {
+                let checkpointing = profile.gradientCheckpointing ? "oui" : "non"
+                let cache = profile.memoryPolicy.cacheLimitMB.map { "\($0) Mo" } ?? "-"
+                print("\(profile.qualifiedID)  base \(profile.model.rawValue)")
+                print("  r\(profile.rank) s\(Int(profile.scale)), \(profile.numLayers) couches, lr \(profile.learningRate), batch \(profile.batchSize), checkpointing \(checkpointing), cache \(cache)")
+                if let m = profile.measurement {
+                    let e7 = m.e7Valid.map { ", E7 \($0)/30" } ?? ""
+                    print(String(format: "  mesure %@ (%d pas) : pic MLX %.1f Go, empreinte %.1f Go, %.0f tok/s, val %.3f", m.date, m.steps, m.peakMLXGB, m.footprintGB, m.trainedTokensPerSecond, m.validationLoss) + e7)
+                } else {
+                    print("  NON MESURE (non publie)")
+                }
+            }
+        }
+    }
+
     struct Eval: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Evalue la loss d'un modele avec adapter sur un dataset"
