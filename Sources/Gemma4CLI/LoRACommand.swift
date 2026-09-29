@@ -93,7 +93,9 @@ extension LoRA {
             print("Modele charge. GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo")
 
             // 2. Detecter la famille de modele
-            let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
+            guard let family = Gemma4LoRADefaults.ModelFamily.from(directory: URL(fileURLWithPath: modelPath)) else {
+                throw ValidationError("famille non reconnue dans \(modelPath)/config.json (E2B, E4B, 12B, 26B-A4B ou 31B)")
+            }
             print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
 
             // 3. Charger et pre-tokeniser les donnees
@@ -229,7 +231,9 @@ extension LoRA {
             let container = try await loadLocalMultimodalModel(path: modelPath)
             print("Modele multimodal charge. GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo")
 
-            let family = Gemma4LoRADefaults.ModelFamily.from(modelId: modelPath)
+            guard let family = Gemma4LoRADefaults.ModelFamily.from(directory: URL(fileURLWithPath: modelPath)) else {
+                throw ValidationError("famille non reconnue dans \(modelPath)/config.json (E2B, E4B, 12B, 26B-A4B ou 31B)")
+            }
             print("Famille detectee: \(family.rawValue) (\(family.totalLayers) couches)")
 
             // Charger les donnees multimodales
