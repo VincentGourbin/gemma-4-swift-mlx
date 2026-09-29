@@ -568,3 +568,18 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
 
   8 bits tient la porte (≤ 2 pts). Les 4 bits perdent 3-4 pts : au bord de l'écart-type d'un échantillon de 100 (~4 pts), donc ni tenue ni rejet nets de la porte ; le mixte n'est pas moins bon que l'uniforme et il est 25 % plus rapide par cas. BFCL non relancé : saturé à 95 % pour tous les modèles, il ne départage pas.
 
+## Leviers K-15 à K-18 — 2026-09-29 (E2B 4 bits, M3 Max, A/B/B/A, cooldown 60 s)
+
+Lignes brutes : `benchmarks/{ngram-k15,sampling-k17,vision-k18,noaudio-k16}-20260929.jsonl`. Une première série K-15 perturbée par une compilation est archivée (`benchmarks/archive/ngram-k15-20260929-perturbe.jsonl`).
+
+| Fiche | Variante A | Variante B | Résultat | Porte |
+|---|---|---|---|---|
+| K-15 n-gramme (n = 5, 512 + 256 jetons) | ancien chemin CPU : 107,0-107,5 tok/s | historique GPU : 124,4-126,9 tok/s (sans n-gramme : 125,8-126,5) | **+17 %**, le coût du n-gramme disparaît ; mêmes jetons interdits à chaque pas sur 256 pas réels (`NoRepeatNGramDivergenceTests`) | ✅ |
+| K-16 sans tour audio (image, 64 jetons) | 3 404 Mo actifs | 2 822 Mo actifs | **−583 Mo** (tour audio 0,61 Go en bf16 même dans le pack 4 bits), sortie et débit identiques | ✅ (≥ 0,3 Go) |
+| K-17 échantillonnage | glouton : 125,8-126,4 tok/s | T 0,3 / top-p 0,95 : 118,6-119,5 tok/s | top-p coûte **5,6 %** (tri des 262 144 logits par jeton, `TopPSampler` amont) | au-dessus du seuil de 5 % ; pas de correction exacte sans synchronisation, voir PLAN |
+| K-18 vision, image 624×1008 (2 457 patches) | préfill 252-273 ms | 243-258 ms | −3 % (dans le bruit : l'image remplit déjà 97 % des 2 520 patches) | — |
+| K-18 vision, vidéo 70 jetons/frame (594 patches) | encodeur 193-194 ms/frame | **77-80 ms/frame** | **×2,5** ; contre une référence fp32, le nouveau chemin est plus précis (0,88 % contre 1,13 %) | ✅ (≥ ×2) |
+
+K-18 sur l'image de référence : features à 3,8·10⁻⁴ (max, relatif) de l'ancien chemin ; description greedy identique sur 188 caractères puis un synonyme (« description » / « breakdown »), bascule d'argmax en bf16.
+K-6 validé : `describe --quantize-bits 4` sur le bf16 d'E2B (encodeurs quantifiés compris) décrit correctement l'image (`benchmarks/describe-q4-20260929.txt`).
+
