@@ -467,16 +467,7 @@ struct Chat: AsyncParsableCommand {
             if let weightPath = drafterPath {
                 let url = URL(fileURLWithPath: weightPath)
                 var rawWeights: [String: MLXArray] = [:]
-                let urls: [URL]
-                var isDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-                if isDir.boolValue {
-                    urls = try FileManager.default
-                        .contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-                        .filter { $0.pathExtension == "safetensors" }
-                } else {
-                    urls = [url]
-                }
+                let urls = try Gemma4DrafterWeights.files(at: url)
                 for u in urls {
                     for (k, v) in try MLX.loadArrays(url: u) { rawWeights[k] = v }
                 }

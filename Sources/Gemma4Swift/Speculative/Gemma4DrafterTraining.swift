@@ -120,6 +120,8 @@ public enum Gemma4DrafterTraining {
         public var validBatches: Int = 8   // nb de batches a evaluer sur la valid
         public var saveEvery: Int = 100
         public var weightsURL: URL? = nil
+        /// Graine du tirage des troncons (A-08 : `randomElement()` non seede).
+        public var seed: UInt64 = 0
 
         public init() {}
     }
@@ -153,6 +155,16 @@ public enum Gemma4DrafterTraining {
     ) throws {
         // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
         // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+        // A-12 : entrees validees ici (erreurs levees) plutot que par precondition/fatalError
+        // dans drafterLoss, qui tourne dans valueAndGrad.
+        guard config.seqLen >= 3 else {
+            throw DrafterTrainingError.invalidInput("seqLen doit etre >= 3 (positions p, p+1, p+2), recu \(config.seqLen)")
+        }
+        let concreteLayers = target.model.layers.count
+        guard (0 ..< concreteLayers).contains(lastFullCacheIdx), (0 ..< concreteLayers).contains(lastSlidingCacheIdx) else {
+            throw DrafterTrainingError.invalidInput(
+                "indices de cache hors du modele cible (\(lastFullCacheIdx), \(lastSlidingCacheIdx) sur \(concreteLayers) couches)")
+        }
         try Gemma4ComputeGate.shared.beginTraining()
         defer { Gemma4ComputeGate.shared.endTraining() }
         target.train(false)   // target en eval mode (frozen)
@@ -175,11 +187,12 @@ public enum Gemma4DrafterTraining {
         let chunks = chunkify(tokenizedSamples)
         let validChunks = chunkify(validSamples)
         guard !chunks.isEmpty else {
-            throw NSError(domain: "DrafterTraining", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "No chunks of length \(seqLen) found in samples"
-            ])
+            throw DrafterTrainingError.invalidInput("aucun troncon de \(seqLen) jetons dans les exemples")
         }
-        print("[drafter-train] \(chunks.count) train chunks, \(validChunks.count) valid chunks (longueur \(seqLen))")
+        let tooShort = tokenizedSamples.filter { $0.count < seqLen }.count
+        print("[drafter-train] \(chunks.count) train chunks, \(validChunks.count) valid chunks (longueur \(seqLen))"
+            + (tooShort > 0 ? " ; \(tooShort) exemple(s) plus court(s) que \(seqLen) ignore(s)" : ""))
+        var rng = SeededGenerator(seed: config.seed)
 
         // valueAndGrad sur le DRAFTER seulement
         // batch = [batchTokens] (single MLXArray in array)
@@ -204,7 +217,7 @@ public enum Gemma4DrafterTraining {
             var flatTokens: [Int32] = []
             flatTokens.reserveCapacity(batchSize * seqLen)
             for _ in 0 ..< batchSize {
-                let chunk = chunks.randomElement()!
+                let chunk = chunks[Int.random(in: 0 ..< chunks.count, using: &rng)]
                 flatTokens.append(contentsOf: chunk.map { Int32($0) })
             }
             let batchTokens = MLXArray(flatTokens).reshaped(batchSize, seqLen)
@@ -294,3 +307,39 @@ public enum Gemma4DrafterTraining {
         }
     }
 }
+
+public enum DrafterTrainingError: LocalizedError, Equatable {
+    case invalidInput(String)
+    case ambiguousWeights(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidInput(let message): return message
+        case .ambiguousWeights(let message): return message
+        }
+    }
+}
+
+/// Fichiers de poids d'un drafter (A-11) : un fichier est pris tel quel ; un dossier est lu
+/// dans l'ordre trie, et refuse s'il contient a la fois `drafter.safetensors` et
+/// `drafter.best.safetensors` (memes cles, l'ordre du systeme de fichiers decidait).
+public enum Gemma4DrafterWeights {
+    public static func files(at url: URL) throws -> [URL] {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            throw DrafterTrainingError.invalidInput("poids du drafter introuvables : \(url.path)")
+        }
+        guard isDirectory.boolValue else { return [url] }
+        let files = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "safetensors" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let names = Set(files.map(\.lastPathComponent))
+        if names.contains("drafter.safetensors") && names.contains("drafter.best.safetensors") {
+            throw DrafterTrainingError.ambiguousWeights(
+                "\(url.lastPathComponent) contient drafter.safetensors et drafter.best.safetensors : "
+                    + "passer le fichier voulu a --drafter-path")
+        }
+        return files
+    }
+}
+

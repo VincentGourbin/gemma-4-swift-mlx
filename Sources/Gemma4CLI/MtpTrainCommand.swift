@@ -52,6 +52,9 @@ struct MtpTrain: AsyncParsableCommand {
     @Option(name: .long, help: "Sequence length par chunk")
     var seqLen: Int = 256
 
+    @Option(name: .long, help: "Graine du tirage des troncons (reproductible)")
+    var seed: UInt64 = 0
+
     @Option(name: .long, help: "Batch size (chunks per step)")
     var batchSize: Int = 1
 
@@ -120,6 +123,7 @@ struct MtpTrain: AsyncParsableCommand {
         let spv = stepsPerValid
         let vb = validBatches
         let sve = saveEvery
+        let seedValue = seed
         let wURL = weightsURL
         nonisolated(unsafe) let validLinesRef = validLines
         nonisolated(unsafe) let drafterRef = drafterModel
@@ -127,7 +131,7 @@ struct MtpTrain: AsyncParsableCommand {
 
         try await container.perform { context in
             guard let llm = context.model as? Gemma4LLMModel else {
-                fatalError("Expected Gemma4LLMModel for training")
+                throw ValidationError("le target doit se charger en Gemma4LLMModel (texte)")
             }
             let langModel = llm.languageModel
             let textCfg = langModel.config
@@ -137,7 +141,7 @@ struct MtpTrain: AsyncParsableCommand {
             let concreteTypes = Array(layerTypes.prefix(textCfg.firstKvSharedLayerIdx))
             guard let lastFullIdx = concreteTypes.lastIndex(of: "full_attention"),
                   let lastSlidingIdx = concreteTypes.lastIndex(of: "sliding_attention") else {
-                fatalError("Cannot find concrete full_attention and sliding_attention layers")
+                throw ValidationError("pas de couches full_attention et sliding_attention concretes dans le target")
             }
 
             // Bind drafter au target (pour input_embed dans le path d'inference)
@@ -180,7 +184,7 @@ struct MtpTrain: AsyncParsableCommand {
             print("  train: \(tokenizedSamples.count) samples (chunks de \(sl)), \(failedLines) lignes echouees")
 
             guard !tokenizedSamples.isEmpty else {
-                fatalError("Aucun sample n'a au moins \(sl) tokens")
+                throw ValidationError("aucun exemple d'au moins \(sl) jetons")
             }
 
             // Tokeniser la valid (si fournie)
@@ -206,6 +210,7 @@ struct MtpTrain: AsyncParsableCommand {
             let optimizer = Adam(learningRate: lrate)
 
             var config = Gemma4DrafterTraining.TrainConfig()
+            config.seed = seedValue
             config.iterations = it
             config.seqLen = sl
             config.batchSize = bs
@@ -247,13 +252,19 @@ struct MtpTrain: AsyncParsableCommand {
             return try tokenizer.encode(text: text)
         }
         if let messages = json["messages"] as? [[String: Any]] {
-            // Convertir au format [String: String] requis par applyChatTemplate
-            let strMessages: [[String: String]] = messages.compactMap { m in
-                guard let role = m["role"] as? String,
-                      let content = m["content"] as? String else { return nil }
-                return ["role": role, "content": content]
+            // A-05 : meme rendu que les sequences vues par la cible — pas de suffixe de
+            // generation (<|turn>model\n) ni d'artefacts du gabarit ; un contenu non textuel
+            // est une erreur (il etait supprime en silence).
+            var strMessages: [[String: String]] = []
+            for m in messages {
+                guard let role = m["role"] as? String, let content = m["content"] as? String else {
+                    throw ValidationError("message sans role ou contenu textuel : \(line.prefix(80))")
+                }
+                strMessages.append(["role": role, "content": content])
             }
-            return try tokenizer.applyChatTemplate(messages: strMessages)
+            var ids = try tokenizer.applyChatTemplate(messages: strMessages)
+            if ids.suffix(3) == [105, 4368, 107] { ids.removeLast(3) }  // <|turn> model \n
+            return Gemma4Processor.strippingTemplateArtifacts(ids)
         }
         throw NSError(domain: "MtpTrain", code: 3, userInfo: [
             NSLocalizedDescriptionKey: "Line missing 'text' or 'messages': \(line.prefix(80))"
