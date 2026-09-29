@@ -71,8 +71,8 @@ public enum Gemma4LoRATrain {
         /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a ;
         /// director, 200 pas : +13 % de debit, -19 % de pic MLX, perte identique).
         public var responseOnlyHead: Bool
-        /// Multimodal : tout le modele en fp32 (ancien chemin, poids x 2). `false` (K-31) :
-        /// base bf16, parametres LoRA fp32.
+        /// Multimodal : tout le modele en fp32 (ancien chemin, poids x 2). `false` (defaut, K-31) :
+        /// base bf16, parametres LoRA fp32 — TB3 : pic 24,1 -> 14,2 Go, +16 % de debit, sans NaN.
         public var multimodalFloat32: Bool
         /// Limite de cache MLX et vidage apres validation (K-30 b ; director : empreinte
         /// 76 -> 16 Go, perte identique) ; nil = aucune politique.
@@ -101,7 +101,7 @@ public enum Gemma4LoRATrain {
             metricsURL: URL? = nil,
             responseOnlyHead: Bool = true,
             memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048),
-            multimodalFloat32: Bool = true
+            multimodalFloat32: Bool = false
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank

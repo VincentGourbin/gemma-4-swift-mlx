@@ -78,8 +78,8 @@ extension LoRA {
         @Option(name: .long, help: "Limite du cache MLX en Mo pendant l'entrainement, vidage apres validation (0 = aucune ; defaut 2048 : empreinte 76 -> 16 Go sur director)")
         var trainCacheLimitMb: Int = 2048
 
-        @Flag(name: .long, help: "Multimodal : base en bf16 et parametres LoRA en fp32 au lieu de tout le modele en fp32 (K-31)")
-        var bf16Base: Bool = false
+        @Flag(name: .long, help: "Multimodal : tout le modele en fp32 (ancien chemin ; defaut : base bf16, LoRA fp32)")
+        var fp32Model: Bool = false
 
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
@@ -271,7 +271,7 @@ extension LoRA {
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
                 responseOnlyHead: !fullHead,
                 memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil,
-                multimodalFloat32: !bf16Base
+                multimodalFloat32: fp32Model
             )
 
             print("\n--- Debut du training multimodal ---")

@@ -32,6 +32,16 @@ public class Gemma4LanguageModel: Module {
         super.init()
     }
 
+    /// Tete liee (embed_tokens) au dtype de la table. A l'entrainement multimodal avec base
+    /// bf16 (K-31), les couches LoRA sortent en fp32 (`y + scale * z`, parametres LoRA fp32) :
+    /// sans ce retour au dtype de la table, MLX promouvait les 262 k x hidden poids de la tete
+    /// en fp32 a chaque pas (debit / 2). Sans effet quand les dtypes coincident (inference).
+    func head(_ hidden: MLXArray) -> MLXArray {
+        let embed = model.embedTokens
+        let dtype = (embed as? QuantizedEmbedding)?.scales.dtype ?? embed.weight.dtype
+        return embed.asLinear(hidden.dtype == dtype ? hidden : hidden.asType(dtype))
+    }
+
     public func callAsFunction(
         inputs: MLXArray? = nil,
         inputsEmbeds: MLXArray? = nil,
@@ -52,7 +62,7 @@ public class Gemma4LanguageModel: Module {
         if logitsFrom > 0 { out = out[0..., logitsFrom...] }
 
         // Tied word embeddings: utiliser embed_tokens comme linear
-        out = model.embedTokens.asLinear(out)
+        out = head(out)
 
         // Final logit softcapping
         if let softcap = finalLogitSoftcapping {
@@ -80,7 +90,7 @@ public class Gemma4LanguageModel: Module {
             visionTokenMask: visionTokenMask
         )
 
-        var logits = model.embedTokens.asLinear(textOut.hidden)
+        var logits = head(textOut.hidden)
         if let softcap = finalLogitSoftcapping {
             logits = tanh(logits / softcap) * softcap
         }

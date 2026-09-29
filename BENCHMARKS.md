@@ -621,3 +621,15 @@ Mémoire disponible simulée (`GEMMA4_AVAILABLE_MB`), 2 passes, cooldown 30 s, s
 
 `4bit-tiny` : texte 128 / 1 024 / 4 096 jetons = 2,92 / 3,11 / 3,28 Go, décodage 133 / 127 / 123 tok/s (= `fast`). L'embedding de position de l'encodeur vision lit la table au lieu d'un one-hot fp32 `[1, N, 2, 10240]` : pic MLX −133 Mo, TTFT −16 ms, sorties identiques. Détails et mode d'emploi : `docs/iOS.md`.
 
+### K-31 : LoRA multimodal, base bf16 (TB3 LaTeX-OCR, E2B bf16, r16, lr 5e-5, 500 pas)
+
+Jeu recréé et archivé (`Scripts/quality/latex-ocr-sample.py`, 500 train / 50 valid, SHA256SUMS) : l'échantillon du README (val 0,36, pic 24 Go) n'avait pas été conservé. Lignes : `benchmarks/lora-k31-*-20260929.jsonl`.
+
+| Variante | Val @100 | Val @500 | Débit (500 pas) | Pic MLX | Empreinte | NaN |
+|---|---|---|---|---|---|---|
+| fp32 (tout le modèle, ancien défaut) | 0,596 | 0,428 | 1,11 it/s | 24,3 Go | 22,7 Go | non |
+| base bf16 + LoRA fp32, tête promue en fp32 | 0,584 | — | 0,77 it/s (100 pas) | 15,9 Go | 12,9 Go | non |
+| **base bf16 + LoRA fp32, tête au dtype de la table** | 0,585 | **0,430** | **1,38 it/s (+24 %)** | **14,4 Go (−41 %)** | **13,0 Go** | non |
+
+Les couches LoRA sortent en fp32 (paramètres LoRA fp32) : sans retour au dtype de la table avant la tête liée, MLX promouvait ses 262 k × 1 536 poids en fp32 à chaque pas (débit ÷ 2).
+
