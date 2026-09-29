@@ -457,39 +457,12 @@ extension LoRA {
         var output: String
 
         func run() async throws {
-            print("Chargement du modele: \(modelPath)")
-            let container = try await loadLocalModel(path: modelPath)
-
-            print("Fusion de l'adapter: \(adapterPath)")
-            try await Gemma4LoRAInference.fuseAdapter(
-                into: container,
-                from: URL(fileURLWithPath: adapterPath)
-            )
-
-            // Sauvegarder les poids fuses
-            let outputURL = URL(fileURLWithPath: output)
-            try FileManager.default.createDirectory(at: outputURL, withIntermediateDirectories: true)
-
-            print("Sauvegarde du modele fuse dans \(output)...")
-            try await container.perform { context in
-                let weights = context.model.parameters()
-                let flatWeights = Dictionary(uniqueKeysWithValues: weights.flattened())
-                try save(arrays: flatWeights, url: outputURL.appending(component: "model.safetensors"))
-            }
-
-            // Copier les fichiers de config du modele original
-            let sourceURL = URL(fileURLWithPath: modelPath)
-            let configFiles = ["config.json", "tokenizer.json", "tokenizer_config.json",
-                             "special_tokens_map.json", "generation_config.json"]
-            for file in configFiles {
-                let src = sourceURL.appending(component: file)
-                let dst = outputURL.appending(component: file)
-                if FileManager.default.fileExists(atPath: src.path()) {
-                    try? FileManager.default.copyItem(at: src, to: dst)
-                }
-            }
-
-            print("Modele fuse sauvegarde dans \(output)")
+            print("Fusion de \(adapterPath) dans \(modelPath)…")
+            let files = try await Gemma4LoRAInference.fuseAndSave(
+                baseDirectory: URL(fileURLWithPath: modelPath),
+                adapterDirectory: URL(fileURLWithPath: adapterPath),
+                output: URL(fileURLWithPath: output))
+            print("Modele fuse sauvegarde dans \(output) (\(files.count) fichier(s) de poids)")
         }
     }
 }
