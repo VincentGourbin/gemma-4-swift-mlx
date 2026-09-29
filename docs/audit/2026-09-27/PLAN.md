@@ -132,6 +132,17 @@ Porte qualité de référence : ToolsForge ≥ 103/108 (Python 95,3 %, Swift 97,
 | K-34 | `eval-mmlu` : n ≥ 1 000 et IC95 affiché, préfixe 5-shot en cache par sujet, logits de la dernière position, `cacheLimit`, petits défauts (choix > 4, EOS 50, division par zéro, `--verbose`) | A-14, A-26 | réponses identiques sur les 100 questions actuelles ; s/question −≥ 30 % (À MESURER) | M (après K-13/K-19) |
 | K-35 | `lora fuse` complet : copie `chat_template.jinja` et `processor_config.json`, `config.json` cohérent avec les poids écrits, erreurs remontées ; vérifier la compatibilité mlx-lm annoncée | A-16 | modèle fusionné rechargé : 32 jetons greedy identiques à base + adaptateur | S |
 
+### Lot I — Résidence sous 4 Go, à la YuE2 (ajouté le 2026-09-29, après les optimisations mémoire)
+Décision de Vincent : « fais ça après les optimisations mémoires pour en bénéficier » — donc après K-30 (b) politique mémoire, et en réutilisant K-16 (`audio: false`) et K-18 (vision sans padding). Référence : YuE2 `4bit-lean` 3,4 Go sur iPhone (résidence par étape, limites depuis `os_proc_available_memory`, capability *Increased Memory Limit*).
+Point de départ mesuré (E2B 4 bits `lean`, Mac) : texte 3,5 Go d'empreinte, image 4,3 Go ; tour audio 0,61 Go et tour vision 0,34 Go en bf16 même dans le pack 4 bits.
+
+| Fiche | Objet | Porte | Effort |
+|---|---|---|---|
+| K-43 | Résidence par étape : tour vision (et audio) libérée après le préfill, rechargée à la demande depuis le dossier du modèle (même contrat que la diffusion : recharger ou refuser, jamais ignorer) ; `Gemma4ReferenceProfile.releaseEncodersAfterPrefill` | E2B image : −≥ 0,3 Go d'empreinte en régime, sorties identiques, temps de rechargement documenté | M |
+| K-44 | `e2b/4bit-lean` sous 4 Go : sans audio par défaut (variante `withAudio`), limites mémoire depuis `availableMemoryMB()` (`os_proc_available_memory` sur iOS), `clearCache` après réponse ; au besoin `e2b/4bit-tiny` (tranche de préfill et cache réduits, comme le `4bit-tiny` de YuE2) | **empreinte < 4 Go en texte ET image** (`phys_footprint_peak`), débit ≥ −15 % contre `4bit-fast` | M |
+| K-45 | Mesure « iPhone » sur Mac : `GEMMA4_AVAILABLE_MB` simulant 6-8 Go, campagne texte/image/audio du profil, lignes dans `BENCHMARKS.md` | tableau mesuré ; aucune ligne au-dessus de la limite simulée | S |
+| K-46 | Doc iOS (`docs/iOS.md`) : capability *Increased Memory Limit*, pack à déposer, profil, chiffres ; test de compilation iOS en CI (`.iOS(.v17)` déclaré mais jamais construit) | build iOS vert en CI ; doc relue | S |
+
 ## 4. Pièges à cocher
 Catalogue §4 : 1, 3, 4, 6 (asyncEval mort — déjà rencontré), 7, 8, 9, 12, 13, 14 (positions multimodales, caches rotatifs, KV partagés), 15, 17, 20 (ABBA), 21.
 
@@ -161,7 +172,7 @@ Ouvertes :
 1. 12B : profil `6bit-*` ou non (MMLU ≥ 1 000 questions, K-21).
 
 ## 6. Hors plan
-DiffusionGemma (a ses propres préréglages), iOS (pas de cible déclarée), noyau SDPA fusionné pour head_dim 256/512 (P-12, amont MLX).
+DiffusionGemma (a ses propres préréglages), iOS au-delà du lot I (pas d'app déclarée), noyau SDPA fusionné pour head_dim 256/512 (P-12, amont MLX).
 
 ## 7. Journal
 
