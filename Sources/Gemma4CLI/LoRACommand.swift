@@ -66,6 +66,12 @@ extension LoRA {
         @Option(name: .long, help: "Gradient clipping max norm (0=desactive, papier recommande 0.3 pour full)")
         var gradClip: Float = 0
 
+        @Option(name: .long, help: "Lots de validation au plus (25 par defaut comme mlx-lm ; 0 = tout le jeu)")
+        var valBatches: Int = 25
+
+        @Option(name: .long, help: "Fichier JSONL des mesures (une ligne par rapport et validation)")
+        var metricsOut: String?
+
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
 
@@ -147,7 +153,9 @@ extension LoRA {
                 enableProfiling: profile,
                 seed: seed,
                 maxSeqLength: maxSeqLength > 0 ? maxSeqLength : nil,
-                resume: resume
+                resume: resume,
+                validationBatches: valBatches > 0 ? valBatches : nil,
+                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) }
             )
 
             print("\n--- Debut du training ---")
@@ -247,7 +255,9 @@ extension LoRA {
                 gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,
                 enableProfiling: profile,
                 seed: seed,
-                resume: resume
+                resume: resume,
+                validationBatches: valBatches > 0 ? valBatches : nil,
+                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) }
             )
 
             print("\n--- Debut du training multimodal ---")

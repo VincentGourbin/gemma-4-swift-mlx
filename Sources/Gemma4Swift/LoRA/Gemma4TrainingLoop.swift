@@ -38,6 +38,33 @@ func trainingLoss(model: Module, batch: MLXArray, lengths: MLXArray) -> (MLXArra
     return (ce, ntoks)
 }
 
+// MARK: - Mesures (K-28)
+
+/// Mesures d'entrainement, une par rapport ou validation (instrument de K-28) : debit
+/// **traite** (B x L, ce que coute le pas) et debit **entraine** (positions de la perte,
+/// l'ancien « tok/s »), memoire MLX.
+public struct Gemma4TrainingMetrics: Sendable, Codable {
+    public enum Kind: String, Sendable, Codable { case train, validation }
+    public let kind: Kind
+    public let iteration: Int
+    public let loss: Float
+    public let iterationsPerSecond: Double
+    public let processedTokensPerSecond: Double
+    public let trainedTokensPerSecond: Double
+    public let seconds: Double
+    public let activeMB: Int
+    public let peakMB: Int
+
+    enum CodingKeys: String, CodingKey {
+        case kind, iteration, loss, seconds
+        case iterationsPerSecond = "it_s"
+        case processedTokensPerSecond = "processed_tok_s"
+        case trainedTokensPerSecond = "trained_tok_s"
+        case activeMB = "active_mlx_mb"
+        case peakMB = "peak_mlx_mb"
+    }
+}
+
 // MARK: - Generateur seede (A-08)
 
 /// SplitMix64 : melange des exemples reproductible (le generateur systeme rendait deux
@@ -188,6 +215,8 @@ public func trainLoRA(
     gradClipMaxNorm: Float = 0,
     startIteration: Int = 0,
     checkpointDirectory: URL? = nil,
+    validationBatches: Int? = nil,
+    metrics: ((Gemma4TrainingMetrics) -> Void)? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -207,6 +236,7 @@ public func trainLoRA(
 
     var losses = [Float]()
     var tokenCount = 0
+    var processedCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
     var lastIteration = startIteration
@@ -234,6 +264,7 @@ public func trainLoRA(
 
         losses.append(lvalue.item(Float.self))
         tokenCount += tokens.item(Int.self)
+        processedCount += batch.size
 
         // Report
         if (iteration + 1) % stepsPerReport == 0 {
@@ -242,11 +273,16 @@ public func trainLoRA(
             let iterPerSec = Double(stepsPerReport) / (now - start)
             let tokPerSec = Double(tokenCount) / (now - start)
 
+            metrics?(Gemma4TrainingMetrics(
+                kind: .train, iteration: iteration + 1, loss: trainingLoss, iterationsPerSecond: iterPerSec,
+                processedTokensPerSecond: Double(processedCount) / (now - start), trainedTokensPerSecond: tokPerSec,
+                seconds: now - start, activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
             let p = LoRATrain.Progress.train(iteration: iteration, trainingLoss: trainingLoss,
                               iterationsPerSecond: iterPerSec, tokensPerSecond: tokPerSec)
             if progress(p) == .stop { break }
             losses.removeAll()
             tokenCount = 0
+            processedCount = 0
             start = Date.timeIntervalSinceReferenceDate
         }
 
@@ -254,9 +290,14 @@ public func trainLoRA(
         if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
             let valStart = Date.timeIntervalSinceReferenceDate
             model.train(false)  // Mode eval pour la validation
-            let valLoss = evaluateTraining(model: model, samples: validSamples, batchSize: batchSize)
+            let valLoss = evaluateTraining(
+                model: model, samples: validSamples, batchSize: batchSize, maxBatches: validationBatches)
             model.train()  // Retour en mode training
             let now = Date.timeIntervalSinceReferenceDate
+            metrics?(Gemma4TrainingMetrics(
+                kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
+                processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
+                activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
 
             let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
                                    validationTime: now - valStart)
@@ -304,13 +345,18 @@ func saveTrainingWeights(
 }
 
 /// Evaluation (ref: mlx-lm evaluate())
-func evaluateTraining(model: Module, samples: [TrainingBatchIterator.TokenizedSample], batchSize: Int) -> Float {
+func evaluateTraining(
+    model: Module, samples: [TrainingBatchIterator.TokenizedSample], batchSize: Int, maxBatches: Int? = nil
+) -> Float {
     var allLosses = [Float]()
     var tokenCount = 0
 
-    for (_, (batch, lengths)) in TrainingBatchIterator(
+    // A-21 : `maxBatches` borne la validation (tout le jeu a chaque evaluation sinon) ;
+    // l'ordre des lots est fixe (trie par longueur), donc la mesure reste comparable.
+    for (index, (batch, lengths)) in TrainingBatchIterator(
         samples: samples, batchSize: batchSize, train: false
     ).enumerated() {
+        if let maxBatches, index >= maxBatches { break }
         let (losses, tokens) = trainingLoss(model: model, batch: batch, lengths: lengths)
         allLosses.append((losses * tokens).item(Float.self))
         tokenCount += tokens.item(Int.self)
@@ -402,6 +448,8 @@ public func trainMultimodalLoRA(
     gradClipMaxNorm: Float = 0,
     startIteration: Int = 0,
     checkpointDirectory: URL? = nil,
+    validationBatches: Int? = nil,
+    metrics: ((Gemma4TrainingMetrics) -> Void)? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -423,6 +471,7 @@ public func trainMultimodalLoRA(
 
     var losses = [Float]()
     var tokenCount = 0
+    var processedCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
     var lastIteration = startIteration
@@ -477,6 +526,7 @@ public func trainMultimodalLoRA(
 
         losses.append(lvalue.item(Float.self))
         tokenCount += tokens.item(Int.self)
+        processedCount += batch.size
 
         // Report
         if (iteration + 1) % stepsPerReport == 0 {
@@ -485,11 +535,16 @@ public func trainMultimodalLoRA(
             let iterPerSec = Double(stepsPerReport) / (now - start)
             let tokPerSec = Double(tokenCount) / (now - start)
 
+            metrics?(Gemma4TrainingMetrics(
+                kind: .train, iteration: iteration + 1, loss: trainingLoss, iterationsPerSecond: iterPerSec,
+                processedTokensPerSecond: Double(processedCount) / (now - start), trainedTokensPerSecond: tokPerSec,
+                seconds: now - start, activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
             let p = LoRATrain.Progress.train(iteration: iteration, trainingLoss: trainingLoss,
                               iterationsPerSecond: iterPerSec, tokensPerSecond: tokPerSec)
             if progress(p) == .stop { break }
             losses.removeAll()
             tokenCount = 0
+            processedCount = 0
             start = Date.timeIntervalSinceReferenceDate
         }
 
@@ -497,9 +552,13 @@ public func trainMultimodalLoRA(
         if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
             let valStart = Date.timeIntervalSinceReferenceDate
             model.train(false)
-            let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples)
+            let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples, maxBatches: validationBatches)
             model.train()
             let now = Date.timeIntervalSinceReferenceDate
+            metrics?(Gemma4TrainingMetrics(
+                kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
+                processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
+                activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
 
             let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
                                    validationTime: now - valStart)
@@ -529,13 +588,14 @@ public func trainMultimodalLoRA(
 }
 
 /// Evaluation multimodal — pre-calcule les embeddings comme le training
-func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSample]) -> Float {
+func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSample], maxBatches: Int? = nil) -> Float {
     let mmModel = model as! Gemma4MultimodalLLMModel
     var allLosses = [Float]()
     var tokenCount = 0
 
-    for (_, (batch, lengths, pixelValues, audioFeatures, audioMask))
+    for (index, (batch, lengths, pixelValues, audioFeatures, audioMask))
         in MultimodalBatchIterator(samples: samples, train: false).enumerated() {
+        if let maxBatches, index >= maxBatches { break }
 
         // Pre-calculer les embeddings (meme path que le training)
         if let pv = pixelValues {

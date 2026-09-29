@@ -162,5 +162,28 @@ struct LoRATrainingLoopTests {
             #expect(first + second == continuous, "reprise \(second.prefix(3)) contre continu \(continuous[10 ..< 13])")
         }
     }
+
+    @Test("K-28 : mesures train et validation, debit traite >= entraine, validation bornee")
+    func testMetrics() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let model = try loraModel()
+            var collected: [Gemma4TrainingMetrics] = []
+            let prompts = (0 ..< 8).map { i in
+                TrainingBatchIterator.TokenizedSample(tokens: (0 ..< 12).map { ($0 * 7 + i * 13) % 128 }, promptOffset: 6)
+            }
+            try trainLoRA(
+                model: model, trainSamples: prompts, validSamples: samples(6),
+                optimizer: Adam(learningRate: 1e-2), iterations: 4, stepsPerReport: 2, stepsPerEval: 2,
+                validationBatches: 2, metrics: { collected.append($0) }) { _ in .more }
+            let train = collected.filter { $0.kind == .train }
+            let validation = collected.filter { $0.kind == .validation }
+            #expect(train.count == 2)
+            #expect(validation.count == 3, "pas 0, 2 et 4")
+            for m in train { #expect(m.processedTokensPerSecond >= m.trainedTokensPerSecond) }
+            let full = evaluateTraining(model: model, samples: samples(6), batchSize: 1)
+            let bounded = evaluateTraining(model: model, samples: samples(6), batchSize: 1, maxBatches: 2)
+            #expect(full != bounded)
+        }
+    }
 }
 

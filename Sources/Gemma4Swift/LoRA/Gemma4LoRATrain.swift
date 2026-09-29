@@ -59,6 +59,10 @@ public enum Gemma4LoRATrain {
         public var maxSeqLength: Int?
         /// Reprendre au dernier checkpoint de `outputDirectory` (poids, etat de l'optimiseur, pas).
         public var resume: Bool
+        /// Lots de validation au plus (nil = tout le jeu ; A-21).
+        public var validationBatches: Int?
+        /// Fichier JSONL ou ecrire une ligne par rapport et validation (K-28).
+        public var metricsURL: URL?
 
         public init(
             fineTuneType: FineTuneType = .lora,
@@ -78,7 +82,9 @@ public enum Gemma4LoRATrain {
             enableProfiling: Bool = false,
             seed: UInt64 = 0,
             maxSeqLength: Int? = 2048,
-            resume: Bool = false
+            resume: Bool = false,
+            validationBatches: Int? = nil,
+            metricsURL: URL? = nil
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -98,6 +104,8 @@ public enum Gemma4LoRATrain {
             self.seed = seed
             self.maxSeqLength = maxSeqLength
             self.resume = resume
+            self.validationBatches = validationBatches
+            self.metricsURL = metricsURL
         }
     }
 
@@ -352,6 +360,8 @@ public enum Gemma4LoRATrain {
                 gradClipMaxNorm: config.gradClipMaxNorm,
                 startIteration: startIteration,
                 checkpointDirectory: config.outputDirectory,
+                validationBatches: config.validationBatches,
+                metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
                 progress: wrappedProgress
             )
 
@@ -541,6 +551,8 @@ public enum Gemma4LoRATrain {
                 gradClipMaxNorm: config.gradClipMaxNorm,
                 startIteration: startIteration,
                 checkpointDirectory: config.outputDirectory,
+                validationBatches: config.validationBatches,
+                metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
                 progress: wrappedProgress
             )
         }
@@ -589,3 +601,35 @@ public enum Gemma4LoRATrain {
         }
     }
 }
+
+/// Ecrit les mesures d'entrainement en JSONL (une ligne par evenement), avec l'empreinte
+/// physique du processus (ce que voit le systeme, au-dela de la memoire MLX).
+public enum Gemma4TrainingMetricsWriter {
+    public static func append(_ metrics: Gemma4TrainingMetrics, to url: URL) {
+        guard var object = (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(metrics))) as? [String: Any]
+        else { return }
+        object["phys_footprint_mb"] = physFootprintMB()
+        object["date"] = ISO8601DateFormatter().string(from: Date())
+        guard var line = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
+        line.append(0x0A)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: line)
+        } else {
+            try? line.write(to: url)
+        }
+    }
+
+    static func physFootprintMB() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int(info.phys_footprint >> 20) : 0
+    }
+}
+
