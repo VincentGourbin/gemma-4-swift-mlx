@@ -606,3 +606,18 @@ La troncature par défaut (parité mlx-lm) coupait la fin des réponses sous `--
 | **(a + b)** | **1,147** | **1,1361** | **0,211 (+26 %)** | **40,7 Go (−19 %)** | **15,9 Go (−79 %)** |
 
 Pertes identiques à 4 décimales. (a + b) devient le défaut (`--full-head`, `--train-cache-limit-mb 0` pour revenir en arrière). Lignes : `benchmarks/lora-k30-{a,b,ab}-20260929.jsonl`.
+
+## Lot I — résidence sous 4 Go (E2B 4 bits) — 2026-09-29
+
+Mémoire disponible simulée (`GEMMA4_AVAILABLE_MB`), 2 passes, cooldown 30 s, sorties identiques (empreinte des jetons). `benchmarks/residency-lot-i-20260929.jsonl`.
+
+| Configuration | Texte (1 024) : empreinte max | Image : empreinte max | Image : en régime | TTFT image |
+|---|---|---|---|---|
+| `4bit-fast` (audio, tours résidentes) | 3,39 Go | 5,06 Go | 5,06 Go | 253-264 ms |
+| `4bit-lean` 6 Go, tours gardées | — | 4,36 Go | 4,07 Go | 255-264 ms |
+| `4bit-lean` 6 Go, tours libérées (K-43) | 3,11 Go | 4,38 Go | 2,83 Go | 335-348 ms |
+| + embedding de position sans one-hot | — | 4,17 Go | 2,83 Go | 318-319 ms |
+| **`4bit-tiny`** (cache 256 Mo) | **3,11 Go** | **3,90 Go** | 2,83 Go | 315-319 ms |
+
+`4bit-tiny` : texte 128 / 1 024 / 4 096 jetons = 2,92 / 3,11 / 3,28 Go, décodage 133 / 127 / 123 tok/s (= `fast`). L'embedding de position de l'encodeur vision lit la table au lieu d'un one-hot fp32 `[1, N, 2, 10240]` : pic MLX −133 Mo, TTFT −16 ms, sorties identiques. Détails et mode d'emploi : `docs/iOS.md`.
+

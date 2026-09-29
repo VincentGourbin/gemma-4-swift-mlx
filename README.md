@@ -557,6 +557,10 @@ gemma4-cli mtp-generate --compare        # bit-exact equivalence vs standard
 gemma4-cli mtp-diag-verify               # sequential vs parallel hidden diff (advanced)
 ```
 
+## iPhone / iPad
+
+Profile `e2b/4bit-tiny` keeps Gemma 4 E2B 4-bit under 4 GB of footprint (text 3.1 GB, one image 3.9 GB, measured on Mac with 6 GB available simulated): no audio tower, vision towers released after prefill, 256 MB MLX cache. See [docs/iOS.md](docs/iOS.md).
+
 ## Inference Server (OpenAI-compatible)
 
 `gemma4-server` lives in the nested package `Server/`, so apps that depend on the library never

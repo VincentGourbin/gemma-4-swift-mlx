@@ -7,7 +7,9 @@ import MLXLMCommon
 import MLXLLM
 import MLXOptimizers
 import Tokenizers
+#if canImport(MLXProfiler)
 import MLXProfiler
+#endif
 
 /// Orchestrateur de fine-tuning LoRA pour les modeles Gemma 4.
 /// Wrapper autour de `LoRATrain` de mlx-swift-lm avec gestion
@@ -223,7 +225,8 @@ public enum Gemma4LoRATrain {
                 to: config.outputDirectory.appending(component: "adapter_config.json"))
         }
 
-        // Profiling
+        // Profiling (macOS : MLXProfiler n'existe pas sur iOS)
+        #if canImport(MLXProfiler)
         let profiler = MLXProfiler.shared
         if config.enableProfiling {
             profiler.enable()
@@ -238,6 +241,7 @@ public enum Gemma4LoRATrain {
                 "valid_samples": "\(validData.count)",
             ])
         }
+        #endif
 
         // Entrainement dans le contexte du container
         let longest = (trainData + validData).map(\.count).max() ?? 0
@@ -299,6 +303,7 @@ public enum Gemma4LoRATrain {
 
             // Callback avec profiling
             let wrappedProgress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition = { p in
+                #if canImport(MLXProfiler)
                 if config.enableProfiling {
                     switch p {
                     case .train(let iteration, let loss, _, let tokPerSec):
@@ -323,6 +328,7 @@ public enum Gemma4LoRATrain {
                         break
                     }
                 }
+                #endif
                 return progress(p)
             }
 
@@ -400,6 +406,7 @@ public enum Gemma4LoRATrain {
             try configData.write(to: configURL)
         }
 
+        #if canImport(MLXProfiler)
         // Exporter le profiling
         if config.enableProfiling, let session = profiler.activeSession {
             let summary = profiler.getTrainingSummary()
@@ -416,6 +423,7 @@ public enum Gemma4LoRATrain {
             try traceData.write(to: traceURL)
             print("Trace Chrome exportee: \(traceURL.path())")
         }
+        #endif
 
         print("Adapter sauvegarde dans \(config.outputDirectory.path())")
     }
@@ -461,7 +469,8 @@ public enum Gemma4LoRATrain {
                 to: config.outputDirectory.appending(component: "adapter_config.json"))
         }
 
-        // Profiling
+        // Profiling (macOS : MLXProfiler n'existe pas sur iOS)
+        #if canImport(MLXProfiler)
         let profiler = MLXProfiler.shared
         if config.enableProfiling {
             profiler.enable()
@@ -475,6 +484,7 @@ public enum Gemma4LoRATrain {
                 "valid_samples": "\(validData.count)",
             ])
         }
+        #endif
 
         nonisolated(unsafe) let capturedTrainData = trainData
         nonisolated(unsafe) let capturedValidData = validData
@@ -526,6 +536,7 @@ public enum Gemma4LoRATrain {
 
             // Callback avec profiling
             let wrappedProgress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition = { p in
+                #if canImport(MLXProfiler)
                 if config.enableProfiling {
                     switch p {
                     case .train(let iteration, let loss, _, let tokPerSec):
@@ -550,6 +561,7 @@ public enum Gemma4LoRATrain {
                         break
                     }
                 }
+                #endif
                 return progress(p)
             }
 
@@ -587,6 +599,7 @@ public enum Gemma4LoRATrain {
             try configData.write(to: configURL)
         }
 
+        #if canImport(MLXProfiler)
         // Exporter le profiling
         if config.enableProfiling, let session = profiler.activeSession {
             let summary = profiler.getTrainingSummary()
@@ -601,6 +614,7 @@ public enum Gemma4LoRATrain {
             let traceURL = config.outputDirectory.appending(component: "training_trace.json")
             try traceData.write(to: traceURL)
         }
+        #endif
 
         print("Adapter multimodal sauvegarde dans \(config.outputDirectory.path())")
     }

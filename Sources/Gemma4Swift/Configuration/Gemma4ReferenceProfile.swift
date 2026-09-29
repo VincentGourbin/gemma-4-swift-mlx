@@ -24,7 +24,8 @@ import Darwin
 public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
 
     public enum Bits: String, CaseIterable, Sendable { case four = "4", eight = "8", sixteen = "16" }
-    public enum Kind: String, CaseIterable, Sendable { case fast, lean }
+    /// `tiny` (lot I) : E2B 4 bits sous 4 Go d'empreinte (iPhone), cache MLX 256 Mo.
+    public enum Kind: String, CaseIterable, Sendable { case fast, lean, tiny }
 
     public let family: Gemma4Pipeline.Model.Family
     public let bits: Bits
@@ -108,6 +109,8 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
         for family: Gemma4Pipeline.Model.Family, availableMB: Int = availableMemoryMB()
     ) -> Gemma4ReferenceProfile? {
         let candidates = profiles(for: family)
+        // Sous 6 Go disponibles (iPhone), le profil `tiny` s'il existe.
+        if availableMB < 6144, let tiny = candidates.first(where: { $0.kind == .tiny }) { return tiny }
         let budgetGB = Float(availableMB) / 1024 / 2
         if let fast = candidates.filter({ $0.kind == .fast && $0.model.estimatedSizeGB <= budgetGB })
             .max(by: { $0.model.estimatedSizeGB < $1.model.estimatedSizeGB }) {
@@ -166,11 +169,15 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
         family: Gemma4Pipeline.Model.Family, bits: Bits, kind: Kind
     ) -> Gemma4ReferenceProfile? {
         guard let model = pack(family, bits) else { return nil }
+        // `tiny` n'existe que la ou il tient sous 4 Go : E2B 4 bits (texte 3,1 Go, image
+        // 3,9 Go d'empreinte max, mesure du 2026-09-29).
+        if kind == .tiny && !(family == .e2b && bits == .four) { return nil }
         // KV 8 bits en lean seulement la ou il y a plusieurs tetes KV (26B-A4B, 31B) :
         // E2B/E4B/12B n'en ont qu'une, le gain y est negligeable (BENCHMARKS.md §3).
         let multiKVHeads = family == .a4b || family == .b31b
         let available = availableMemoryMB()
-        let lean = kind == .lean
+        let tiny = kind == .tiny
+        let lean = kind == .lean || tiny
         // 16bit-lean garde les caches Mac : des limites serrees font thrasher un
         // working set bf16 (YuE2 : +73 % de temps).
         let macCaches = !lean || bits == .sixteen
@@ -179,17 +186,19 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
             notes.append("12B 4 bits : qualite degradee (MMLU 37 % contre 57 % en bf16, 100 questions) ; preferer 8 bits.")
         }
         if family == .a4b || family == .b31b { notes.append("Pas d'audio.") }
-        notes.append(lean
+        notes.append(tiny
+            ? "Minimal : sous 4 Go d'empreinte (texte 3,1 Go, image 3,9 Go), cache MLX 256 Mo, sans audio, tours liberees."
+            : lean
             ? "Econome : limites memoire adaptees a la machine, sans audio, tours liberees apres le prefill."
             : "Rapide : tout resident.")
-        notes.append("Valeurs initiales non mesurees.")
+        if !tiny { notes.append("Valeurs initiales non mesurees.") }
         return Gemma4ReferenceProfile(
             family: family, bits: bits, kind: kind, model: model,
             kvBits: lean && multiKVHeads ? 8 : nil,
             // Tranche 256 en lean, sauf 26B-A4B : sur ce MoE elle coute 12 a 22 % de
             // prefill pour 1 a 5 % de memoire (campagne du 2026-09-27).
             prefillStepSize: lean && family != .a4b ? 256 : 512,
-            cacheLimitMB: macCaches ? 4096 : min(1024, max(256, available / 6)),
+            cacheLimitMB: macCaches ? 4096 : tiny ? 256 : min(1024, max(256, available / 6)),
             memoryLimitMB: macCaches ? nil : max(4096, available - 2048),
             clearCacheAfterAnswer: lean,
             multimodal: true,

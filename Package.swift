@@ -30,7 +30,8 @@ let package = Package(
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "MLXOptimizers", package: "mlx-swift"),
-                .product(name: "MLXProfiler", package: "swift-mlx-profiler"),
+                // macOS seulement : MLXProfiler utilise `Process`, absent d'iOS (K-46).
+                .product(name: "MLXProfiler", package: "swift-mlx-profiler", condition: .when(platforms: [.macOS])),
             ]
         ),
         .executableTarget(

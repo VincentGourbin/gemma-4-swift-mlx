@@ -73,4 +73,21 @@ struct VisionUnpaddedParityTests {
             #expect(out.dtype == .bfloat16)
         }
     }
+
+    @Test("embedding de position par lecture de table = one-hot x matmul (port Python)")
+    func testPositionEmbeddingGather() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let vision = try model()
+            let embedder = vision.patchEmbedder
+            let positions = MLXArray([Int32(0), 0, 3, 1, 7, 5, -1, -1]).reshaped(1, 4, 2)
+            let padding = MLXArray([false, false, false, true]).reshaped(1, 4)
+            let got = embedder.positionEmbeddings(patchPositions: positions, paddingPositions: padding)
+            // Reference : one-hot x matmul, somme des axes x et y, padding a zero.
+            let oh = oneHot(positions, numClasses: 64).transposed(0, 2, 1, 3).asType(embedder.positionEmbeddingTable.dtype)
+            var expected = matmul(oh, embedder.positionEmbeddingTable).sum(axis: 1)
+            expected = MLX.where(expandedDimensions(padding, axis: -1), MLXArray(Float(0)), expected)
+            #expect(allClose(got, expected, atol: 1e-6).item(Bool.self))
+        }
+    }
 }
+

@@ -37,3 +37,10 @@ jobs:
             -derivedDataPath ../.build/xcode-server \
             -skipMacroValidation \
             -only-testing:Gemma4ServerTests
+      - name: Build library for iOS (K-46)
+        run: |
+          xcodebuild build \
+            -scheme Gemma4Swift \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath .build/xcode-ios \
+            -skipMacroValidation

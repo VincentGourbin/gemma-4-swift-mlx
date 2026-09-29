@@ -116,7 +116,7 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
     }
 
     public static let all: [DiffusionReferenceProfile] = Bits.allCases.flatMap { bits in
-        Kind.allCases.map { make(bits: bits, kind: $0) }
+        [Kind.fast, .lean].map { make(bits: bits, kind: $0) }
     }
 
     private static func make(bits: Bits, kind: Kind) -> DiffusionReferenceProfile {

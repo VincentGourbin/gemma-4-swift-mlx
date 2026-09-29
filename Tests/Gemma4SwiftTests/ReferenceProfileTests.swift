@@ -7,10 +7,11 @@ import MLXLMCommon
 @Suite("Profils de reference")
 struct ReferenceProfileTests {
 
-    @Test("matrice : 5 familles x 4/8/16 bits x fast/lean, identifiants uniques")
+    @Test("matrice : 5 familles x 4/8/16 bits x fast/lean + e2b/4bit-tiny, identifiants uniques")
     func testMatrix() {
         let all = Gemma4ReferenceProfile.all
-        #expect(all.count == 30)
+        #expect(all.count == 31)
+        #expect(all.filter { $0.kind == .tiny }.map(\.qualifiedID) == ["e2b/4bit-tiny"])
         #expect(Set(all.map(\.qualifiedID)).count == all.count)
         #expect(!all.contains { $0.model.isDiffusion })
         for profile in all {
@@ -65,6 +66,7 @@ struct ReferenceProfileTests {
         #expect(big.kind == .fast && big.bits == .sixteen)
         let small = try #require(Gemma4ReferenceProfile.recommended(for: .b31b, availableMB: 8 * 1024))
         #expect(small.kind == .lean && small.bits == .four)
+        #expect(Gemma4ReferenceProfile.recommended(for: .e2b, availableMB: 5 * 1024)?.qualifiedID == "e2b/4bit-tiny")
     }
 
     @Test("textOnlyVariant garde tout sauf les tours")
@@ -75,12 +77,14 @@ struct ReferenceProfileTests {
         #expect(text.model == profile.model && text.prefillStepSize == profile.prefillStepSize)
     }
 
-    @Test("lean : sans audio et tours liberees ; fast : tout resident ; variante avec audio")
+    @Test("lean/tiny : sans audio et tours liberees ; fast : tout resident ; variante avec audio")
     func testResidency() throws {
         for profile in Gemma4ReferenceProfile.all {
-            #expect(profile.releaseEncodersAfterPrefill == (profile.kind == .lean), "\(profile.qualifiedID)")
-            if profile.kind == .lean { #expect(!profile.audio, "\(profile.qualifiedID)") }
+            #expect(profile.releaseEncodersAfterPrefill == (profile.kind != .fast), "\(profile.qualifiedID)")
+            if profile.kind != .fast { #expect(!profile.audio, "\(profile.qualifiedID)") }
         }
+        let tiny = try #require(Gemma4ReferenceProfile.named("e2b/4bit-tiny"))
+        #expect(tiny.cacheLimitMB == 256 && tiny.clearCacheAfterAnswer)
         let fast = try #require(Gemma4ReferenceProfile.named("e2b/4bit-fast"))
         #expect(fast.audio)
         let lean = try #require(Gemma4ReferenceProfile.named("e2b/4bit-lean"))
