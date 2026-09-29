@@ -182,10 +182,25 @@ struct Usage: Encodable {
     let promptTokens: Int
     let completionTokens: Int
     let totalTokens: Int
+    let promptTokensDetails: Details?
+
+    struct Details: Encodable {
+        let cachedTokens: Int
+        enum CodingKeys: String, CodingKey { case cachedTokens = "cached_tokens" }
+    }
+
+    init(promptTokens: Int, completionTokens: Int, totalTokens: Int, cachedTokens: Int = 0) {
+        self.promptTokens = promptTokens
+        self.completionTokens = completionTokens
+        self.totalTokens = totalTokens
+        self.promptTokensDetails = .init(cachedTokens: cachedTokens)
+    }
+
     enum CodingKeys: String, CodingKey {
         case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"
         case totalTokens = "total_tokens"
+        case promptTokensDetails = "prompt_tokens_details"
     }
 }
 

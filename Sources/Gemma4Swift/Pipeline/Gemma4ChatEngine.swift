@@ -167,13 +167,50 @@ final class ConversationStore: @unchecked Sendable {
         let ids: [Int]
         let caches: [any KVCache]
         let imageDigests: [Data]
+        var bytes: Int { caches.reduce(0) { $0 + $1.state.reduce(0) { $0 + $1.nbytes } } }
     }
 
     private let lock = NSLock()
-    private var snapshot: Snapshot?
+    /// Du plus ancien au plus recent (LRU). Plusieurs conversations (clients d'un serveur)
+    /// alternent sans s'evincer tant que le budget tient (K-40).
+    private var snapshots: [Snapshot] = []
+    var capacity: Int
+    var budgetBytes: Int
 
-    func take() -> Snapshot? { lock.withLock { snapshot } }
-    func put(_ value: Snapshot?) { lock.withLock { snapshot = value } }
+    init(capacity: Int = 8, budgetBytes: Int = 2 << 30) {
+        self.capacity = capacity
+        self.budgetBytes = budgetBytes
+    }
+
+    /// Le plus long instantane dont les ids sont un prefixe strict de `ids` et dont les
+    /// images sont celles du debut de `digests` ; il redevient le plus recent.
+    func bestPrefix(of ids: [Int], digests: [Data]) -> Snapshot? {
+        lock.withLock {
+            let candidates = snapshots.indices.filter {
+                snapshots[$0].ids.count < ids.count && ids.starts(with: snapshots[$0].ids)
+                    && digests.starts(with: snapshots[$0].imageDigests)
+            }
+            guard let best = candidates.max(by: { snapshots[$0].ids.count < snapshots[$1].ids.count }) else { return nil }
+            let snapshot = snapshots.remove(at: best)
+            snapshots.append(snapshot)
+            return snapshot
+        }
+    }
+
+    /// Ajoute un instantane ; celui qu'il prolonge (meme conversation) est remplace.
+    func put(_ snapshot: Snapshot) {
+        lock.withLock {
+            snapshots.removeAll { snapshot.ids.starts(with: $0.ids) }
+            snapshots.append(snapshot)
+            var total = snapshots.reduce(0) { $0 + $1.bytes }
+            while snapshots.count > max(1, capacity) || (total > budgetBytes && snapshots.count > 1) {
+                total -= snapshots.removeFirst().bytes
+            }
+        }
+    }
+
+    func removeAll() { lock.withLock { snapshots.removeAll() } }
+    var count: Int { lock.withLock { snapshots.count } }
 }
 
 public actor Gemma4ChatEngine: Gemma4ChatBackend {
@@ -186,11 +223,17 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
 
     public func setReusesConversation(_ value: Bool) {
         reusesConversation = value
-        if !value { conversation.put(nil) }
+        if !value { conversation.removeAll() }
     }
 
-    /// Oublie l'instantane : le prochain tour re-prefille tout.
-    public func resetConversation() { conversation.put(nil) }
+    /// Nombre de conversations gardees (LRU) et budget memoire de leurs caches.
+    public func configureConversationCache(capacity: Int, budgetBytes: Int) {
+        conversation.capacity = capacity
+        conversation.budgetBytes = budgetBytes
+    }
+
+    /// Oublie les instantanes : le prochain tour re-prefille tout.
+    public func resetConversation() { conversation.removeAll() }
 
     public init(container: ModelContainer, profile: Gemma4ReferenceProfile? = nil) {
         self.container = container
@@ -350,8 +393,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         var suffix = ids
         var images = allImages
         var cached = 0
-        if reusable, let snapshot = store?.take(), snapshot.ids.count < ids.count,
-           ids.starts(with: snapshot.ids), digests.starts(with: snapshot.imageDigests) {
+        if reusable, let snapshot = store?.bestPrefix(of: ids, digests: digests) {
             cache = snapshot.caches.map { $0.copy() }
             suffix = Array(ids[snapshot.ids.count...])
             images = Array(allImages[snapshot.imageDigests.count...])

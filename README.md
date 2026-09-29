@@ -578,6 +578,11 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
 - One generation at a time: the queue is released only when the computation has really stopped. A
   client that disconnects cancels its generation; it is detected at the next failed write, so the next
   request's time to first token is about +18 ms (≈ 2 decode steps on E2B 4-bit) above an idle server.
+- Conversation reuse: each turn keeps a snapshot of the KV caches at the end of its prompt; a request
+  whose prompt strictly extends one of them only prefills the new suffix (LRU of 8 conversations,
+  2 GB budget: `--conversation-cache-count`, `--conversation-cache-gb`, `0` disables). Reported as
+  `usage.prompt_tokens_details.cached_tokens`. E2B 4-bit, ~2 350-token system prompt: 98 % of the prompt
+  served from cache from turn 2, time to first token 460 → 100 ms; two interleaved clients both keep theirs.
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
 
 ## Library Integration

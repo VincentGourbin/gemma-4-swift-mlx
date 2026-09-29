@@ -131,6 +131,7 @@ struct ServerCounters: Encodable {
     var failed = 0
     var rejected = 0
     var promptTokens = 0
+    var cachedPromptTokens = 0
     var completionTokens = 0
 }
 
@@ -262,7 +263,8 @@ public actor Gemma4Server {
                                toolCalls: calls.isEmpty ? nil : calls),
                 finishReason: usage?.finishReason.rawValue ?? "stop")],
             usage: Usage(promptTokens: usage?.promptTokens ?? 0, completionTokens: usage?.completionTokens ?? 0,
-                         totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0)))
+                         totalTokens: (usage?.promptTokens ?? 0) + (usage?.completionTokens ?? 0),
+                         cachedTokens: usage?.cachedPromptTokens ?? 0))
         return Self.json(response)
     }
 
@@ -297,7 +299,8 @@ public actor Gemma4Server {
                         try await send(
                             .init(), finish: usage.finishReason.rawValue,
                             usage: Usage(promptTokens: usage.promptTokens, completionTokens: usage.completionTokens,
-                                         totalTokens: usage.promptTokens + usage.completionTokens))
+                                         totalTokens: usage.promptTokens + usage.completionTokens,
+                                         cachedTokens: usage.cachedPromptTokens))
                     }
                 }
                 try await writer.write(ByteBuffer(string: "data: [DONE]\n\n"))
@@ -332,6 +335,7 @@ public actor Gemma4Server {
         guard let usage else { return }
         counters.completed += 1
         counters.promptTokens += usage.promptTokens
+        counters.cachedPromptTokens += usage.cachedPromptTokens
         counters.completionTokens += usage.completionTokens
     }
 
