@@ -66,6 +66,9 @@ extension LoRA {
         @Option(name: .long, help: "Gradient clipping max norm (0=desactive, papier recommande 0.3 pour full)")
         var gradClip: Float = 0
 
+        @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
+        var resume: Bool = false
+
         @Option(name: .long, help: "Graine : init LoRA, dropout et melange des exemples (reproductible)")
         var seed: UInt64 = 0
 
@@ -192,7 +195,8 @@ extension LoRA {
                 gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,  // Default 0.3 pour full
                 enableProfiling: profile,
                 seed: seed,
-                maxSeqLength: maxSeqLength > 0 ? maxSeqLength : nil
+                maxSeqLength: maxSeqLength > 0 ? maxSeqLength : nil,
+                resume: resume
             )
 
             print("\n--- Debut du training ---")
@@ -289,7 +293,8 @@ extension LoRA {
                 maskPrompt: ftType == .full ? true : maskPrompt,
                 gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,
                 enableProfiling: profile,
-                seed: seed
+                seed: seed,
+                resume: resume
             )
 
             print("\n--- Debut du training multimodal ---")

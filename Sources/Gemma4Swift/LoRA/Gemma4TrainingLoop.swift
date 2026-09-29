@@ -186,10 +186,14 @@ public func trainLoRA(
     isFullFineTune: Bool = false,
     seed: UInt64 = 0,
     gradClipMaxNorm: Float = 0,
+    startIteration: Int = 0,
+    checkpointDirectory: URL? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
     // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    // Reprise d'un run deja termine : rien a faire (l'iterateur d'entrainement ne finit jamais).
+    guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()
     defer { Gemma4ComputeGate.shared.endTraining() }
     // Activer le mode training (ref: Python model.train())
@@ -205,9 +209,12 @@ public func trainLoRA(
     var tokenCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
+    var lastIteration = startIteration
     for (iteration, (batch, lengths)) in TrainingBatchIterator(
         samples: trainSamples, batchSize: batchSize, train: true, seed: seed
     ).enumerated() {
+        // Reprise (K-25) : rejouer le melange jusqu'au pas sauvegarde, sans calcul.
+        if iteration < startIteration { continue }
         // Arret propre (A-02) : annulation -> sortie de boucle et sauvegarde finale.
         if Task.isCancelled { break }
         // Forward + backward (ref: Python step())
@@ -223,6 +230,7 @@ public func trainLoRA(
 
         // eval APRES l'update pour synchroniser
         eval(model, optimizer, lvalue)
+        lastIteration = iteration + 1
 
         losses.append(lvalue.item(Float.self))
         tokenCount += tokens.item(Int.self)
@@ -243,7 +251,7 @@ public func trainLoRA(
         }
 
         // Validation
-        if iteration == 0 || (iteration + 1) % stepsPerEval == 0 {
+        if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
             let valStart = Date.timeIntervalSinceReferenceDate
             model.train(false)  // Mode eval pour la validation
             let valLoss = evaluateTraining(model: model, samples: validSamples, batchSize: batchSize)
@@ -258,13 +266,9 @@ public func trainLoRA(
 
         // Save
         if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
-            if isFullFineTune {
-                let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
-                try save(arrays: allParams, url: url)
-            } else {
-                let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
-                try save(arrays: trainableParams, url: url)
-            }
+            try saveTrainingWeights(
+                model: model, isFullFineTune: isFullFineTune, weightsURL: url, optimizer: optimizer,
+                iteration: iteration + 1, seed: seed, checkpointDirectory: checkpointDirectory)
             let p = LoRATrain.Progress.save(iteration: iteration, url: url)
             if progress(p) == .stop { break }
             start = Date.timeIntervalSinceReferenceDate
@@ -273,15 +277,29 @@ public func trainLoRA(
         if iteration + 1 >= iterations { break }
     }
 
-    // Sauvegarde finale
+    // Sauvegarde finale (aussi apres une annulation)
     if let url = weightsURL {
-        if isFullFineTune {
-            let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
-            try save(arrays: allParams, url: url)
-        } else {
-            let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
-            try save(arrays: trainableParams, url: url)
-        }
+        try saveTrainingWeights(
+            model: model, isFullFineTune: isFullFineTune, weightsURL: url, optimizer: optimizer,
+            iteration: lastIteration, seed: seed, checkpointDirectory: checkpointDirectory)
+    }
+}
+
+/// Sauvegarde intermediaire ou finale : checkpoint complet (K-25) si un dossier est
+/// donne, sinon ancien comportement (un fichier ecrase).
+func saveTrainingWeights(
+    model: Module, isFullFineTune: Bool, weightsURL: URL, optimizer: any Optimizer,
+    iteration: Int, seed: UInt64, checkpointDirectory: URL?
+) throws {
+    let weights = Dictionary(
+        uniqueKeysWithValues: (isFullFineTune ? model.parameters() : model.trainableParameters()).flattened())
+    if let checkpointDirectory {
+        try Gemma4TrainingCheckpoint.write(
+            weights: weights, optimizer: optimizer,
+            state: Gemma4TrainingState(iteration: iteration, seed: seed),
+            directory: checkpointDirectory, weightsName: weightsURL.lastPathComponent)
+    } else {
+        try save(arrays: weights, url: weightsURL)
     }
 }
 
@@ -382,10 +400,14 @@ public func trainMultimodalLoRA(
     isFullFineTune: Bool = false,
     seed: UInt64 = 0,
     gradClipMaxNorm: Float = 0,
+    startIteration: Int = 0,
+    checkpointDirectory: URL? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
     // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    // Reprise d'un run deja termine : rien a faire (l'iterateur d'entrainement ne finit jamais).
+    guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()
     defer { Gemma4ComputeGate.shared.endTraining() }
     model.train()
@@ -403,8 +425,10 @@ public func trainMultimodalLoRA(
     var tokenCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
+    var lastIteration = startIteration
     for (iteration, (batch, lengths, pixelValues, audioFeatures, audioMask))
         in MultimodalBatchIterator(samples: trainSamples, train: true, seed: seed).enumerated() {
+        if iteration < startIteration { continue }
         if Task.isCancelled { break }
 
         // Pre-calculer les embeddings media EN DEHORS de valueAndGrad
@@ -449,6 +473,7 @@ public func trainMultimodalLoRA(
         let clipped = gradClipMaxNorm > 0 ? clipGradNorm(gradients: grad, maxNorm: gradClipMaxNorm).0 : grad
         optimizer.update(model: model, gradients: clipped)
         eval(model, optimizer, lvalue)
+        lastIteration = iteration + 1
 
         losses.append(lvalue.item(Float.self))
         tokenCount += tokens.item(Int.self)
@@ -469,7 +494,7 @@ public func trainMultimodalLoRA(
         }
 
         // Validation
-        if iteration == 0 || (iteration + 1) % stepsPerEval == 0 {
+        if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
             let valStart = Date.timeIntervalSinceReferenceDate
             model.train(false)
             let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples)
@@ -484,13 +509,9 @@ public func trainMultimodalLoRA(
 
         // Save
         if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
-            if isFullFineTune {
-                let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
-                try save(arrays: allParams, url: url)
-            } else {
-                let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
-                try save(arrays: trainableParams, url: url)
-            }
+            try saveTrainingWeights(
+                model: model, isFullFineTune: isFullFineTune, weightsURL: url, optimizer: optimizer,
+                iteration: iteration + 1, seed: seed, checkpointDirectory: checkpointDirectory)
             let p = LoRATrain.Progress.save(iteration: iteration, url: url)
             if progress(p) == .stop { break }
             start = Date.timeIntervalSinceReferenceDate
@@ -499,15 +520,11 @@ public func trainMultimodalLoRA(
         if iteration + 1 >= iterations { break }
     }
 
-    // Sauvegarde finale
+    // Sauvegarde finale (aussi apres une annulation)
     if let url = weightsURL {
-        if isFullFineTune {
-            let allParams = Dictionary(uniqueKeysWithValues: model.parameters().flattened())
-            try save(arrays: allParams, url: url)
-        } else {
-            let trainableParams = Dictionary(uniqueKeysWithValues: model.trainableParameters().flattened())
-            try save(arrays: trainableParams, url: url)
-        }
+        try saveTrainingWeights(
+            model: model, isFullFineTune: isFullFineTune, weightsURL: url, optimizer: optimizer,
+            iteration: lastIteration, seed: seed, checkpointDirectory: checkpointDirectory)
     }
 }
 

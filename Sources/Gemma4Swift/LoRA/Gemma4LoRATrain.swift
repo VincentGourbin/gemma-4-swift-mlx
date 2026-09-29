@@ -57,6 +57,8 @@ public enum Gemma4LoRATrain {
         public var seed: UInt64
         /// Longueur maximale d'un exemple en jetons (troncature, comme mlx-lm) ; nil = aucune.
         public var maxSeqLength: Int?
+        /// Reprendre au dernier checkpoint de `outputDirectory` (poids, etat de l'optimiseur, pas).
+        public var resume: Bool
 
         public init(
             fineTuneType: FineTuneType = .lora,
@@ -75,7 +77,8 @@ public enum Gemma4LoRATrain {
             gradClipMaxNorm: Float = 0,
             enableProfiling: Bool = false,
             seed: UInt64 = 0,
-            maxSeqLength: Int? = 2048
+            maxSeqLength: Int? = 2048,
+            resume: Bool = false
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -94,6 +97,7 @@ public enum Gemma4LoRATrain {
             self.enableProfiling = enableProfiling
             self.seed = seed
             self.maxSeqLength = maxSeqLength
+            self.resume = resume
         }
     }
 
@@ -162,6 +166,13 @@ public enum Gemma4LoRATrain {
             numLayers: config.numLayers,
             useDora: config.fineTuneType == .dora
         )
+        // Config ecrite des le demarrage (K-25) : un run interrompu laisse un adaptateur
+        // chargeable (LoRAContainer.from(directory:) exige ce fichier).
+        if config.fineTuneType != .full {
+            try Gemma4TrainingCheckpoint.atomicWrite(
+                try JSONEncoder().encode(loraConfig),
+                to: config.outputDirectory.appending(component: "adapter_config.json"))
+        }
 
         // Profiling
         let profiler = MLXProfiler.shared
@@ -217,11 +228,18 @@ public enum Gemma4LoRATrain {
             print("Parametres trainables: \(trainableParams) / \(totalParams) (\(String(format: "%.2f", pct))%)")
 
             // Optimizer — AdamW avec weight decay pour full SFT (ref papier: 0.01)
-            let optimizer: any Optimizer
-            if isFullFineTune {
-                optimizer = AdamW(learningRate: config.learningRate, weightDecay: 0.01)
-            } else {
-                optimizer = Adam(learningRate: config.learningRate)
+            // Meme calcul qu'Adam / AdamW de MLXOptimizers, etat sauvegardable (K-25).
+            let optimizer = Gemma4ResumableAdam(
+                learningRate: config.learningRate, weightDecay: isFullFineTune ? 0.01 : 0)
+
+            // Reprise : poids et etat de l'optimiseur du dernier checkpoint, pas suivant.
+            var startIteration = 0
+            if config.resume, let state = Gemma4TrainingCheckpoint.readState(in: config.outputDirectory) {
+                try Gemma4TrainingCheckpoint.restore(
+                    into: model, optimizer: optimizer, directory: config.outputDirectory,
+                    weightsName: weightsURL.lastPathComponent)
+                startIteration = state.iteration
+                print("Reprise au pas \(state.iteration) (graine \(state.seed))")
             }
 
             // Callback avec profiling
@@ -304,6 +322,8 @@ public enum Gemma4LoRATrain {
                 isFullFineTune: isFullFineTune,
                 seed: config.seed,
                 gradClipMaxNorm: config.gradClipMaxNorm,
+                startIteration: startIteration,
+                checkpointDirectory: config.outputDirectory,
                 progress: wrappedProgress
             )
 
@@ -374,6 +394,13 @@ public enum Gemma4LoRATrain {
             numLayers: config.numLayers,
             useDora: config.fineTuneType == .dora
         )
+        // Config ecrite des le demarrage (K-25) : un run interrompu laisse un adaptateur
+        // chargeable (LoRAContainer.from(directory:) exige ce fichier).
+        if config.fineTuneType != .full {
+            try Gemma4TrainingCheckpoint.atomicWrite(
+                try JSONEncoder().encode(loraConfig),
+                to: config.outputDirectory.appending(component: "adapter_config.json"))
+        }
 
         // Profiling
         let profiler = MLXProfiler.shared
@@ -424,11 +451,18 @@ public enum Gemma4LoRATrain {
             let pct = Double(trainableParams) / Double(totalParams) * 100
             print("Parametres trainables: \(trainableParams) / \(totalParams) (\(String(format: "%.2f", pct))%)")
 
-            let optimizer: any Optimizer
-            if isFullFineTune {
-                optimizer = AdamW(learningRate: config.learningRate, weightDecay: 0.01)
-            } else {
-                optimizer = Adam(learningRate: config.learningRate)
+            // Meme calcul qu'Adam / AdamW de MLXOptimizers, etat sauvegardable (K-25).
+            let optimizer = Gemma4ResumableAdam(
+                learningRate: config.learningRate, weightDecay: isFullFineTune ? 0.01 : 0)
+
+            // Reprise : poids et etat de l'optimiseur du dernier checkpoint, pas suivant.
+            var startIteration = 0
+            if config.resume, let state = Gemma4TrainingCheckpoint.readState(in: config.outputDirectory) {
+                try Gemma4TrainingCheckpoint.restore(
+                    into: model, optimizer: optimizer, directory: config.outputDirectory,
+                    weightsName: weightsURL.lastPathComponent)
+                startIteration = state.iteration
+                print("Reprise au pas \(state.iteration) (graine \(state.seed))")
             }
 
             // Callback avec profiling
@@ -477,6 +511,8 @@ public enum Gemma4LoRATrain {
                 isFullFineTune: isFullFineTune,
                 seed: config.seed,
                 gradClipMaxNorm: config.gradClipMaxNorm,
+                startIteration: startIteration,
+                checkpointDirectory: config.outputDirectory,
                 progress: wrappedProgress
             )
         }

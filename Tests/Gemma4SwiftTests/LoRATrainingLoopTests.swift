@@ -106,4 +106,61 @@ struct LoRATrainingLoopTests {
             try Gemma4LoRATrain.checkFullFineTune(model)
         }
     }
+
+    private func run(
+        _ model: Gemma4LLMModel, optimizer: any Optimizer, iterations: Int, start: Int = 0, directory: URL? = nil
+    ) throws -> [Float] {
+        var out: [Float] = []
+        try trainLoRA(
+            model: model, trainSamples: samples(8), validSamples: samples(2),
+            optimizer: optimizer, iterations: iterations, stepsPerReport: 1, stepsPerEval: 1_000,
+            saveEvery: 5, weightsURL: directory?.appendingPathComponent("adapters.safetensors"),
+            seed: 5, startIteration: start, checkpointDirectory: directory
+        ) { progress in
+            if case .train(_, let loss, _, _) = progress { out.append(loss) }
+            return .more
+        }
+        return out
+    }
+
+    @Test("Gemma4ResumableAdam = Adam de MLXOptimizers, bit a bit (et AdamW)")
+    func testResumableAdamMatchesMLX() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let mlxAdam = try run(loraModel(), optimizer: Adam(learningRate: 1e-2), iterations: 12)
+            let ours = try run(loraModel(), optimizer: Gemma4ResumableAdam(learningRate: 1e-2), iterations: 12)
+            #expect(mlxAdam == ours)
+            let mlxAdamW = try run(loraModel(), optimizer: AdamW(learningRate: 1e-2, weightDecay: 0.01), iterations: 12)
+            let oursW = try run(loraModel(), optimizer: Gemma4ResumableAdam(learningRate: 1e-2, weightDecay: 0.01), iterations: 12)
+            #expect(mlxAdamW == oursW)
+        }
+    }
+
+    @Test("reprise 10 -> 20 = run continu de 20 pas ; checkpoints numerotes + etat")
+    func testResume() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("gemma4-resume-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+
+            let continuous = try run(loraModel(), optimizer: Gemma4ResumableAdam(learningRate: 1e-2), iterations: 20)
+
+            let first = try run(loraModel(), optimizer: Gemma4ResumableAdam(learningRate: 1e-2), iterations: 10, directory: dir)
+            let state = try #require(Gemma4TrainingCheckpoint.readState(in: dir))
+            #expect(state == Gemma4TrainingState(iteration: 10, seed: 5))
+            for file in ["0000005_adapters.safetensors", "0000010_adapters.safetensors", "adapters.safetensors",
+                         "optimizer.safetensors", "training_state.json"] {
+                #expect(FileManager.default.fileExists(atPath: dir.appendingPathComponent(file).path), "\(file)")
+            }
+            let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasPrefix(".tmp-") }
+            #expect(leftovers.isEmpty, "temporaires restants : \(leftovers)")
+
+            let model = try loraModel()
+            let optimizer = Gemma4ResumableAdam(learningRate: 1e-2)
+            try Gemma4TrainingCheckpoint.restore(into: model, optimizer: optimizer, directory: dir)
+            let second = try run(model, optimizer: optimizer, iterations: 20, start: state.iteration, directory: dir)
+
+            #expect(first + second == continuous, "reprise \(second.prefix(3)) contre continu \(continuous[10 ..< 13])")
+        }
+    }
 }
+
