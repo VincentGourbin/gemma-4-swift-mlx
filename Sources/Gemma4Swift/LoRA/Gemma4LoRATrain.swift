@@ -71,6 +71,9 @@ public enum Gemma4LoRATrain {
         /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a ;
         /// director, 200 pas : +13 % de debit, -19 % de pic MLX, perte identique).
         public var responseOnlyHead: Bool
+        /// Multimodal : tout le modele en fp32 (ancien chemin, poids x 2). `false` (K-31) :
+        /// base bf16, parametres LoRA fp32.
+        public var multimodalFloat32: Bool
         /// Limite de cache MLX et vidage apres validation (K-30 b ; director : empreinte
         /// 76 -> 16 Go, perte identique) ; nil = aucune politique.
         public var memoryPolicy: Gemma4TrainingMemoryPolicy?
@@ -97,7 +100,8 @@ public enum Gemma4LoRATrain {
             validationBatches: Int? = nil,
             metricsURL: URL? = nil,
             responseOnlyHead: Bool = true,
-            memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048)
+            memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048),
+            multimodalFloat32: Bool = true
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -121,6 +125,7 @@ public enum Gemma4LoRATrain {
             self.metricsURL = metricsURL
             self.responseOnlyHead = responseOnlyHead
             self.memoryPolicy = memoryPolicy
+            self.multimodalFloat32 = multimodalFloat32
         }
     }
 
@@ -492,12 +497,15 @@ public enum Gemma4LoRATrain {
         try await container.perform { (context: ModelContext) in
             let model = context.model
 
-            // Convertir le modele en float32 pour eviter les NaN en bf16
-            // sur les sequences longues (>300 tokens avec images)
-            model.apply { array in
-                array.dtype.isFloatingPoint ? array.asType(.float32) : array
+            // Ancien chemin : tout le modele en fp32 (poids x 2) contre les NaN du bf16 sur les
+            // sequences longues avec image. K-31 : `multimodalFloat32 = false` garde la base en
+            // bf16 et ne passe en fp32 que les parametres LoRA (plus bas) ; la perte l'est deja.
+            if config.multimodalFloat32 {
+                model.apply { array in
+                    array.dtype.isFloatingPoint ? array.asType(.float32) : array
+                }
+                print("Modele converti en float32 pour stabilite numerique")
             }
-            print("Modele converti en float32 pour stabilite numerique")
 
             MLXRandom.seed(config.seed)
 
@@ -509,6 +517,11 @@ public enum Gemma4LoRATrain {
                     model: model,
                     configuration: loraConfig
                 )
+            }
+            if !config.multimodalFloat32 && !isFullFineTune {
+                let loraParameters = model.trainableParameters().flattened().map { ($0.0, $0.1.asType(.float32)) }
+                model.update(parameters: ModuleParameters.unflattened(loraParameters))
+                print("Base en bf16, parametres LoRA en fp32")
             }
 
             let trainableParams = model.trainableParameters()

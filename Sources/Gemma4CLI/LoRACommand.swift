@@ -78,6 +78,9 @@ extension LoRA {
         @Option(name: .long, help: "Limite du cache MLX en Mo pendant l'entrainement, vidage apres validation (0 = aucune ; defaut 2048 : empreinte 76 -> 16 Go sur director)")
         var trainCacheLimitMb: Int = 2048
 
+        @Flag(name: .long, help: "Multimodal : base en bf16 et parametres LoRA en fp32 au lieu de tout le modele en fp32 (K-31)")
+        var bf16Base: Bool = false
+
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
 
@@ -267,7 +270,8 @@ extension LoRA {
                 validationBatches: valBatches > 0 ? valBatches : nil,
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
                 responseOnlyHead: !fullHead,
-                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil
+                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil,
+                multimodalFloat32: !bf16Base
             )
 
             print("\n--- Debut du training multimodal ---")
