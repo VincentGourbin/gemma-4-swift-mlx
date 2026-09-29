@@ -58,8 +58,14 @@ struct EvalMmlu: AsyncParsableCommand {
     @Option(name: .long, help: "Limite le nombre de questions")
     var limit: Int?
 
-    @Option(name: .long, help: "Verbose : print chaque question")
-    var verbose: Bool = false
+    @Flag(name: .long, help: "Afficher chaque question")
+    var verbose = false
+
+    @Flag(name: .long, help: "Re-prefiller le prefixe 5-shot a chaque question (ancien chemin, A/B de K-34)")
+    var noPrefixCache = false
+
+    @Option(name: .long, help: "Fichier JSONL ou ajouter la ligne de resultat (score, IC95, temps)")
+    var out: String?
 
     @Flag(name: .long, help: "Mode Chain-of-Thought : utilise cot_content pour 5-shot + generation libre + parse 'answer is (X)'")
     var cot: Bool = false
@@ -152,6 +158,11 @@ struct EvalMmlu: AsyncParsableCommand {
         print("Letter token IDs : A=\(letterTokens[0]) B=\(letterTokens[1]) C=\(letterTokens[2]) D=\(letterTokens[3])")
 
         let kvBitsParam = self.kvBits
+        // K-34 : cache MLX borne (un prefixe 5-shot par sujet, pas besoin de plus).
+        Memory.cacheLimit = 2 << 30
+        // Prefixe 5-shot prefille une fois par sujet (questions groupees par sujet), hors
+        // TurboQuant (caches sans copie) et hors CoT.
+        let prefixCache = (kvBitsParam == nil && !cot && !noPrefixCache) ? PrefixCache() : nil
 
         var correctByCfg = ["bf16-kv": 0]
         var totalByCfg = ["bf16-kv": 0]
@@ -201,12 +212,18 @@ struct EvalMmlu: AsyncParsableCommand {
                         kvBits: kv
                     )
                 } else {
-                    answer = await Self.predictAnswerLogits(
-                        container: container,
-                        prompt: prompt,
-                        letterTokens: candidateTokens,
-                        kvBits: kv
-                    )
+                    if let prefixCache, kv == nil {
+                        answer = await Self.predictAnswerCached(
+                            container: container, cache: prefixCache, subject: item.subject,
+                            prefix: prefix, prompt: prompt, letterTokens: candidateTokens)
+                    } else {
+                        answer = await Self.predictAnswerLogits(
+                            container: container,
+                            prompt: prompt,
+                            letterTokens: candidateTokens,
+                            kvBits: kv
+                        )
+                    }
                 }
                 answers[cfgName] = answer
                 totalByCfg[cfgName, default: 0] += 1
@@ -227,7 +244,7 @@ struct EvalMmlu: AsyncParsableCommand {
                 let elapsed = Date().timeIntervalSince(startTime)
                 let eta = elapsed / Double(idx + 1) * Double(items.count - idx - 1)
                 func ltr(_ i: Int?) -> String {
-                    guard let i = i, i >= 0 && i < 4 else { return "?" }
+                    guard let i = i, i >= 0 && i < letters.count else { return "?" }
                     return letters[i]
                 }
                 print("[\(idx + 1)/\(items.count)] subj=\(item.subject) gold=\(letters[item.answer]) " +
@@ -239,13 +256,29 @@ struct EvalMmlu: AsyncParsableCommand {
 
         let elapsed = Date().timeIntervalSince(startTime)
         print("\n=== Results (\(items.count) questions, 5-shot, \(String(format: "%.1f", elapsed))s) ===")
-        for (cfg, total) in totalByCfg {
+        var resultLine: [String: Any] = [
+            "questions": items.count, "seconds": elapsed,
+            "seconds_per_question": items.isEmpty ? 0 : elapsed / Double(items.count),
+            "prefix_cache": prefixCache != nil, "model": URL(fileURLWithPath: modelPath).lastPathComponent,
+            "date": ISO8601DateFormatter().string(from: Date()),
+        ]
+        if let prefixCache { resultLine["prefix_misses"] = prefixCache.misses }
+        for (cfg, total) in totalByCfg where total > 0 {
             let correct = correctByCfg[cfg] ?? 0
+            let (low, high) = Self.wilson(correct, total)
             let pct = Double(correct) / Double(total) * 100.0
-            print("  \(cfg): \(correct)/\(total) = \(String(format: "%.1f%%", pct))")
+            print("  \(cfg): \(correct)/\(total) = \(String(format: "%.1f%%", pct)) (IC95 \(String(format: "%.1f-%.1f", low * 100, high * 100)))")
+            resultLine[cfg] = ["correct": correct, "total": total, "accuracy": pct, "ci95": [low * 100, high * 100]]
+        }
+        if let out {
+            var line = try JSONSerialization.data(withJSONObject: resultLine, options: [.sortedKeys])
+            line.append(0x0A)
+            if let handle = FileHandle(forWritingAtPath: out) {
+                try handle.seekToEnd(); try handle.write(contentsOf: line); try handle.close()
+            } else { try line.write(to: URL(fileURLWithPath: out)) }
         }
         if cfgs.count == 2 {
-            let agreePct = Double(sameAnswer) / Double(items.count) * 100.0
+            let agreePct = Double(sameAnswer) / Double(max(1, items.count)) * 100.0
             print("  Agreement bf16 vs TQ: \(sameAnswer)/\(items.count) = \(String(format: "%.1f%%", agreePct))")
         }
         print("\nBy subject (bf16-kv accuracy):")
@@ -278,7 +311,7 @@ struct EvalMmlu: AsyncParsableCommand {
             var genIds: [Int] = [Int(nextTok)]
 
             for _ in 0 ..< maxTokens - 1 {
-                if nextTok == 1 || nextTok == 106 { break }  // EOS
+                if nextTok == 1 || nextTok == 106 || nextTok == 50 { break }  // <eos>, <turn|>, <|tool_response>
                 let stepIn = MLXArray([nextTok]).reshaped(1, 1)
                 let out = context.model(stepIn, cache: cache)
                 nextTok = argMax(out[0..., 0, 0...], axis: -1).item(Int32.self)
@@ -335,6 +368,62 @@ struct EvalMmlu: AsyncParsableCommand {
         return -1
     }
 
+    /// Intervalle de confiance a 95 % (Wilson) d'une proportion.
+    static func wilson(_ correct: Int, _ total: Int) -> (Double, Double) {
+        guard total > 0 else { return (0, 0) }
+        let n = Double(total), p = Double(correct) / n, z = 1.96
+        let center = (p + z * z / (2 * n)) / (1 + z * z / n)
+        let half = z * ((p * (1 - p) + z * z / (4 * n)) / n).squareRoot() / (1 + z * z / n)
+        return (max(0, center - half), min(1, center + half))
+    }
+
+    /// Prefixe 5-shot du sujet courant : ids et caches KV apres son prefill.
+    final class PrefixCache: @unchecked Sendable {
+        var subject: String?
+        var ids: [Int] = []
+        var caches: [any KVCache] = []
+        var misses = 0
+    }
+
+    /// K-34 : le prefixe 5-shot est prefille une fois par sujet ; chaque question repart
+    /// d'une copie de ses caches et ne prefille que sa suite. Tete sur la seule derniere
+    /// position. Si la tokenisation du prompt complet ne commence pas par celle du prefixe,
+    /// repli sur le prompt complet (compte dans `misses`).
+    private static func predictAnswerCached(
+        container: ModelContainer, cache box: PrefixCache, subject: String,
+        prefix: String, prompt: String, letterTokens: [Int]
+    ) async -> Int {
+        await container.perform { context in
+            guard let llm = context.model as? Gemma4LLMModel else { return -1 }
+            let full = context.tokenizer.encode(text: prompt)
+            if box.subject != subject {
+                let ids = context.tokenizer.encode(text: prefix)
+                let caches = llm.newCache(parameters: nil)
+                _ = llm.languageModel(
+                    inputs: MLXArray(ids.map { Int32($0) })[.newAxis], cache: caches.map { $0 as KVCache? },
+                    logitsFrom: max(0, ids.count - 1))
+                eval(caches)
+                box.subject = subject; box.ids = ids; box.caches = caches
+            }
+            let caches: [any KVCache]
+            let suffix: [Int]
+            if full.count > box.ids.count, full.starts(with: box.ids) {
+                caches = box.caches.map { $0.copy() }
+                suffix = Array(full[box.ids.count...])
+            } else {
+                box.misses += 1
+                caches = llm.newCache(parameters: nil)
+                suffix = full
+            }
+            let logits = llm.languageModel(
+                inputs: MLXArray(suffix.map { Int32($0) })[.newAxis], cache: caches.map { $0 as KVCache? },
+                logitsFrom: suffix.count - 1)
+            let last = logits[0, logits.dim(1) - 1, 0...]
+            let candidates = last.take(MLXArray(letterTokens.map { Int32($0) }), axis: 0).asArray(Float.self)
+            return candidates.indices.max { candidates[$0] < candidates[$1] } ?? 0
+        }
+    }
+
     /// Forward complet sur le prompt 5-shot, compare logits a " A"/" B"/" C"/" D".
     private static func predictAnswerLogits(
         container: ModelContainer,
@@ -348,7 +437,10 @@ struct EvalMmlu: AsyncParsableCommand {
             let inputIds = MLXArray(promptIds.map { Int32($0) }).reshaped(1, -1)
             let params = kvBitsArg != nil ? GenerateParameters(kvBits: kvBitsArg) : nil
             let cache = context.model.newCache(parameters: params)
-            let logits = context.model(inputIds, cache: cache)
+            // Tete sur la seule derniere position quand le modele le permet (K-34).
+            let logits = (context.model as? Gemma4LLMModel).map {
+                $0.languageModel(inputs: inputIds, cache: cache.map { $0 as KVCache? }, logitsFrom: inputIds.dim(1) - 1)
+            } ?? context.model(inputIds, cache: cache)
             // Logits du dernier token = distribution du prochain token (= " A"/" B"/...)
             let lastLogits = logits[0, logits.dim(1) - 1, 0...]
             // Gather des candidats en un seul tenseur + UN seul sync via asArray

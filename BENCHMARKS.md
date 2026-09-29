@@ -633,3 +633,14 @@ Jeu recréé et archivé (`Scripts/quality/latex-ocr-sample.py`, 500 train / 50 
 
 Les couches LoRA sortent en fp32 (paramètres LoRA fp32) : sans retour au dtype de la table avant la tête liée, MLX promouvait ses 262 k × 1 536 poids en fp32 à chaque pas (débit ÷ 2).
 
+### K-34 : `eval-mmlu` (E2B 4 bits, 5-shot)
+
+Jeu recréé et archivé : `Scripts/quality/mmlu-sample.py` → 1 140 questions (20 par sujet, 57 sujets, graine 0) + 5 exemples « dev » par sujet (`/Volumes/Lexar/datasets/mmlu/mmlu_5shot_1140.json`, sha256 `447df0c0…`). Lignes : `benchmarks/mmlu-k34-20260929.jsonl`.
+
+| Chemin | 200 questions | Score (200) | 1 140 questions |
+|---|---|---|---|
+| préfixe 5-shot re-préfillé à chaque question (`--no-prefix-cache`) | 74,7 s | 41,0 % (IC95 34,4-47,9) | — |
+| **préfixe préfillé une fois par sujet + tête sur la dernière position** | **18,8 s (−75 %)** | 39,5 % (IC95 33,0-46,4) | **46,2 % (IC95 43,4-49,1), 106 s** |
+
+Réponses concordantes à 195/200 : découper le calcul (préfixe puis suite) change les arrondis bf16 et fait basculer quelques argmax, comme en K-19 ; aucun repli de tokenisation (0 sur 1 140).
+
