@@ -186,10 +186,10 @@ struct Bench: AsyncParsableCommand {
             let input = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
             var iterator: TokenIterator
             if let ngram {
-                // Chemin host = ancien comportement (synchronisation par jeton) : A/B de K-15.
+                // Chemin host = ancien comportement exact (historique CPU, sync par jeton) : A/B de K-15.
                 iterator = try TokenIterator(
                     input: input, model: context.model, cache: nil,
-                    processor: NoRepeatNGramLogitProcessor(ngramSize: ngram, includeThinkingInWindow: !ngramOnHost),
+                    processor: NoRepeatNGramLogitProcessor(ngramSize: ngram, forceHostHistory: ngramOnHost),
                     sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
                     maxTokens: maxTokens)
             } else {

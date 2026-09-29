@@ -76,9 +76,13 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     /// Longueur de `deviceHistory`, suivie cote CPU sans lire le GPU.
     private var deviceCount = 0
 
+    /// Diagnostic : force l'historique CPU (ancien chemin, synchronisation par jeton)
+    /// meme quand tous les tokens comptent — pour l'A/B de K-15.
+    public let forceHostHistory: Bool
+
     /// Le chemin GPU n'a pas d'automate de canal : reserve au cas ou tous les
     /// tokens comptent.
-    private var onDevice: Bool { includeThinkingInWindow }
+    private var onDevice: Bool { includeThinkingInWindow && !forceHostHistory }
 
     /// - Parameters:
     ///   - ngramSize: taille du n-gramme, >= 1.
@@ -89,12 +93,14 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     public init(
         ngramSize: Int,
         includePromptInWindow: Bool = true,
-        includeThinkingInWindow: Bool = true
+        includeThinkingInWindow: Bool = true,
+        forceHostHistory: Bool = false
     ) {
         precondition(ngramSize >= 1, "ngramSize doit etre >= 1 (recu \(ngramSize))")
         self.ngramSize = ngramSize
         self.includePromptInWindow = includePromptInWindow
         self.includeThinkingInWindow = includeThinkingInWindow
+        self.forceHostHistory = forceHostHistory
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
