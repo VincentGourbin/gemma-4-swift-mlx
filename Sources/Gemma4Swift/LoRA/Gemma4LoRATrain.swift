@@ -55,7 +55,10 @@ public enum Gemma4LoRATrain {
         public var enableProfiling: Bool
         /// Graine : initialisation LoRA, dropout **et** melange des exemples (A-08).
         public var seed: UInt64
-        /// Longueur maximale d'un exemple en jetons (troncature, comme mlx-lm) ; nil = aucune.
+        /// Longueur maximale d'un exemple en jetons ; nil = aucune troncature (defaut).
+        /// Pas de 2048 par defaut comme mlx-lm : sur le dataset director de Fluxforge, 59 %
+        /// des exemples depassent 2048 jetons et la troncature coupe la fin de la reponse
+        /// (E7 29/30 -> 27/30, mesure du 2026-09-29). Les exemples longs sont signales.
         public var maxSeqLength: Int?
         /// Reprendre au dernier checkpoint de `outputDirectory` (poids, etat de l'optimiseur, pas).
         public var resume: Bool
@@ -85,7 +88,7 @@ public enum Gemma4LoRATrain {
             gradClipMaxNorm: Float = 0,
             enableProfiling: Bool = false,
             seed: UInt64 = 0,
-            maxSeqLength: Int? = 2048,
+            maxSeqLength: Int? = nil,
             resume: Bool = false,
             validationBatches: Int? = nil,
             metricsURL: URL? = nil,
@@ -235,6 +238,12 @@ public enum Gemma4LoRATrain {
         }
 
         // Entrainement dans le contexte du container
+        let longest = (trainData + validData).map(\.count).max() ?? 0
+        let long = (trainData + validData).filter { $0.count > 2048 }.count
+        if config.maxSeqLength == nil && long > 0 {
+            print("Note : \(long) exemple(s) de plus de 2048 jetons (max \(longest)), non tronques "
+                + "(--max-seq-length pour borner la memoire)")
+        }
         let (capturedTrainData, truncatedTrain) = truncate(trainData, maxLength: config.maxSeqLength)
         let (capturedValidData, truncatedValid) = truncate(validData, maxLength: config.maxSeqLength)
         if truncatedTrain + truncatedValid > 0 {

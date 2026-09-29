@@ -84,8 +84,8 @@ extension LoRA {
         @Option(name: .long, help: "Graine : init LoRA, dropout et melange des exemples (reproductible)")
         var seed: UInt64 = 0
 
-        @Option(name: .long, help: "Longueur maximale d'un exemple en jetons, troncature comptee (0 = aucune)")
-        var maxSeqLength: Int = 2048
+        @Option(name: .long, help: "Longueur maximale d'un exemple en jetons, troncature comptee (0 = aucune, defaut : la fin des reponses longues serait perdue)")
+        var maxSeqLength: Int = 0
 
         @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
         var profile: Bool = false
