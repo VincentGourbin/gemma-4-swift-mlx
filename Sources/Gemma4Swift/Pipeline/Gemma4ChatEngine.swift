@@ -8,6 +8,7 @@
 // les appels d'outils par le parseur amont `ToolCallFormat.gemma4`.
 
 import CoreGraphics
+import CryptoKit
 import Foundation
 import ImageIO
 import MLX
@@ -78,6 +79,8 @@ public struct Gemma4ChatUsage: Sendable, Equatable {
     public enum FinishReason: String, Sendable { case stop, length, toolCalls = "tool_calls", cancelled }
 
     public let promptTokens: Int
+    /// Jetons du prompt servis par l'instantane de conversation (K-19), non re-prefilles.
+    public let cachedPromptTokens: Int
     public let completionTokens: Int
     public let prefillSeconds: Double
     public let promptTokensPerSecond: Double
@@ -87,11 +90,12 @@ public struct Gemma4ChatUsage: Sendable, Equatable {
     public let finishReason: FinishReason
 
     public init(
-        promptTokens: Int, completionTokens: Int, prefillSeconds: Double = 0,
+        promptTokens: Int, cachedPromptTokens: Int = 0, completionTokens: Int, prefillSeconds: Double = 0,
         promptTokensPerSecond: Double = 0, tokensPerSecond: Double = 0,
         timeToFirstToken: TimeInterval? = nil, peakMemoryBytes: Int = 0, finishReason: FinishReason
     ) {
         self.promptTokens = promptTokens
+        self.cachedPromptTokens = cachedPromptTokens
         self.completionTokens = completionTokens
         self.prefillSeconds = prefillSeconds
         self.promptTokensPerSecond = promptTokensPerSecond
@@ -154,9 +158,39 @@ public protocol Gemma4ChatBackend: Sendable {
     var acceptsImages: Bool { get async }
 }
 
+/// Instantane de conversation (K-19) : caches KV a la **fin du prompt** du tour
+/// precedent (pas apres la generation : le gabarit retire la pensee des tours passes,
+/// donc les jetons generes ne sont pas ceux du rendu suivant — piege 13), avec les ids
+/// et les empreintes des images deja encodees.
+final class ConversationStore: @unchecked Sendable {
+    struct Snapshot {
+        let ids: [Int]
+        let caches: [any KVCache]
+        let imageDigests: [Data]
+    }
+
+    private let lock = NSLock()
+    private var snapshot: Snapshot?
+
+    func take() -> Snapshot? { lock.withLock { snapshot } }
+    func put(_ value: Snapshot?) { lock.withLock { snapshot = value } }
+}
+
 public actor Gemma4ChatEngine: Gemma4ChatBackend {
     public let container: ModelContainer
     public let profile: Gemma4ReferenceProfile?
+    /// Reutiliser le prefixe du tour precedent quand le nouveau prompt le prolonge
+    /// strictement (K-19). Sans effet avec le n-gramme ni sur le 12B unified.
+    public var reusesConversation = true
+    let conversation = ConversationStore()
+
+    public func setReusesConversation(_ value: Bool) {
+        reusesConversation = value
+        if !value { conversation.put(nil) }
+    }
+
+    /// Oublie l'instantane : le prochain tour re-prefille tout.
+    public func resetConversation() { conversation.put(nil) }
 
     public init(container: ModelContainer, profile: Gemma4ReferenceProfile? = nil) {
         self.container = container
@@ -261,6 +295,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
     ) -> Gemma4ChatRun {
         let container = container
         let profile = profile
+        let store: ConversationStore? = reusesConversation ? conversation : nil
         let (events, continuation) = AsyncThrowingStream<Gemma4ChatEvent, Error>.makeStream()
         let task = Task {
             // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
@@ -273,7 +308,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
                 try await container.perform { context in
                     try await Self.run(
                         messages: messages, tools: tools, options: options, profile: profile,
-                        context: context, continuation: continuation)
+                        store: store, context: context, continuation: continuation)
                 }
                 if profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
                 continuation.finish()
@@ -291,13 +326,39 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         tools: [[String: any Sendable]],
         options: Gemma4ChatOptions,
         profile: Gemma4ReferenceProfile?,
+        store: ConversationStore?,
         context: ModelContext,
         continuation: AsyncThrowingStream<Gemma4ChatEvent, Error>.Continuation
     ) async throws {
-        let images = messages.flatMap(\.images)
+        let allImages = messages.flatMap(\.images)
         let ids = try promptIds(
             messages: messages, tools: tools, enableThinking: options.enableThinking,
             tokenizer: context.tokenizer)
+        let digests = allImages.map { Data(SHA256.hash(data: $0)) }
+
+        var parameters = GenerateParameters(
+            maxTokens: options.maxTokens, temperature: options.temperature,
+            topP: options.topP, topK: options.topK)
+        profile?.apply(to: &parameters)
+
+        // Reutilisation : extension stricte du prompt precedent, memes images en tete,
+        // hors n-gramme (son historique ne verrait que le suffixe) et hors 12B unified
+        // (masque bidirectionnel a l'offset 0, incompatible avec un cache non vide).
+        let reusable = store != nil && options.noRepeatNGramSize == nil
+            && (context.model is Gemma4LLMModel || context.model is Gemma4MultimodalLLMModel)
+        var cache: [any KVCache]
+        var suffix = ids
+        var images = allImages
+        var cached = 0
+        if reusable, let snapshot = store?.take(), snapshot.ids.count < ids.count,
+           ids.starts(with: snapshot.ids), digests.starts(with: snapshot.imageDigests) {
+            cache = snapshot.caches.map { $0.copy() }
+            suffix = Array(ids[snapshot.ids.count...])
+            images = Array(allImages[snapshot.imageDigests.count...])
+            cached = snapshot.ids.count
+        } else {
+            cache = context.model.newCache(parameters: parameters)
+        }
 
         if !images.isEmpty {
             guard let model = context.model as? Gemma4MultimodalLLMModel else {
@@ -315,26 +376,28 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             model.pendingPixelValues = batch
         }
 
-        var parameters = GenerateParameters(
-            maxTokens: options.maxTokens, temperature: options.temperature,
-            topP: options.topP, topK: options.topK)
-        profile?.apply(to: &parameters)
-        let input = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
+        // Chrono avant l'iterateur : son init fait tout le prefill (TTFT et debit du prompt).
+        Memory.peakMemory = 0
+        let start = Date()
+        let input = LMInput(tokens: MLXArray(suffix.map { Int32($0) }))
         let iterator: TokenIterator
         if let n = options.noRepeatNGramSize {
             iterator = try TokenIterator(
-                input: input, model: context.model, cache: nil,
+                input: input, model: context.model, cache: cache,
                 processor: NoRepeatNGramLogitProcessor(ngramSize: n),
                 sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
                 maxTokens: options.maxTokens)
         } else {
-            iterator = try TokenIterator(input: input, model: context.model, parameters: parameters)
+            iterator = try TokenIterator(input: input, model: context.model, cache: cache, parameters: parameters)
+        }
+        // L'iterateur a prefille tout le prompt : instantane « fin de prompt ».
+        if reusable {
+            store?.put(.init(ids: ids, caches: cache.map { $0.copy() }, imageDigests: digests))
         }
 
-        Memory.peakMemory = 0
-        let start = Date()
+        let prefillEnd = Date()
         let (tokens, generation) = MLXLMCommon.generateTokenTask(
-            promptTokenCount: ids.count, modelConfiguration: context.configuration,
+            promptTokenCount: suffix.count, modelConfiguration: context.configuration,
             tokenizer: context.tokenizer, iterator: iterator)
 
         var router = Gemma4ChannelRouter()
@@ -404,12 +467,13 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         } else {
             finish = .stop
         }
-        let prefill = info?.promptTime ?? 0
+        // `promptTime` de l'amont ne voit que l'amorce apres l'init de l'iterateur.
+        let prefill = prefillEnd.timeIntervalSince(start) + (info?.promptTime ?? 0)
         let decode = info?.generateTime ?? 0
         continuation.yield(.done(Gemma4ChatUsage(
-            promptTokens: ids.count, completionTokens: completion,
+            promptTokens: ids.count, cachedPromptTokens: cached, completionTokens: completion,
             prefillSeconds: prefill,
-            promptTokensPerSecond: prefill > 0 ? Double(ids.count) / prefill : 0,
+            promptTokensPerSecond: prefill > 0 ? Double(suffix.count) / prefill : 0,
             tokensPerSecond: decode > 0 ? Double(completion) / decode : 0,
             timeToFirstToken: firstToken, peakMemoryBytes: Memory.peakMemory,
             finishReason: finish)))
