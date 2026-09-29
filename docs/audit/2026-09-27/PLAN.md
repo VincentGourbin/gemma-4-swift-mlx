@@ -253,7 +253,7 @@ puis d2/d3 (`--image`). Ordre (audit-diffusion §E.2) : K-D10 base bf16 D1/D2/D3
 
 ### 2026-09-29 — K-D12 packs, K-15, K-18
 - K-D12 (`3c869e5e`) : `export-diffusion`, format `gemma4-diffusion-prequantized-v1`, chargement direct détecté automatiquement. Packs sur `/Volumes/Lexar/models/local/diffusiongemma-26B-A4B-it-{8bit,4bit}` : 8 bits 32 s / 26,7 Go au chargement, 4 bits 11 s / 18,8 Go (contre 62-64 s / 51 Go à la volée), sorties identiques. Porte ⅓ tenue en 4 bits, pas en 8 bits (disque USB). Publication HF : décision de Vincent.
-- K-15 (`1ab24fc2`, `a0d…`) : historique n-gramme sur GPU, +17 % (107 → 125 tok/s, = sans n-gramme) ; parité sur 256 pas réels. Premier A/B faux : comparé à `includeThinkingInWindow: false` (autre mode) — `forceHostHistory` pour l'A/B exact.
+- K-15 (`1ab24fc2`, `2c946eb6`) : historique n-gramme sur GPU, +17 % (107 → 125 tok/s, = sans n-gramme) ; parité sur 256 pas réels. Premier A/B faux : comparé à `includeThinkingInWindow: false` (autre mode) — `forceHostHistory` pour l'A/B exact.
 - K-18 (`af8e647b`) : vision sans padding ; vidéo ×2,5 (193 → 78 ms/frame), plus précis contre fp32 ; image −3 % (déjà 97 % des patches).
 - K-16 (`9a8ac015`) : `load(audio: false)` −583 Mo sur E2B 4 bits ; audio refusé au lieu d'être ignoré.
 - K-17 : top-p coûte 5,6 %. Pas de correction exacte bon marché (un pré-filtre top-k change la distribution quand la masse des k premiers < top-p ; vérifier la masse sur GPU demande soit une synchronisation, soit les deux calculs). Proposition : documenter, et offrir `topK` (p. ex. 64) dans les profils `fast` si Vincent accepte l'approximation. ASK.
