@@ -56,11 +56,23 @@ struct Bench: AsyncParsableCommand {
     @Option(name: .long, help: "Etiquette libre (variante A/B, commentaire)")
     var label: String = ""
 
+    @Option(name: .long, help: "Temperature d'echantillonnage (defaut 0 : greedy)")
+    var temperature: Float = 0
+
+    @Option(name: .long, help: "top-p (avec --temperature > 0)")
+    var topP: Float = 1
+
+    @Option(name: .long, help: "top-k (avec --temperature > 0 ; 0 = desactive)")
+    var topK: Int = 0
+
     @Option(name: .long, help: "Blocage des n-grammes repetes (NoRepeatNGramLogitProcessor), taille n")
     var noRepeatNgram: Int?
 
     @Option(name: .long, help: "Chemin du n-gramme : device (historique GPU, defaut) ou host (historique CPU, sync par jeton)")
     var ngramPath: String = "device"
+
+    @Flag(name: .long, help: "Diagnostic K-18 : encodeur vision paddé a maxPatches (ancien chemin)")
+    var visionPadded = false
 
     @Flag(name: .long, help: "Ne pas faire la passe d'echauffement (compilation Metal) non chronometree")
     var noWarmup = false
@@ -138,6 +150,10 @@ struct Bench: AsyncParsableCommand {
         let modelPath = self.modelPath
         let prefillStep = self.prefillStep
         let ngram = self.noRepeatNgram
+        let visionPadded = self.visionPadded
+        let temperature = self.temperature
+        let topP = self.topP
+        let topK = self.topK
         let ngramOnHost = self.ngramPath == "host"
         let line = try await container.perform { context -> BenchLine in
             let ids: [Int]
@@ -148,11 +164,12 @@ struct Bench: AsyncParsableCommand {
                     throw ValidationError("--image exige un modele multimodal E2B/E4B")
                 }
                 model.pendingPixelValues = pixelsCapture
+                model.visionTower.padToMaxPatches = visionPadded
             } else {
                 ids = try Self.promptIds(size: promptSize, filler: filler, tokenizer: context.tokenizer)
             }
 
-            var parameters = GenerateParameters(maxTokens: maxTokens, temperature: 0)
+            var parameters = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: topP, topK: topK)
             profile?.apply(to: &parameters)
             // Une option explicite l'emporte sur le profil (balayage d'une variable).
             if let prefillStep { parameters.prefillStepSize = prefillStep }
@@ -209,9 +226,11 @@ struct Bench: AsyncParsableCommand {
                 "phys_footprint_peak_mb": footprint.peak,
                 "prefill_step": parameters.prefillStepSize,
                 "kv_bits": parameters.kvBits ?? 16,
+                "temperature": Double(temperature), "top_p": Double(topP), "top_k": topK,
                 // Empreinte des jetons generes : parite de sortie entre variantes A/B.
                 "output_sha": Self.digest(generated),
             ]
+            if pixelsCapture != nil { line["vision_padded"] = visionPadded }
             if let ngram {
                 line["ngram"] = ngram
                 line["ngram_path"] = ngramOnHost ? "host" : "device"

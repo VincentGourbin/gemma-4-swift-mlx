@@ -13,7 +13,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     public let config: Gemma4Config
 
     @ModuleInfo(key: "language_model") var languageModel: Gemma4LanguageModel
-    @ModuleInfo(key: "vision_tower") var visionTower: VisionModel
+    @ModuleInfo(key: "vision_tower") public var visionTower: VisionModel
     @ModuleInfo(key: "embed_vision") var embedVision: MultimodalEmbedder
     @ModuleInfo(key: "audio_tower") var audioTower: AudioEncoder?
     @ModuleInfo(key: "embed_audio") var embedAudio: MultimodalEmbedder?
