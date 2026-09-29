@@ -313,14 +313,14 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     /// - Parameters:
     ///   - path: URL du repertoire contenant config.json + safetensors + tokenizer.json
     ///   - multimodal: si true, charge le modele multimodal complet. Defaut: true.
-    public func load(from path: URL, multimodal: Bool = true) async throws {
+    public func load(from path: URL, multimodal: Bool = true, audio: Bool = true) async throws {
         state = .unloaded
         // Gemma4Registration.loadContainer et pas la fonction libre
         // loadModelContainer : celle-ci passe par ModelFactoryRegistry, qui essaie
         // MLXVLM avant MLXLLM et renverrait MLXVLM.Gemma4 des qu'un autre module du
         // processus lie MLXVLM. Cf. la doc de loadContainer(from:using:multimodal:).
         let loaded = try await Gemma4Registration.loadContainer(
-            from: path, using: Gemma4TokenizerLoader(), multimodal: multimodal)
+            from: path, using: Gemma4TokenizerLoader(), multimodal: multimodal, audio: audio)
         setContainer(loaded)
     }
 
@@ -823,6 +823,8 @@ public enum Gemma4PipelineError: LocalizedError {
     case modelNotDownloaded(String)
     case invalidInput(String)
     case unsupportedModelFamily(String, reason: String)
+    /// Audio fourni a un modele charge sans tour audio (`load(audio: false)`).
+    case audioTowerUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -831,6 +833,8 @@ public enum Gemma4PipelineError: LocalizedError {
         case .invalidInput(let msg): return "Entree invalide: \(msg)"
         case .unsupportedModelFamily(let id, let reason):
             return "Famille modele non supportee par Gemma4Pipeline pour '\(id)' : \(reason)"
+        case .audioTowerUnavailable:
+            return "Audio fourni mais le modele a ete charge sans tour audio (audio: false)"
         }
     }
 }

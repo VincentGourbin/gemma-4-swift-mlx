@@ -15,7 +15,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     @ModuleInfo(key: "language_model") var languageModel: Gemma4LanguageModel
     @ModuleInfo(key: "vision_tower") public var visionTower: VisionModel
     @ModuleInfo(key: "embed_vision") var embedVision: MultimodalEmbedder
-    @ModuleInfo(key: "audio_tower") var audioTower: AudioEncoder?
+    @ModuleInfo(key: "audio_tower") public var audioTower: AudioEncoder?
     @ModuleInfo(key: "embed_audio") var embedAudio: MultimodalEmbedder?
 
     public let modelType: String
@@ -255,6 +255,13 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     /// tout le prompt, puis le modele de langage avance par tranches d'embeddings ;
     /// le dernier jeton (texte : fin du gabarit) est rendu au `TokenIterator`.
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+        // Sans tour audio (chargement `audio: false`), l'audio en attente serait ignore
+        // en silence par `prepareMultimodalEmbeds` : refuser plutot que repondre sans.
+        if pendingAudioFeatures != nil && audioTower == nil {
+            pendingAudioFeatures = nil
+            pendingAudioMask = nil
+            throw Gemma4PipelineError.audioTowerUnavailable
+        }
         let promptTokens = input.text.tokens
         let promptCount = promptTokens.shape[0]
         guard promptCount > 0 else {
