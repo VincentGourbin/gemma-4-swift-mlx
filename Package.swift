@@ -16,7 +16,8 @@ let package = Package(
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
-        .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.4.0"),
+        // 1.5.1 : code a base de `Process` (xctrace) sous #if os(macOS), compile pour iOS.
+        .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.5.1"),
     ],
     targets: [
         .target(
@@ -30,8 +31,7 @@ let package = Package(
                 .product(name: "MLXLLM", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "MLXOptimizers", package: "mlx-swift"),
-                // macOS seulement : MLXProfiler utilise `Process`, absent d'iOS (K-46).
-                .product(name: "MLXProfiler", package: "swift-mlx-profiler", condition: .when(platforms: [.macOS])),
+                .product(name: "MLXProfiler", package: "swift-mlx-profiler"),
             ]
         ),
         .executableTarget(

@@ -34,46 +34,83 @@ public enum Gemma4DrafterTraining {
         lastFullCacheIdx: Int,
         lastSlidingCacheIdx: Int
     ) -> (loss: MLXArray, ntoks: MLXArray) {
-        let L = batchTokens.dim(1)
-        precondition(L >= 3, "batch sequence length doit etre >= 3 (need positions p, p+1, p+2)")
+        let target = targetOutputs(
+            target: target, batchTokens: batchTokens,
+            lastFullCacheIdx: lastFullCacheIdx, lastSlidingCacheIdx: lastSlidingCacheIdx)
+        return drafterLoss(drafter: drafter, batchTokens: batchTokens, target: target)
+    }
 
+    /// Ce que le drafter consomme de la cible gelee pour un lot. Calculer ces sorties hors de
+    /// `valueAndGrad` a ete mesure (K-30 d, 2026-09-29) : aucun gain (MLX ne propage deja rien
+    /// a travers la cible sous stopGradient) ; la boucle garde donc le chemin simple.
+    public struct TargetOutputs {
+        public let preNormHiddens: MLXArray   // [B, L, backbone]
+        public let targetArgmax: MLXArray     // [B, L]
+        public let bonusEmbeds: MLXArray      // [B, L-1, backbone]
+        public let fullKV: (keys: MLXArray, values: MLXArray)
+        public let slidingKV: (keys: MLXArray, values: MLXArray)
+
+        var arrays: [MLXArray] {
+            [preNormHiddens, targetArgmax, bonusEmbeds, fullKV.keys, fullKV.values, slidingKV.keys, slidingKV.values]
+        }
+
+        init(_ a: [MLXArray]) {
+            preNormHiddens = a[0]; targetArgmax = a[1]; bonusEmbeds = a[2]
+            fullKV = (a[3], a[4]); slidingKV = (a[5], a[6])
+        }
+
+        init(preNormHiddens: MLXArray, targetArgmax: MLXArray, bonusEmbeds: MLXArray,
+             fullKV: (keys: MLXArray, values: MLXArray), slidingKV: (keys: MLXArray, values: MLXArray)) {
+            self.preNormHiddens = preNormHiddens; self.targetArgmax = targetArgmax; self.bonusEmbeds = bonusEmbeds
+            self.fullKV = fullKV; self.slidingKV = slidingKV
+        }
+    }
+
+    /// Forward de la cible (gelee) : hidden pre-norm, argmax des logits (cibles de
+    /// distillation), K/V partages, embeddings des jetons bonus. Tout en stopGradient.
+    public static func targetOutputs(
+        target: Gemma4LanguageModel,
+        batchTokens: MLXArray,
+        lastFullCacheIdx: Int,
+        lastSlidingCacheIdx: Int
+    ) -> TargetOutputs {
         // 1. Target forward (no grad) — pre-norm hidden + sharedKV + LOGITS
         let targetOut = target.forwardWithIntermediates(inputs: batchTokens)
-        // stopGradient sur tout ce qui vient du target — frozen, pas de backprop
-        let hiddens = stopGradient(targetOut.preNormHiddenStates)  // [B, L, backbone]
-
-        // Self-distillation targets: utiliser argmax(target_logits) plutot que ground truth.
-        // C'est ce qui maximise l'acceptance rate au moment de l'inference MTP — le drafter
-        // doit MATCH le target, pas la verite terrain.
-        let targetArgmax = stopGradient(argMax(targetOut.logits, axis: -1))  // [B, L]
-
+        let hiddens = stopGradient(targetOut.preNormHiddenStates)
+        // Self-distillation : argmax(target_logits) plutot que la verite terrain — le
+        // drafter doit coller a la cible, c'est ce qui maximise l'acceptation MTP.
+        let targetArgmax = stopGradient(argMax(targetOut.logits, axis: -1))
         guard let fullKV = targetOut.intermediates[lastFullCacheIdx],
               let slidingKV = targetOut.intermediates[lastSlidingCacheIdx] else {
-            fatalError("Cannot extract shared K/V from target intermediates")
+            fatalError("Cannot extract shared K/V from target intermediates")  // indices valides par trainDrafter
         }
-        let sharedKV: SharedKVStates = [
-            "full_attention": (
-                keys: stopGradient(fullKV.keys),
-                values: stopGradient(fullKV.values)
-            ),
-            "sliding_attention": (
-                keys: stopGradient(slidingKV.keys),
-                values: stopGradient(slidingKV.values)
-            ),
-        ]
-
-        // 2. Construire les (bonus_token, prev_hidden) pour positions 1..L-1
-        // bonus[p] = batchTokens[p] (token a la position p, qu'on traite comme bonus)
-        // prev_hidden[p] = hiddens[p-1] (etat avant de voir token p)
-        let bonusTokens = batchTokens[0..., 1...]                          // [B, L-1]
-        let prevHiddens = hiddens[0..., .stride(to: -1)]                   // [B, L-1, backbone]
-
+        // bonus[p] = batchTokens[p], embeddings a l'echelle du modele
+        let bonusTokens = batchTokens[0..., 1...]
         let scale = pow(Float(target.config.hiddenSize), 0.5)
         var bonusEmbeds = target.model.embedTokens(bonusTokens)
-        bonusEmbeds = bonusEmbeds * MLXArray(scale, dtype: bonusEmbeds.dtype)
-        bonusEmbeds = stopGradient(bonusEmbeds)
+        bonusEmbeds = stopGradient(bonusEmbeds * MLXArray(scale, dtype: bonusEmbeds.dtype))
+        return TargetOutputs(
+            preNormHiddens: hiddens, targetArgmax: targetArgmax, bonusEmbeds: bonusEmbeds,
+            fullKV: (stopGradient(fullKV.keys), stopGradient(fullKV.values)),
+            slidingKV: (stopGradient(slidingKV.keys), stopGradient(slidingKV.values)))
+    }
 
-        let drafterInput = concatenated([bonusEmbeds, prevHiddens], axis: -1)
+    /// Perte du drafter a partir des sorties de la cible deja calculees.
+    public static func drafterLoss(
+        drafter: Gemma4AssistantDraftModel,
+        batchTokens: MLXArray,
+        target: TargetOutputs
+    ) -> (loss: MLXArray, ntoks: MLXArray) {
+        let L = batchTokens.dim(1)
+        precondition(L >= 3, "batch sequence length doit etre >= 3 (need positions p, p+1, p+2)")
+        let sharedKV: SharedKVStates = [
+            "full_attention": (keys: target.fullKV.keys, values: target.fullKV.values),
+            "sliding_attention": (keys: target.slidingKV.keys, values: target.slidingKV.values),
+        ]
+        let targetArgmax = target.targetArgmax
+        // prev_hidden[p] = hiddens[p-1] (etat avant de voir le jeton p)
+        let prevHiddens = target.preNormHiddens[0..., .stride(to: -1)]
+        let drafterInput = concatenated([target.bonusEmbeds, prevHiddens], axis: -1)
         // drafterInput: [B, L-1, 2*backbone]
 
         // 3. Drafter forward (avec grad) en parallele, mask causal
@@ -197,13 +234,11 @@ public enum Gemma4DrafterTraining {
         // valueAndGrad sur le DRAFTER seulement
         // batch = [batchTokens] (single MLXArray in array)
         let lossValueGrad = valueAndGrad(model: drafter) { (drafter: Gemma4AssistantDraftModel, arrays: [MLXArray]) -> [MLXArray] in
-            let (loss, ntoks) = drafterLoss(
-                drafter: drafter,
-                target: target,
-                batchTokens: arrays[0],
-                lastFullCacheIdx: lastFullCacheIdx,
-                lastSlidingCacheIdx: lastSlidingCacheIdx
-            )
+            let (loss, ntoks) = arrays.count > 1
+                ? drafterLoss(drafter: drafter, batchTokens: arrays[0], target: TargetOutputs(Array(arrays[1...])))
+                : drafterLoss(
+                    drafter: drafter, target: target, batchTokens: arrays[0],
+                    lastFullCacheIdx: lastFullCacheIdx, lastSlidingCacheIdx: lastSlidingCacheIdx)
             return [loss, ntoks]
         }
 

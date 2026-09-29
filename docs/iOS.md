@@ -10,8 +10,9 @@ en image (lot I de l'audit du 2026-09-27, sur le modèle de YuE2 `4bit-lean`).
   elle, la limite jetsam d'une app tombe sous les 3,9 Go du cas image.
 - Le pack `mlx-community/gemma-4-e2b-it-4bit` (≈ 3,6 Go) dans un dossier de l'app, par exemple
   `Caches/models/mlx-community/gemma-4-e2b-it-4bit/` avec `Gemma4ModelCache.customModelsDirectory`.
-- La bibliothèque compile pour iOS (vérifié en CI, `generic/platform=iOS`). `MLXProfiler` n'est lié que
-  sur macOS : `TrainingConfig.enableProfiling` est sans effet sur iOS.
+- La bibliothèque compile pour iOS (vérifié en CI, `generic/platform=iOS`) depuis `swift-mlx-profiler`
+  1.5.1, qui réserve à macOS son code à base de `Process` (Metal System Trace via xctrace, capture des
+  réglages système) ; le reste du profiler fonctionne sur iOS.
 
 ## Utilisation
 
