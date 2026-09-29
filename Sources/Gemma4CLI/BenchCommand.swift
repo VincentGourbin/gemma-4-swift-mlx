@@ -2,6 +2,7 @@
 
 import ArgumentParser
 import CoreGraphics
+import CryptoKit
 import Darwin
 import Foundation
 import Gemma4Swift
@@ -54,6 +55,12 @@ struct Bench: AsyncParsableCommand {
 
     @Option(name: .long, help: "Etiquette libre (variante A/B, commentaire)")
     var label: String = ""
+
+    @Option(name: .long, help: "Blocage des n-grammes repetes (NoRepeatNGramLogitProcessor), taille n")
+    var noRepeatNgram: Int?
+
+    @Option(name: .long, help: "Chemin du n-gramme : device (historique GPU, defaut) ou host (historique CPU, sync par jeton)")
+    var ngramPath: String = "device"
 
     @Flag(name: .long, help: "Ne pas faire la passe d'echauffement (compilation Metal) non chronometree")
     var noWarmup = false
@@ -130,6 +137,8 @@ struct Bench: AsyncParsableCommand {
         nonisolated(unsafe) let pixelsCapture = pixels
         let modelPath = self.modelPath
         let prefillStep = self.prefillStep
+        let ngram = self.noRepeatNgram
+        let ngramOnHost = self.ngramPath == "host"
         let line = try await container.perform { context -> BenchLine in
             let ids: [Int]
             if let pixelsCapture {
@@ -151,15 +160,26 @@ struct Bench: AsyncParsableCommand {
             Memory.clearCache()
             Memory.peakMemory = 0
             let start = Date()
-            var iterator = try TokenIterator(
-                input: LMInput(tokens: MLXArray(ids.map { Int32($0) })),
-                model: context.model, parameters: parameters)
+            let input = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
+            var iterator: TokenIterator
+            if let ngram {
+                // Chemin host = ancien comportement (synchronisation par jeton) : A/B de K-15.
+                iterator = try TokenIterator(
+                    input: input, model: context.model, cache: nil,
+                    processor: NoRepeatNGramLogitProcessor(ngramSize: ngram, includeThinkingInWindow: !ngramOnHost),
+                    sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
+                    maxTokens: maxTokens)
+            } else {
+                iterator = try TokenIterator(input: input, model: context.model, parameters: parameters)
+            }
             let prefillSeconds = iterator.promptPrefillTime
 
             var stamps: [TimeInterval] = []
+            var generated: [Int] = []
             stamps.reserveCapacity(maxTokens)
-            while stamps.count < maxTokens, iterator.next() != nil {
+            while stamps.count < maxTokens, let token = iterator.next() {
                 stamps.append(Date().timeIntervalSince(start))
+                generated.append(token)
             }
             let snapshot = Memory.snapshot()
 
@@ -189,7 +209,13 @@ struct Bench: AsyncParsableCommand {
                 "phys_footprint_peak_mb": footprint.peak,
                 "prefill_step": parameters.prefillStepSize,
                 "kv_bits": parameters.kvBits ?? 16,
+                // Empreinte des jetons generes : parite de sortie entre variantes A/B.
+                "output_sha": Self.digest(generated),
             ]
+            if let ngram {
+                line["ngram"] = ngram
+                line["ngram_path"] = ngramOnHost ? "host" : "device"
+            }
             // Taille des poids x tok/s : indicateur, pas une mesure. Surestime sur E2B/E4B,
             // dont les tables d'embeddings par couche ne sont lues que sur quelques lignes
             // par jeton (on observe alors plus que le plafond de la puce).
@@ -199,6 +225,12 @@ struct Bench: AsyncParsableCommand {
             return BenchLine(fields: line)
         }
         return line.fields
+    }
+
+    /// SHA-256 court (12 hex) d'une suite de jetons.
+    static func digest(_ tokens: [Int]) -> String {
+        let bytes = tokens.flatMap { withUnsafeBytes(of: Int32($0).littleEndian, Array.init) }
+        return SHA256.hash(data: bytes).prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 
     private func emit(_ line: [String: Any]) throws {
