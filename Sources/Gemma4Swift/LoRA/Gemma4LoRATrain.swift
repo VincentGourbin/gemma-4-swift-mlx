@@ -63,6 +63,10 @@ public enum Gemma4LoRATrain {
         public var validationBatches: Int?
         /// Fichier JSONL ou ecrire une ligne par rapport et validation (K-28).
         public var metricsURL: URL?
+        /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a).
+        public var responseOnlyHead: Bool
+        /// Limite de cache MLX et vidage apres validation (K-30 b) ; nil = aucune politique.
+        public var memoryPolicy: Gemma4TrainingMemoryPolicy?
 
         public init(
             fineTuneType: FineTuneType = .lora,
@@ -84,7 +88,9 @@ public enum Gemma4LoRATrain {
             maxSeqLength: Int? = 2048,
             resume: Bool = false,
             validationBatches: Int? = nil,
-            metricsURL: URL? = nil
+            metricsURL: URL? = nil,
+            responseOnlyHead: Bool = false,
+            memoryPolicy: Gemma4TrainingMemoryPolicy? = nil
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -106,6 +112,8 @@ public enum Gemma4LoRATrain {
             self.resume = resume
             self.validationBatches = validationBatches
             self.metricsURL = metricsURL
+            self.responseOnlyHead = responseOnlyHead
+            self.memoryPolicy = memoryPolicy
         }
     }
 
@@ -362,6 +370,8 @@ public enum Gemma4LoRATrain {
                 checkpointDirectory: config.outputDirectory,
                 validationBatches: config.validationBatches,
                 metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
+                responseOnlyHead: config.responseOnlyHead && config.maskPrompt,
+                memoryPolicy: config.memoryPolicy,
                 progress: wrappedProgress
             )
 
@@ -553,6 +563,8 @@ public enum Gemma4LoRATrain {
                 checkpointDirectory: config.outputDirectory,
                 validationBatches: config.validationBatches,
                 metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
+                responseOnlyHead: config.responseOnlyHead && config.maskPrompt,
+                memoryPolicy: config.memoryPolicy,
                 progress: wrappedProgress
             )
         }

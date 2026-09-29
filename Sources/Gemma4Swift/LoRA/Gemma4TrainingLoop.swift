@@ -15,18 +15,30 @@ import MLXOptimizers
 ///
 /// - batch: [batch_size, seq_len] — la sequence COMPLETE (pas split)
 /// - lengths: [batch_size, 2] — [[prompt_offset, total_length]] par sample
-func trainingLoss(model: Module, batch: MLXArray, lengths: MLXArray) -> (MLXArray, MLXArray) {
+func trainingLoss(
+    model: Module, batch: MLXArray, lengths: MLXArray, headFrom: Int = 0
+) -> (MLXArray, MLXArray) {
     // Split inputs/targets INSIDE la loss (comme Python)
     let inputs = batch[0..., .stride(to: -1)]
-    let targets = batch[0..., 1...]
+    var targets = batch[0..., 1...]
 
-    // Forward pass — le Python fait model(inputs) sans cache
-    let model = model as! any LLMModel
-    let logits = model(inputs, cache: nil).asType(.float32)
+    // Forward pass — le Python fait model(inputs) sans cache.
+    // K-30 (a) : avec le prompt masque, la tete (262 k logits en fp32) ne tourne que sur
+    // les positions a partir de `headFrom` — celles d'avant ne comptent pas dans la perte.
+    let logits: MLXArray
+    if headFrom > 0, let llm = model as? Gemma4LLMModel {
+        logits = llm.logits(inputs, from: headFrom).asType(.float32)
+    } else if headFrom > 0, let mm = model as? Gemma4MultimodalLLMModel {
+        logits = mm.logits(inputs, from: headFrom).asType(.float32)
+    } else {
+        logits = (model as! any LLMModel)(inputs, cache: nil).asType(.float32)
+    }
+    let start = logits.dim(1) == targets.dim(1) ? 0 : headFrom
+    targets = targets[0..., start...]
 
     // Masque: positions >= offset ET <= total_length
     let seqLen = targets.dim(1)
-    let steps = MLXArray(Array(Int32(1) ... Int32(seqLen))).reshaped(1, seqLen)
+    let steps = MLXArray(Array(Int32(start + 1) ... Int32(start + seqLen))).reshaped(1, seqLen)
     let offsets = lengths[0..., 0 ..< 1]    // prompt offset
     let totals = lengths[0..., 1 ..< 2]     // total length
     let mask = (steps .>= offsets) .&& (steps .<= totals)
@@ -62,6 +74,30 @@ public struct Gemma4TrainingMetrics: Sendable, Codable {
         case trainedTokensPerSecond = "trained_tok_s"
         case activeMB = "active_mlx_mb"
         case peakMB = "peak_mlx_mb"
+    }
+}
+
+// MARK: - Politique memoire (K-30 b)
+
+/// Politique memoire d'un entrainement (A-20 : aucune jusqu'ici ; E2B bf16 director :
+/// 76 Go d'empreinte pour 36 Go de pic MLX, le cache grossissant sans borne).
+public struct Gemma4TrainingMemoryPolicy: Sendable, Equatable {
+    /// `Memory.cacheLimit` en Mo (nil = inchange).
+    public var cacheLimitMB: Int?
+    /// `Memory.clearCache()` apres chaque validation et sauvegarde (pics transitoires).
+    public var clearCacheAfterValidation: Bool
+
+    public init(cacheLimitMB: Int? = nil, clearCacheAfterValidation: Bool = true) {
+        self.cacheLimitMB = cacheLimitMB
+        self.clearCacheAfterValidation = clearCacheAfterValidation
+    }
+
+    func applyAtStart() {
+        if let cacheLimitMB { Memory.cacheLimit = cacheLimitMB << 20 }
+    }
+
+    func afterValidationOrSave() {
+        if clearCacheAfterValidation { Memory.clearCache() }
     }
 }
 
@@ -217,6 +253,8 @@ public func trainLoRA(
     checkpointDirectory: URL? = nil,
     validationBatches: Int? = nil,
     metrics: ((Gemma4TrainingMetrics) -> Void)? = nil,
+    responseOnlyHead: Bool = false,
+    memoryPolicy: Gemma4TrainingMemoryPolicy? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -229,10 +267,13 @@ public func trainLoRA(
     model.train()
 
     // Loss + grad
+    // K-30 (a) : debut de la tete, fixe avant chaque pas (plus petit offset du lot - 1).
+    var headFrom = 0
     let lossValueGrad = valueAndGrad(model: model) { model, arrays in
-        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1])
+        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1], headFrom: headFrom)
         return [ce, ntoks]
     }
+    memoryPolicy?.applyAtStart()
 
     var losses = [Float]()
     var tokenCount = 0
@@ -248,6 +289,7 @@ public func trainLoRA(
         // Arret propre (A-02) : annulation -> sortie de boucle et sauvegarde finale.
         if Task.isCancelled { break }
         // Forward + backward (ref: Python step())
+        headFrom = responseOnlyHead ? max(0, lengths[0..., 0].min().item(Int.self) - 1) : 0
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
@@ -302,6 +344,7 @@ public func trainLoRA(
             let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
                                    validationTime: now - valStart)
             if progress(p) == .stop { break }
+            memoryPolicy?.afterValidationOrSave()
             start = Date.timeIntervalSinceReferenceDate
         }
 
@@ -450,6 +493,8 @@ public func trainMultimodalLoRA(
     checkpointDirectory: URL? = nil,
     validationBatches: Int? = nil,
     metrics: ((Gemma4TrainingMetrics) -> Void)? = nil,
+    responseOnlyHead: Bool = false,
+    memoryPolicy: Gemma4TrainingMemoryPolicy? = nil,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -464,10 +509,13 @@ public func trainMultimodalLoRA(
     let mmModel = model as! Gemma4MultimodalLLMModel
 
     // Loss + grad — reutilise trainingLoss() existant
+    // K-30 (a) : debut de la tete, fixe avant chaque pas (plus petit offset du lot - 1).
+    var headFrom = 0
     let lossValueGrad = valueAndGrad(model: model) { model, arrays in
-        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1])
+        let (ce, ntoks) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1], headFrom: headFrom)
         return [ce, ntoks]
     }
+    memoryPolicy?.applyAtStart()
 
     var losses = [Float]()
     var tokenCount = 0
@@ -515,6 +563,7 @@ public func trainMultimodalLoRA(
         mmModel.pendingAudioFeatures = nil
         mmModel.pendingAudioMask = nil
 
+        headFrom = responseOnlyHead ? max(0, lengths[0..., 0].min().item(Int.self) - 1) : 0
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
@@ -563,6 +612,7 @@ public func trainMultimodalLoRA(
             let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
                                    validationTime: now - valStart)
             if progress(p) == .stop { break }
+            memoryPolicy?.afterValidationOrSave()
             start = Date.timeIntervalSinceReferenceDate
         }
 

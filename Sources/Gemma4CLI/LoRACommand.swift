@@ -72,6 +72,12 @@ extension LoRA {
         @Option(name: .long, help: "Fichier JSONL des mesures (une ligne par rapport et validation)")
         var metricsOut: String?
 
+        @Flag(name: .long, help: "Avec --mask-prompt : tete et perte sur les seules positions de reponse (K-30 a)")
+        var responseOnlyHead: Bool = false
+
+        @Option(name: .long, help: "Limite du cache MLX en Mo pendant l'entrainement, vidage apres validation (K-30 b)")
+        var trainCacheLimitMb: Int?
+
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
 
@@ -155,7 +161,9 @@ extension LoRA {
                 maxSeqLength: maxSeqLength > 0 ? maxSeqLength : nil,
                 resume: resume,
                 validationBatches: valBatches > 0 ? valBatches : nil,
-                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) }
+                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
+                responseOnlyHead: responseOnlyHead,
+                memoryPolicy: trainCacheLimitMb.map { Gemma4TrainingMemoryPolicy(cacheLimitMB: $0) }
             )
 
             print("\n--- Debut du training ---")
@@ -257,7 +265,9 @@ extension LoRA {
                 seed: seed,
                 resume: resume,
                 validationBatches: valBatches > 0 ? valBatches : nil,
-                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) }
+                metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
+                responseOnlyHead: responseOnlyHead,
+                memoryPolicy: trainCacheLimitMb.map { Gemma4TrainingMemoryPolicy(cacheLimitMB: $0) }
             )
 
             print("\n--- Debut du training multimodal ---")

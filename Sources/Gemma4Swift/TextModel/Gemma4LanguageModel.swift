@@ -37,7 +37,8 @@ public class Gemma4LanguageModel: Module {
         inputsEmbeds: MLXArray? = nil,
         cache: [KVCache?]? = nil,
         perLayerInputs: MLXArray? = nil,
-        visionTokenMask: MLXArray? = nil
+        visionTokenMask: MLXArray? = nil,
+        logitsFrom: Int = 0
     ) -> MLXArray {
         var out = model(
             inputs: inputs,
@@ -46,6 +47,9 @@ public class Gemma4LanguageModel: Module {
             perLayerInputs: perLayerInputs,
             visionTokenMask: visionTokenMask
         )
+        // Tete sur les seules positions >= logitsFrom (K-30 a : l'entrainement masque
+        // n'a besoin des logits 262 k que sur la reponse).
+        if logitsFrom > 0 { out = out[0..., logitsFrom...] }
 
         // Tied word embeddings: utiliser embed_tokens comme linear
         out = model.embedTokens.asLinear(out)

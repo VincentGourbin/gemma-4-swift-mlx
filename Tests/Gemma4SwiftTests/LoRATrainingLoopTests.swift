@@ -185,5 +185,28 @@ struct LoRATrainingLoopTests {
             #expect(full != bounded)
         }
     }
+
+    @Test("K-30 a : tete partielle = meme perte et memes gradients que la tete complete")
+    func testResponseOnlyHead() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let model = try loraModel()
+            let batch = MLXArray((0 ..< 24).map { Int32(($0 * 5 + 3) % 128) }).reshaped(2, 12)
+            let lengths = MLXArray([Int32(7), 12, Int32(5), 10]).reshaped(2, 2)
+            func grad(_ headFrom: Int) -> ([MLXArray], ModuleParameters) {
+                valueAndGrad(model: model) { model, arrays -> [MLXArray] in
+                    let (ce, n) = trainingLoss(model: model, batch: arrays[0], lengths: arrays[1], headFrom: headFrom)
+                    return [ce, n]
+                }(model, [batch, lengths])
+            }
+            let (full, gFull) = grad(0)
+            let (part, gPart) = grad(4)  // plus petit offset 5, moins 1
+            #expect(abs(full[0] - part[0]).item(Float.self) < 1e-6, "perte \(full[0].item(Float.self)) / \(part[0].item(Float.self))")
+            #expect(full[1].item(Int.self) == part[1].item(Int.self))
+            let a = Dictionary(gFull.flattened(), uniquingKeysWith: { x, _ in x })
+            for (key, value) in gPart.flattened() {
+                #expect(allClose(value, a[key]!, atol: 1e-6).item(Bool.self), "\(key)")
+            }
+        }
+    }
 }
 

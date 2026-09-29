@@ -133,7 +133,12 @@ public enum Gemma4Registration {
         let factory = LLMModelFactory(
             typeRegistry: typeRegistry(multimodal: multimodal, audio: audio),
             modelRegistry: LLMRegistry.shared)
-        return try await factory.loadContainer(from: directory, using: tokenizerLoader)
+        let container = try await factory.loadContainer(from: directory, using: tokenizerLoader)
+        // K-43 : le modele multimodal sait ou recharger ses tours s'il les libere.
+        await container.perform { context in
+            (context.model as? Gemma4MultimodalLLMModel)?.weightsDirectory = directory
+        }
+        return container
     }
 
 }

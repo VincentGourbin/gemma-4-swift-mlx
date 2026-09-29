@@ -41,6 +41,11 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         return languageModel(inputs: inputs, cache: cacheArray)
     }
 
+    /// Logits des positions `from...` seulement (entrainement masque, K-30 a).
+    public func logits(_ inputs: MLXArray, from: Int) -> MLXArray {
+        languageModel(inputs: inputs, cache: nil, logitsFrom: from)
+    }
+
     /// Hidden states de toutes les couches, convention HuggingFace
     /// `output_hidden_states=True` : `num_hidden_layers + 1` tenseurs
     /// `[B, T, hidden_size]` (49 x `[B, T, 3840]` sur le 12B).
