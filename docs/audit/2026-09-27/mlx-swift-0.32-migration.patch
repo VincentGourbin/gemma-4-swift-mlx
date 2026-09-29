@@ -1,0 +1,219 @@
+diff --git a/Sources/Gemma4CLI/EvalCommand.swift b/Sources/Gemma4CLI/EvalCommand.swift
+index ae658021..df84f139 100644
+--- a/Sources/Gemma4CLI/EvalCommand.swift
++++ b/Sources/Gemma4CLI/EvalCommand.swift
+@@ -204,7 +204,7 @@ struct EvalMmlu: AsyncParsableCommand {
+             for (cfgName, kv) in cfgs {
+                 let answer: Int
+                 if cot {
+-                    answer = await Self.predictAnswerCoT(
++                    answer = try await Self.predictAnswerCoT(
+                         container: container,
+                         prompt: prompt,
+                         nChoices: nChoices,
+@@ -217,7 +217,7 @@ struct EvalMmlu: AsyncParsableCommand {
+                             container: container, cache: prefixCache, subject: item.subject,
+                             prefix: prefix, prompt: prompt, letterTokens: candidateTokens)
+                     } else {
+-                        answer = await Self.predictAnswerLogits(
++                        answer = try await Self.predictAnswerLogits(
+                             container: container,
+                             prompt: prompt,
+                             letterTokens: candidateTokens,
+@@ -297,13 +297,13 @@ struct EvalMmlu: AsyncParsableCommand {
+         nChoices: Int,
+         maxTokens: Int,
+         kvBits: Int?
+-    ) async -> Int {
++    ) async throws -> Int {
+         let kvBitsArg = kvBits
+-        let generated: String = await container.perform { context in
++        let generated: String = try await container.perform { context in
+             let promptIds = context.tokenizer.encode(text: prompt)
+             let inputIds = MLXArray(promptIds.map { Int32($0) })
+             let params = kvBitsArg != nil ? GenerateParameters(kvBits: kvBitsArg) : nil
+-            let cache = context.model.newCache(parameters: params)
++            let cache = try context.model.newCache(parameters: params)
+ 
+             // Prefill
+             let prefillOut = context.model(inputIds.reshaped(1, -1), cache: cache)
+@@ -430,13 +430,13 @@ struct EvalMmlu: AsyncParsableCommand {
+         prompt: String,
+         letterTokens: [Int],
+         kvBits: Int?
+-    ) async -> Int {
++    ) async throws -> Int {
+         let kvBitsArg = kvBits
+-        return await container.perform { context in
++        return try await container.perform { context in
+             let promptIds = context.tokenizer.encode(text: prompt)
+             let inputIds = MLXArray(promptIds.map { Int32($0) }).reshaped(1, -1)
+             let params = kvBitsArg != nil ? GenerateParameters(kvBits: kvBitsArg) : nil
+-            let cache = context.model.newCache(parameters: params)
++            let cache = try context.model.newCache(parameters: params)
+             // Tete sur la seule derniere position quand le modele le permet (K-34).
+             let logits = (context.model as? Gemma4LLMModel).map {
+                 $0.languageModel(inputs: inputIds, cache: cache.map { $0 as KVCache? }, logitsFrom: inputIds.dim(1) - 1)
+diff --git a/Sources/Gemma4CLI/Gemma4CLI.swift b/Sources/Gemma4CLI/Gemma4CLI.swift
+index d3a6acda..622c5511 100644
+--- a/Sources/Gemma4CLI/Gemma4CLI.swift
++++ b/Sources/Gemma4CLI/Gemma4CLI.swift
+@@ -847,7 +847,7 @@ struct Describe: AsyncParsableCommand {
+                 topP: 0.95
+             )
+ 
+-            let cache = context.model.newCache(parameters: params)
++            let cache = try context.model.newCache(parameters: params)
+ 
+             // Prefill
+             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
+@@ -1099,7 +1099,7 @@ struct Describe: AsyncParsableCommand {
+                 temperature: self.temperature,
+                 topP: 0.95
+             )
+-            let cache = context.model.newCache(parameters: params)
++            let cache = try context.model.newCache(parameters: params)
+ 
+             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
+             var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+diff --git a/Sources/Gemma4CLI/LoRACommand.swift b/Sources/Gemma4CLI/LoRACommand.swift
+index c215f9d5..83c9bde4 100644
+--- a/Sources/Gemma4CLI/LoRACommand.swift
++++ b/Sources/Gemma4CLI/LoRACommand.swift
+@@ -515,7 +515,7 @@ extension LoRA {
+                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
+ 
+                 // Prefill
+-                let cache = model.newCache(parameters: nil)
++                let cache = try model.newCache(parameters: nil)
+                 let prefillOutput = model(inputIds.reshaped(1, -1), cache: cache)
+                 var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+ 
+@@ -662,7 +662,7 @@ extension LoRA {
+                     }
+ 
+                     let inputIds = MLXArray(tokenIds.map { Int32($0) })
+-                    let cache = model.newCache(parameters: nil)
++                    let cache = try model.newCache(parameters: nil)
+                     let prefillOutput = model(inputIds.reshaped(1, -1), cache: cache)
+                     var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
+ 
+diff --git a/Sources/Gemma4CLI/ProfileCommand.swift b/Sources/Gemma4CLI/ProfileCommand.swift
+index 01950d1e..952fcbfd 100644
+--- a/Sources/Gemma4CLI/ProfileCommand.swift
++++ b/Sources/Gemma4CLI/ProfileCommand.swift
+@@ -152,7 +152,7 @@ struct ProfileRun: AsyncParsableCommand {
+             if let kvBits = self.kvBits, let gemma = context.model as? Gemma4LLMModel {
+                 cache = gemma.languageModel.makeCache(kvBits: Float(kvBits))
+             } else {
+-                cache = context.model.newCache(parameters: nil)
++                cache = try context.model.newCache(parameters: nil)
+             }
+             session.endPhase("3. KV Cache Allocation", category: .kvCache)
+ 
+@@ -403,7 +403,7 @@ struct ProfileSweep: AsyncParsableCommand {
+ 
+                     let params = kvBitsFloat != nil ? GenerateParameters(kvBits: Int(kvBitsFloat!)) : nil
+                     session.beginPhase("Prefill", category: .prefill)
+-                    let cache = context.model.newCache(parameters: params)
++                    let cache = try context.model.newCache(parameters: params)
+                     let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
+                     let prefillLogits = prefillOutput[0..., prefillOutput.dim(1) - 1, 0...]
+                     let firstToken = argMax(prefillLogits, axis: -1)
+diff --git a/Sources/Gemma4Swift/Pipeline/Gemma4ChatEngine.swift b/Sources/Gemma4Swift/Pipeline/Gemma4ChatEngine.swift
+index 997db665..7d40530b 100644
+--- a/Sources/Gemma4Swift/Pipeline/Gemma4ChatEngine.swift
++++ b/Sources/Gemma4Swift/Pipeline/Gemma4ChatEngine.swift
+@@ -404,7 +404,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
+             images = Array(allImages[snapshot.imageDigests.count...])
+             cached = snapshot.ids.count
+         } else {
+-            cache = context.model.newCache(parameters: parameters)
++            cache = try context.model.newCache(parameters: parameters)
+         }
+ 
+         if !images.isEmpty {
+diff --git a/Sources/Gemma4Swift/Pipeline/Gemma4LLMModel.swift b/Sources/Gemma4Swift/Pipeline/Gemma4LLMModel.swift
+index ec669f9c..7179e079 100644
+--- a/Sources/Gemma4Swift/Pipeline/Gemma4LLMModel.swift
++++ b/Sources/Gemma4Swift/Pipeline/Gemma4LLMModel.swift
+@@ -84,6 +84,14 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
+ 
+     /// Prefill par tranches de `windowSize` (defaut 512) ; seul le dernier jeton est
+     /// rendu au `TokenIterator`, donc le head ne tourne que sur une position.
++    /// Exigence du protocole depuis mlx-swift-lm > 3.31.4 (mlx-swift 0.32) : sans elle, le
++    /// `prepare` par defaut de `LLMModel` prendrait la place du notre (et sauterait les medias).
++    public func prepare(
++        _ input: LMInput, cache: [KVCache], state: LMOutput.State?, prefill: PrefillParameters
++    ) throws -> PrepareResult {
++        try prepare(input, cache: cache, windowSize: prefill.stepSize)
++    }
++
+     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+         let promptTokens = input.text.tokens
+         let promptCount = promptTokens.shape[0]
+diff --git a/Sources/Gemma4Swift/Pipeline/Gemma4MultimodalLLMModel.swift b/Sources/Gemma4Swift/Pipeline/Gemma4MultimodalLLMModel.swift
+index b238e990..3096056b 100644
+--- a/Sources/Gemma4Swift/Pipeline/Gemma4MultimodalLLMModel.swift
++++ b/Sources/Gemma4Swift/Pipeline/Gemma4MultimodalLLMModel.swift
+@@ -271,6 +271,14 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
+     /// les embeddings fusionnes (tours + masked_scatter) sont calcules une fois sur
+     /// tout le prompt, puis le modele de langage avance par tranches d'embeddings ;
+     /// le dernier jeton (texte : fin du gabarit) est rendu au `TokenIterator`.
++    /// Exigence du protocole depuis mlx-swift-lm > 3.31.4 (mlx-swift 0.32) : sans elle, le
++    /// `prepare` par defaut de `LLMModel` prendrait la place du notre (et sauterait les medias).
++    public func prepare(
++        _ input: LMInput, cache: [KVCache], state: LMOutput.State?, prefill: PrefillParameters
++    ) throws -> PrepareResult {
++        try prepare(input, cache: cache, windowSize: prefill.stepSize)
++    }
++
+     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+         // Sans tour audio (chargement `audio: false`), l'audio en attente serait ignore
+         // en silence par `prepareMultimodalEmbeds` : refuser plutot que repondre sans.
+diff --git a/Sources/Gemma4Swift/Pipeline/Gemma4UnifiedMultimodalLLMModel.swift b/Sources/Gemma4Swift/Pipeline/Gemma4UnifiedMultimodalLLMModel.swift
+index 796efa10..0c5dbd1c 100644
+--- a/Sources/Gemma4Swift/Pipeline/Gemma4UnifiedMultimodalLLMModel.swift
++++ b/Sources/Gemma4Swift/Pipeline/Gemma4UnifiedMultimodalLLMModel.swift
+@@ -324,6 +324,14 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
+         )
+     }
+ 
++    /// Exigence du protocole depuis mlx-swift-lm > 3.31.4 (mlx-swift 0.32) : sans elle, le
++    /// `prepare` par defaut de `LLMModel` prendrait la place du notre (et sauterait les medias).
++    public func prepare(
++        _ input: LMInput, cache: [KVCache], state: LMOutput.State?, prefill: PrefillParameters
++    ) throws -> PrepareResult {
++        try prepare(input, cache: cache, windowSize: prefill.stepSize)
++    }
++
+     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+         let promptTokens = input.text.tokens
+         guard promptTokens.shape[0] > 0 else {
+diff --git a/Tests/Gemma4SwiftTests/ChunkedPrefillParityTests.swift b/Tests/Gemma4SwiftTests/ChunkedPrefillParityTests.swift
+index 4a4c8108..5969e2dd 100644
+--- a/Tests/Gemma4SwiftTests/ChunkedPrefillParityTests.swift
++++ b/Tests/Gemma4SwiftTests/ChunkedPrefillParityTests.swift
+@@ -51,7 +51,7 @@ struct ChunkedPrefillParityTests {
+         _ model: any LanguageModel, tokens: MLXArray, cache: [KVCache], step: Int
+     ) throws -> (last: MLXArray, next: MLXArray, remaining: Int) {
+         guard case .tokens(let rest) = try model.prepare(
+-            LMInput(tokens: tokens), cache: cache, windowSize: step)
++            LMInput(tokens: tokens), cache: cache, state: nil, prefill: .init(stepSize: step))
+         else { throw CancellationError() }
+         let last = model(rest.tokens[.newAxis], cache: cache)[0..., -1, 0...]
+         let next = model(MLXArray([Int32(7)])[.newAxis], cache: cache)[0..., -1, 0...]
+@@ -118,10 +118,10 @@ struct ChunkedPrefillParityTests {
+                 systemPrompt: "Tu es un assistant utile.", tokenizer: context.tokenizer)
+             let tokens = MLXArray(ids.map { Int32($0) })
+ 
+-            let single = context.model(tokens[.newAxis], cache: context.model.newCache(parameters: nil))[0..., -1, 0...]
+-            let cache = context.model.newCache(parameters: nil)
++            let single = context.model(tokens[.newAxis], cache: try context.model.newCache(parameters: nil))[0..., -1, 0...]
++            let cache = try context.model.newCache(parameters: nil)
+             guard case .tokens(let rest) = try context.model.prepare(
+-                LMInput(tokens: tokens), cache: cache, windowSize: 512) else { return "prepare: logits" }
++                LMInput(tokens: tokens), cache: cache, state: nil, prefill: .init(stepSize: 512)) else { return "prepare: logits" }
+             let chunked = context.model(rest.tokens[.newAxis], cache: cache)[0..., -1, 0...]
+             let a = single.asType(.float32), b = chunked.asType(.float32)
+             let rel = (sqrt(sum(square(a - b))) / sqrt(sum(square(a)))).item(Float.self)

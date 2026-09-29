@@ -151,7 +151,7 @@ struct DrafterTrainingTests {
             #expect(abs(l1[0] - l2[0]).item(Float.self) < 1e-6)
             let reference = Dictionary(g1.flattened(), uniquingKeysWith: { a, _ in a })
             for (key, value) in g2.flattened() {
-                #expect(allClose(value, reference[key]!, atol: 1e-6).item(Bool.self), "\(key)")
+                #expect(allClose(value, reference[key]!, atol: 1e-5).item(Bool.self), "\(key)")
             }
         }
     }

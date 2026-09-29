@@ -89,6 +89,15 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
 `ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
 
+**Next bump (mlx-swift 0.32, mlx-swift-lm > 3.31.4) has a silent trap.** The protocol
+requirement becomes `prepare(_:cache:state:prefill:)` and `LLMModel` ships a default for it,
+so our three `prepare(_:cache:windowSize:)` (text, multimodal, unified) still compile but are
+**no longer called** by `TokenIterator`: images and audio would be skipped without any error.
+Each model needs a shim implementing the new requirement and forwarding
+`prefill.stepSize` as `windowSize`. The other breaks: `newCache(parameters:)` now `throws`,
+and `ChunkedPrefillParityTests` calls the old signature. The whole migration was validated in a
+throwaway worktree on 2026-09-29 (313/313 tests, see action-plans#602).
+
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
 from `.build/*/checkouts/mlx-swift-lm/.git/packed-refs` (or delete the checkout) and
