@@ -424,18 +424,42 @@ public struct MultimodalTokenizedSample {
     public let pixelValues: MLXArray?      // [1, 3, H, W] pour image
     public let audioFeatures: MLXArray?    // [1, T, 128] mel spectrogram
     public let audioMask: MLXArray?        // [1, T] mask de padding
+    /// Embeddings media deja projetes, fournis par l'appelant : les tours ne sont pas rappelees.
+    public let imageEmbeddings: MLXArray?
+    public let audioEmbeddings: MLXArray?
 
     public init(tokens: [Int], promptOffset: Int,
                 pixelValues: MLXArray? = nil,
                 audioFeatures: MLXArray? = nil,
-                audioMask: MLXArray? = nil) {
+                audioMask: MLXArray? = nil,
+                imageEmbeddings: MLXArray? = nil,
+                audioEmbeddings: MLXArray? = nil) {
         self.tokens = tokens
         self.promptOffset = promptOffset
         self.pixelValues = pixelValues
         self.audioFeatures = audioFeatures
         self.audioMask = audioMask
+        self.imageEmbeddings = imageEmbeddings
+        self.audioEmbeddings = audioEmbeddings
     }
 }
+
+/// Embeddings image / audio d'un echantillon par les tours gelees (hors gradient).
+func mediaEmbeddings(_ mm: Gemma4MultimodalLLMModel, _ sample: MultimodalTokenizedSample) -> (MLXArray?, MLXArray?) {
+    var image = sample.imageEmbeddings
+    if image == nil, let pv = sample.pixelValues {
+        let features = (0 ..< pv.dim(0)).map { i in mm.embedVision(mm.visionTower(pv[i ..< (i + 1)])) }
+        image = stopGradient(concatenated(features, axis: 1))
+    }
+    var audio = sample.audioEmbeddings
+    if audio == nil, let af = sample.audioFeatures, let tower = mm.audioTower, let embedder = mm.embedAudio {
+        let mask = sample.audioMask ?? MLXArray.zeros([af.dim(0), af.dim(1)], type: Bool.self)
+        let (encodings, _) = tower(af, audioMelMask: mask)
+        audio = stopGradient(embedder(encodings))
+    }
+    return (image, audio)
+}
+
 
 /// Iterateur batch size 1 pour samples multimodaux (media de taille variable)
 public struct MultimodalBatchIterator: Sequence, IteratorProtocol {
@@ -452,6 +476,18 @@ public struct MultimodalBatchIterator: Sequence, IteratorProtocol {
         self.rng = SeededGenerator(seed: seed)
         self.permutation = Array(0 ..< samples.count)
         if train { self.permutation.shuffle(using: &rng) }
+    }
+
+    /// Echantillon suivant (ordre melange et seede identique a `next()`).
+    mutating func nextSample() -> MultimodalTokenizedSample? {
+        if permIndex >= permutation.count {
+            if !train { return nil }
+            permutation.shuffle(using: &rng)
+            permIndex = 0
+        }
+        let sample = samples[permutation[permIndex]]
+        permIndex += 1
+        return sample
     }
 
     public mutating func next() -> (MLXArray, MLXArray, MLXArray?, MLXArray?, MLXArray?)? {
@@ -523,42 +559,21 @@ public func trainMultimodalLoRA(
     var start = Date.timeIntervalSinceReferenceDate
 
     var lastIteration = startIteration
-    for (iteration, (batch, lengths, pixelValues, audioFeatures, audioMask))
-        in MultimodalBatchIterator(samples: trainSamples, train: true, seed: seed).enumerated() {
+    var iterator = MultimodalBatchIterator(samples: trainSamples, train: true, seed: seed)
+    var iteration = -1
+    while let sample = iterator.nextSample() {
+        iteration += 1
         if iteration < startIteration { continue }
         if Task.isCancelled { break }
+        let batch = MLXArray(sample.tokens.map { Int32($0) }).reshaped(1, sample.tokens.count)
+        let lengths = MLXArray([Int32(sample.promptOffset), Int32(sample.tokens.count)]).reshaped(1, 2)
 
-        // Pre-calculer les embeddings media EN DEHORS de valueAndGrad
-        // pour eviter que le graph de gradient trace le vision/audio tower
-        // (qui produit des NaN quand trace en mode gradient)
-        if let pv = pixelValues {
-            // Encoder l'image via le vision tower + projecteur
-            var allFeatures: [MLXArray] = []
-            let numImages = pv.dim(0)
-            for i in 0 ..< numImages {
-                let singleImage = pv[i ..< (i + 1)]
-                var features = mmModel.visionTower(singleImage)
-                features = mmModel.embedVision(features)
-                allFeatures.append(features)
-            }
-            var imageFeatures = concatenated(allFeatures, axis: 1)
-            imageFeatures = stopGradient(imageFeatures)
-            mmModel.pendingImageEmbeddings = imageFeatures
-        } else {
-            mmModel.pendingImageEmbeddings = nil
-        }
-
-        if let af = audioFeatures, let tower = mmModel.audioTower, let embedder = mmModel.embedAudio {
-            let mask = audioMask ?? MLXArray.zeros([af.dim(0), af.dim(1)], type: Bool.self)
-            let (audioEncodings, _) = tower(af, audioMelMask: mask)
-            var audioEmbeds = embedder(audioEncodings)
-            audioEmbeds = stopGradient(audioEmbeds)
-            mmModel.pendingAudioEmbeddings = audioEmbeds
-        } else {
-            mmModel.pendingAudioEmbeddings = nil
-        }
-
-        // Reset pending raw features — on utilise les embeddings pre-calculees
+        // Embeddings media EN DEHORS de valueAndGrad (le graphe de gradient ne trace pas les
+        // tours, qui produisaient des NaN), ou fournis par l'appelant dans l'echantillon.
+        // Les precalculer pour tout le jeu (K-30 e) a ete mesure sans gain sur TB3.
+        let (imageEmbeddings, audioEmbeddings) = mediaEmbeddings(mmModel, sample)
+        mmModel.pendingImageEmbeddings = imageEmbeddings
+        mmModel.pendingAudioEmbeddings = audioEmbeddings
         mmModel.pendingPixelValues = nil
         mmModel.pendingAudioFeatures = nil
         mmModel.pendingAudioMask = nil
@@ -643,31 +658,16 @@ func evaluateMultimodalTraining(model: Module, samples: [MultimodalTokenizedSamp
     var allLosses = [Float]()
     var tokenCount = 0
 
-    for (index, (batch, lengths, pixelValues, audioFeatures, audioMask))
-        in MultimodalBatchIterator(samples: samples, train: false).enumerated() {
+    var iterator = MultimodalBatchIterator(samples: samples, train: false)
+    var index = -1
+    while let sample = iterator.nextSample() {
+        index += 1
         if let maxBatches, index >= maxBatches { break }
-
-        // Pre-calculer les embeddings (meme path que le training)
-        if let pv = pixelValues {
-            var allFeatures: [MLXArray] = []
-            for i in 0 ..< pv.dim(0) {
-                var features = mmModel.visionTower(pv[i ..< (i + 1)])
-                features = mmModel.embedVision(features)
-                allFeatures.append(features)
-            }
-            mmModel.pendingImageEmbeddings = stopGradient(concatenated(allFeatures, axis: 1))
-        } else {
-            mmModel.pendingImageEmbeddings = nil
-        }
-
-        if let af = audioFeatures, let tower = mmModel.audioTower, let embedder = mmModel.embedAudio {
-            let mask = audioMask ?? MLXArray.zeros([af.dim(0), af.dim(1)], type: Bool.self)
-            let (audioEncodings, _) = tower(af, audioMelMask: mask)
-            mmModel.pendingAudioEmbeddings = stopGradient(embedder(audioEncodings))
-        } else {
-            mmModel.pendingAudioEmbeddings = nil
-        }
-
+        let batch = MLXArray(sample.tokens.map { Int32($0) }).reshaped(1, sample.tokens.count)
+        let lengths = MLXArray([Int32(sample.promptOffset), Int32(sample.tokens.count)]).reshaped(1, 2)
+        let (imageEmbeddings, audioEmbeddings) = mediaEmbeddings(mmModel, sample)
+        mmModel.pendingImageEmbeddings = imageEmbeddings
+        mmModel.pendingAudioEmbeddings = audioEmbeddings
         mmModel.pendingPixelValues = nil
         mmModel.pendingAudioFeatures = nil
         mmModel.pendingAudioMask = nil

@@ -1,0 +1,42 @@
+Chargement du modele multimodal: /Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-bf16
+Modele multimodal charge. GPU: 9735 Mo
+Famille detectee: e2b (35 couches)
+Chargement des donnees multimodales depuis /Volumes/Lexar/datasets/LaTeX_OCR/tb3...
+Train: 500 samples, Valid: 50 samples
+Pre-traitement des media...
+  Preprocessing 1/500...
+  Preprocessing 100/500...
+  Preprocessing 200/500...
+  Preprocessing 300/500...
+  Preprocessing 400/500...
+  Preprocessing 500/500...
+  Preprocessing 1/50...
+
+--- Debut du training multimodal ---
+Mode: lora + response masking, Rank: 16, Scale: 20.0, LR: 5e-05
+Batch: 1 (multimodal), Iterations: 100
+Couches: 16
+Sortie: /Volumes/Lexar/models/local/adapters/k30e-recompute
+---
+
+Base en bf16, parametres LoRA en fp32
+Parametres trainables: 13631488 / 5117929955 (0.27%)
+Train multimodal: 500 samples (0 audio, 500 image)
+Iteration 1: validation loss 1,477683, validation time 16,630241s
+Iteration 10: training loss 1,182083, iterations/sec 1,745412, Tokens/sec 142,600195
+Iteration 20: training loss 0,739655, iterations/sec 1,57998, Tokens/sec 120,710474
+Iteration 30: training loss 0,652829, iterations/sec 1,672477, Tokens/sec 112,892225
+Iteration 40: training loss 0,725086, iterations/sec 1,798356, Tokens/sec 89,198462
+Iteration 50: training loss 0,698046, iterations/sec 1,620197, Tokens/sec 134,47635
+Iteration 50: saved weights to /Volumes/Lexar/models/local/adapters/k30e-recompute/adapters.safetensors
+Iteration 60: training loss 0,434469, iterations/sec 1,77118, Tokens/sec 100,248761
+Iteration 70: training loss 0,662265, iterations/sec 1,794718, Tokens/sec 90,453788
+Iteration 80: training loss 0,603418, iterations/sec 1,715608, Tokens/sec 133,302771
+Iteration 90: training loss 0,463491, iterations/sec 1,687635, Tokens/sec 117,965684
+Iteration 100: training loss 0,580862, iterations/sec 1,732182, Tokens/sec 108,60784
+Iteration 100: validation loss 0,584809, validation time 15,647728s
+Iteration 100: saved weights to /Volumes/Lexar/models/local/adapters/k30e-recompute/adapters.safetensors
+Adapter multimodal sauvegarde dans /Volumes/Lexar/models/local/adapters/k30e-recompute/
+
+Training multimodal termine.
+GPU pic: 14167 Mo
