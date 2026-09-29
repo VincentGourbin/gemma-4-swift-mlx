@@ -66,6 +66,12 @@ extension LoRA {
         @Option(name: .long, help: "Gradient clipping max norm (0=desactive, papier recommande 0.3 pour full)")
         var gradClip: Float = 0
 
+        @Option(name: .long, help: "Graine : init LoRA, dropout et melange des exemples (reproductible)")
+        var seed: UInt64 = 0
+
+        @Option(name: .long, help: "Longueur maximale d'un exemple en jetons, troncature comptee (0 = aucune)")
+        var maxSeqLength: Int = 2048
+
         @Flag(name: .long, help: "Activer le profiling (exporte Chrome Trace)")
         var profile: Bool = false
 
@@ -100,16 +106,31 @@ extension LoRA {
                     let url = dataURL.appending(component: "\(name).jsonl")
                     let lines = try String(contentsOf: url, encoding: .utf8)
                         .components(separatedBy: .newlines)
-                        .filter { $0.first == "{" }
 
                     struct ChatMsg: Codable {
                         let messages: [ChatMessage]?
                         let text: String?
                     }
 
-                    return try lines.compactMap { line -> [Int]? in
-                        guard let data = line.data(using: .utf8) else { return nil }
-                        let sample = try JSONDecoder().decode(ChatMsg.self, from: data)
+                    // A-06 : chaque rejet est compte et signale (numero de ligne + raison).
+                    var rejected: [String] = []
+                    defer {
+                        if !rejected.isEmpty {
+                            print("\(name).jsonl : \(rejected.count) ligne(s) rejetee(s)")
+                            for reason in rejected.prefix(10) { print("  - \(reason)") }
+                            if rejected.count > 10 { print("  … +\(rejected.count - 10)") }
+                        }
+                    }
+                    return try lines.enumerated().compactMap { index, raw -> [Int]? in
+                        let line = raw.trimmingCharacters(in: .whitespaces)
+                        guard !line.isEmpty else { return nil }
+                        let sample: ChatMsg
+                        do {
+                            sample = try JSONDecoder().decode(ChatMsg.self, from: Data(line.utf8))
+                        } catch {
+                            rejected.append("ligne \(index + 1) : JSON invalide ou champs inattendus")
+                            return nil
+                        }
 
                         if let msgs = sample.messages, !msgs.isEmpty {
                             // Chat format: tokeniser DIRECTEMENT via applyChatTemplate
@@ -127,6 +148,7 @@ extension LoRA {
                         } else if let text = sample.text {
                             return tok.encode(text: text)
                         }
+                        rejected.append("ligne \(index + 1) : ni `messages` ni `text`")
                         return nil
                     }
                 }
@@ -150,7 +172,9 @@ extension LoRA {
             }
 
             // 5. Configurer et lancer le training
-            let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) ?? .lora
+            guard let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) else {
+                throw ValidationError("--fine-tune-type inconnu : \(fineTuneType) (lora, dora ou full)")
+            }
             let config = Gemma4LoRATrain.TrainingConfig(
                 fineTuneType: ftType,
                 loraRank: rank,
@@ -166,7 +190,9 @@ extension LoRA {
                 outputDirectory: URL(fileURLWithPath: output),
                 maskPrompt: ftType == .full ? true : maskPrompt,  // Full SFT utilise toujours le masking
                 gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,  // Default 0.3 pour full
-                enableProfiling: profile
+                enableProfiling: profile,
+                seed: seed,
+                maxSeqLength: maxSeqLength > 0 ? maxSeqLength : nil
             )
 
             print("\n--- Debut du training ---")
@@ -244,7 +270,9 @@ extension LoRA {
             let validSamples = try await preprocessMultimodalSamples(validTexts, container: container)
 
             // Phase 3: Lancer le training
-            let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) ?? .lora
+            guard let ftType = Gemma4LoRATrain.FineTuneType(rawValue: fineTuneType) else {
+                throw ValidationError("--fine-tune-type inconnu : \(fineTuneType) (lora, dora ou full)")
+            }
             let config = Gemma4LoRATrain.TrainingConfig(
                 fineTuneType: ftType,
                 loraRank: rank,
@@ -260,7 +288,8 @@ extension LoRA {
                 outputDirectory: URL(fileURLWithPath: output),
                 maskPrompt: ftType == .full ? true : maskPrompt,
                 gradClipMaxNorm: ftType == .full && gradClip == 0 ? 0.3 : gradClip,
-                enableProfiling: profile
+                enableProfiling: profile,
+                seed: seed
             )
 
             print("\n--- Debut du training multimodal ---")

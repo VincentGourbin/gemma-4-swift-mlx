@@ -53,6 +53,10 @@ public enum Gemma4LoRATrain {
         public var gradClipMaxNorm: Float
         /// Activer le profiling du training
         public var enableProfiling: Bool
+        /// Graine : initialisation LoRA, dropout **et** melange des exemples (A-08).
+        public var seed: UInt64
+        /// Longueur maximale d'un exemple en jetons (troncature, comme mlx-lm) ; nil = aucune.
+        public var maxSeqLength: Int?
 
         public init(
             fineTuneType: FineTuneType = .lora,
@@ -69,7 +73,9 @@ public enum Gemma4LoRATrain {
             outputDirectory: URL = URL(fileURLWithPath: "./adapters"),
             maskPrompt: Bool = false,
             gradClipMaxNorm: Float = 0,
-            enableProfiling: Bool = false
+            enableProfiling: Bool = false,
+            seed: UInt64 = 0,
+            maxSeqLength: Int? = 2048
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -86,6 +92,40 @@ public enum Gemma4LoRATrain {
             self.maskPrompt = maskPrompt
             self.gradClipMaxNorm = gradClipMaxNorm
             self.enableProfiling = enableProfiling
+            self.seed = seed
+            self.maxSeqLength = maxSeqLength
+        }
+    }
+
+    public enum TrainingSetupError: LocalizedError, Equatable {
+        case fullFineTuneOnQuantizedModel
+
+        public var errorDescription: String? {
+            switch self {
+            case .fullFineTuneOnQuantizedModel:
+                return "--fine-tune-type full sur un pack quantifie n'entraine presque rien (les QuantizedLinear "
+                    + "sont geles) : utiliser lora/dora, ou un modele bf16 pour full"
+            }
+        }
+    }
+
+    /// Tronque les exemples a `maxLength` jetons (A-06 : un exemple de 20 k jetons partait tel
+    /// quel). Rend aussi le nombre d'exemples tronques, a signaler.
+    public static func truncate(_ samples: [[Int]], maxLength: Int?) -> (samples: [[Int]], truncated: Int) {
+        guard let maxLength, maxLength > 1 else { return (samples, 0) }
+        var truncated = 0
+        let result = samples.map { tokens -> [Int] in
+            guard tokens.count > maxLength else { return tokens }
+            truncated += 1
+            return Array(tokens.prefix(maxLength))
+        }
+        return (result, truncated)
+    }
+
+    /// `full` n'a de sens que si les poids ne sont pas quantifies (A-07).
+    static func checkFullFineTune(_ model: Module) throws {
+        if model.leafModules().flattened().contains(where: { $0.1 is Quantized }) {
+            throw TrainingSetupError.fullFineTuneOnQuantizedModel
         }
     }
 
@@ -140,16 +180,21 @@ public enum Gemma4LoRATrain {
         }
 
         // Entrainement dans le contexte du container
-        let capturedTrainData = trainData
-        let capturedValidData = validData
+        let (capturedTrainData, truncatedTrain) = truncate(trainData, maxLength: config.maxSeqLength)
+        let (capturedValidData, truncatedValid) = truncate(validData, maxLength: config.maxSeqLength)
+        if truncatedTrain + truncatedValid > 0 {
+            print("Troncature a \(config.maxSeqLength ?? 0) jetons : \(truncatedTrain) exemple(s) d'entrainement, "
+                + "\(truncatedValid) de validation")
+        }
 
         try await container.perform { (context: ModelContext) in
             let model = context.model
 
-            // Fixer le seed avant l'initialisation LoRA (ref: Python seed=0)
-            MLXRandom.seed(0)
+            // Graine avant l'initialisation LoRA (ref: Python seed=0)
+            MLXRandom.seed(config.seed)
 
             if isFullFineTune {
+                try checkFullFineTune(model)
                 // Full SFT — tous les poids sont trainables (pas de freeze, pas de LoRA)
                 // Ref: arXiv:2512.15943 — small models concentrate capacity on the task
                 print("Mode: Full Fine-Tuning (tous les poids)")
@@ -257,6 +302,8 @@ public enum Gemma4LoRATrain {
                 saveEvery: config.saveEvery,
                 weightsURL: weightsURL,
                 isFullFineTune: isFullFineTune,
+                seed: config.seed,
+                gradClipMaxNorm: config.gradClipMaxNorm,
                 progress: wrappedProgress
             )
 
@@ -356,9 +403,10 @@ public enum Gemma4LoRATrain {
             }
             print("Modele converti en float32 pour stabilite numerique")
 
-            MLXRandom.seed(0)
+            MLXRandom.seed(config.seed)
 
             if isFullFineTune {
+                try checkFullFineTune(model)
                 print("Mode: Full Fine-Tuning multimodal (tous les poids)")
             } else {
                 let _ = try LoRAContainer.from(
@@ -427,6 +475,8 @@ public enum Gemma4LoRATrain {
                 saveEvery: config.saveEvery,
                 weightsURL: weightsURL,
                 isFullFineTune: isFullFineTune,
+                seed: config.seed,
+                gradClipMaxNorm: config.gradClipMaxNorm,
                 progress: wrappedProgress
             )
         }

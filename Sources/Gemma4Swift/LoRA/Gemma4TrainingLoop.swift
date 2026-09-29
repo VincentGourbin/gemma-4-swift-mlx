@@ -38,6 +38,22 @@ func trainingLoss(model: Module, batch: MLXArray, lengths: MLXArray) -> (MLXArra
     return (ce, ntoks)
 }
 
+// MARK: - Generateur seede (A-08)
+
+/// SplitMix64 : melange des exemples reproductible (le generateur systeme rendait deux
+/// runs identiques incomparables en « loss a N pas »).
+public struct SeededGenerator: RandomNumberGenerator, Sendable {
+    private var state: UInt64
+    public init(seed: UInt64) { state = seed &+ 0x9E37_79B9_7F4A_7C15 }
+    public mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
+    }
+}
+
 // MARK: - Batch iterator (ref: mlx-lm iterate_batches)
 
 /// Prepare un batch a partir de tokens pre-tokenises.
@@ -57,8 +73,10 @@ public struct TrainingBatchIterator: Sequence, IteratorProtocol {
     var batchIndices: [[Int]]
     var permutation: [Int]
     var permIndex: Int = 0
+    var rng: SeededGenerator
 
-    init(samples: [TokenizedSample], batchSize: Int, train: Bool) {
+    init(samples: [TokenizedSample], batchSize: Int, train: Bool, seed: UInt64 = 0) {
+        self.rng = SeededGenerator(seed: seed)
         self.samples = samples
         self.batchSize = batchSize
         self.train = train
@@ -80,14 +98,14 @@ public struct TrainingBatchIterator: Sequence, IteratorProtocol {
 
         self.batchIndices = batches
         self.permutation = Array(0 ..< batches.count)
-        if train { self.permutation.shuffle() }
+        if train { self.permutation.shuffle(using: &rng) }
     }
 
     /// Retourne (batch, lengths) — comme Python iterate_batches
     public mutating func next() -> (MLXArray, MLXArray)? {
         if permIndex >= permutation.count {
             if !train { return nil }
-            permutation.shuffle()
+            permutation.shuffle(using: &rng)
             permIndex = 0
         }
 
@@ -166,6 +184,8 @@ public func trainLoRA(
     saveEvery: Int = 100,
     weightsURL: URL? = nil,
     isFullFineTune: Bool = false,
+    seed: UInt64 = 0,
+    gradClipMaxNorm: Float = 0,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -186,15 +206,20 @@ public func trainLoRA(
     var start = Date.timeIntervalSinceReferenceDate
 
     for (iteration, (batch, lengths)) in TrainingBatchIterator(
-        samples: trainSamples, batchSize: batchSize, train: true
+        samples: trainSamples, batchSize: batchSize, train: true, seed: seed
     ).enumerated() {
+        // Arret propre (A-02) : annulation -> sortie de boucle et sauvegarde finale.
+        if Task.isCancelled { break }
         // Forward + backward (ref: Python step())
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
+        // Ecretage global (A-01 : l'option etait acceptee et affichee, jamais appliquee).
+        let clipped = gradClipMaxNorm > 0 ? clipGradNorm(gradients: grad, maxNorm: gradClipMaxNorm).0 : grad
+
         // Update (ref: Python optimizer.update(model, grad))
-        optimizer.update(model: model, gradients: grad)
+        optimizer.update(model: model, gradients: clipped)
 
         // eval APRES l'update pour synchroniser
         eval(model, optimizer, lvalue)
@@ -312,18 +337,20 @@ public struct MultimodalBatchIterator: Sequence, IteratorProtocol {
     let train: Bool
     var permutation: [Int]
     var permIndex: Int = 0
+    var rng: SeededGenerator
 
-    public init(samples: [MultimodalTokenizedSample], train: Bool) {
+    public init(samples: [MultimodalTokenizedSample], train: Bool, seed: UInt64 = 0) {
         self.samples = samples
         self.train = train
+        self.rng = SeededGenerator(seed: seed)
         self.permutation = Array(0 ..< samples.count)
-        if train { self.permutation.shuffle() }
+        if train { self.permutation.shuffle(using: &rng) }
     }
 
     public mutating func next() -> (MLXArray, MLXArray, MLXArray?, MLXArray?, MLXArray?)? {
         if permIndex >= permutation.count {
             if !train { return nil }
-            permutation.shuffle()
+            permutation.shuffle(using: &rng)
             permIndex = 0
         }
 
@@ -353,6 +380,8 @@ public func trainMultimodalLoRA(
     saveEvery: Int = 100,
     weightsURL: URL? = nil,
     isFullFineTune: Bool = false,
+    seed: UInt64 = 0,
+    gradClipMaxNorm: Float = 0,
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
@@ -375,7 +404,8 @@ public func trainMultimodalLoRA(
     var start = Date.timeIntervalSinceReferenceDate
 
     for (iteration, (batch, lengths, pixelValues, audioFeatures, audioMask))
-        in MultimodalBatchIterator(samples: trainSamples, train: true).enumerated() {
+        in MultimodalBatchIterator(samples: trainSamples, train: true, seed: seed).enumerated() {
+        if Task.isCancelled { break }
 
         // Pre-calculer les embeddings media EN DEHORS de valueAndGrad
         // pour eviter que le graph de gradient trace le vision/audio tower
@@ -416,7 +446,8 @@ public func trainMultimodalLoRA(
         let lvalue = resultArray[0]
         let tokens = resultArray[1]
 
-        optimizer.update(model: model, gradients: grad)
+        let clipped = gradClipMaxNorm > 0 ? clipGradNorm(gradients: grad, maxNorm: gradClipMaxNorm).0 : grad
+        optimizer.update(model: model, gradients: clipped)
         eval(model, optimizer, lvalue)
 
         losses.append(lvalue.item(Float.self))
