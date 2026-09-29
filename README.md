@@ -557,6 +557,29 @@ gemma4-cli mtp-generate --compare        # bit-exact equivalence vs standard
 gemma4-cli mtp-diag-verify               # sequential vs parallel hidden diff (advanced)
 ```
 
+## Inference Server (OpenAI-compatible)
+
+`gemma4-server` lives in the nested package `Server/`, so apps that depend on the library never
+resolve Hummingbird or swift-nio (`Scripts/check-server-isolation.sh` checks it in CI).
+
+```bash
+cd Server && xcodebuild -scheme gemma4-server -configuration Release -destination "platform=macOS" \
+  -derivedDataPath ../.build/xcode-server -skipMacroValidation build
+../.build/xcode-server/Build/Products/Release/gemma4-server \
+  --model-path /Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-4bit --reference e2b/4bit-fast --port 8080
+```
+
+- `POST /v1/chat/completions` — JSON or SSE (`stream: true`); `tools` / `tool_calls` and `role: "tool"`
+  turns; `reasoning_content` with `chat_template_kwargs: {"enable_thinking": true}`; images as
+  `image_url` **`data:` base64 URLs only**. `GET /v1/models`, `GET /healthz`, `GET /metrics` (counters only).
+- Listens on `127.0.0.1` by default; any other `--host` requires `--api-key` (or `GEMMA4_SERVER_API_KEY`),
+  checked in constant time. Limits: 32 MiB body, 4 media, 20 Mpx per image, `max_tokens` cap, queue of 16
+  (then HTTP 429). `input_audio` is rejected in v1. `--no-audio` skips the audio tower (−0.6 GB on E2B).
+- One generation at a time: the queue is released only when the computation has really stopped. A
+  client that disconnects cancels its generation; it is detected at the next failed write, so the next
+  request's time to first token is about +18 ms (≈ 2 decode steps on E2B 4-bit) above an idle server.
+- The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
+
 ## Library Integration
 
 ```swift
