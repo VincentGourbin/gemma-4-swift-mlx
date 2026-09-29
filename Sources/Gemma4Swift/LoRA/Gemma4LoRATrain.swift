@@ -66,9 +66,11 @@ public enum Gemma4LoRATrain {
         public var validationBatches: Int?
         /// Fichier JSONL ou ecrire une ligne par rapport et validation (K-28).
         public var metricsURL: URL?
-        /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a).
+        /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a ;
+        /// director, 200 pas : +13 % de debit, -19 % de pic MLX, perte identique).
         public var responseOnlyHead: Bool
-        /// Limite de cache MLX et vidage apres validation (K-30 b) ; nil = aucune politique.
+        /// Limite de cache MLX et vidage apres validation (K-30 b ; director : empreinte
+        /// 76 -> 16 Go, perte identique) ; nil = aucune politique.
         public var memoryPolicy: Gemma4TrainingMemoryPolicy?
 
         public init(
@@ -92,8 +94,8 @@ public enum Gemma4LoRATrain {
             resume: Bool = false,
             validationBatches: Int? = nil,
             metricsURL: URL? = nil,
-            responseOnlyHead: Bool = false,
-            memoryPolicy: Gemma4TrainingMemoryPolicy? = nil
+            responseOnlyHead: Bool = true,
+            memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048)
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank

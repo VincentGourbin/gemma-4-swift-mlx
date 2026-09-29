@@ -72,11 +72,11 @@ extension LoRA {
         @Option(name: .long, help: "Fichier JSONL des mesures (une ligne par rapport et validation)")
         var metricsOut: String?
 
-        @Flag(name: .long, help: "Avec --mask-prompt : tete et perte sur les seules positions de reponse (K-30 a)")
-        var responseOnlyHead: Bool = false
+        @Flag(name: .long, help: "Calculer la tete sur toutes les positions (par defaut, avec --mask-prompt : reponse seule, perte identique, +13 % de debit)")
+        var fullHead: Bool = false
 
-        @Option(name: .long, help: "Limite du cache MLX en Mo pendant l'entrainement, vidage apres validation (K-30 b)")
-        var trainCacheLimitMb: Int?
+        @Option(name: .long, help: "Limite du cache MLX en Mo pendant l'entrainement, vidage apres validation (0 = aucune ; defaut 2048 : empreinte 76 -> 16 Go sur director)")
+        var trainCacheLimitMb: Int = 2048
 
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
@@ -162,8 +162,8 @@ extension LoRA {
                 resume: resume,
                 validationBatches: valBatches > 0 ? valBatches : nil,
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
-                responseOnlyHead: responseOnlyHead,
-                memoryPolicy: trainCacheLimitMb.map { Gemma4TrainingMemoryPolicy(cacheLimitMB: $0) }
+                responseOnlyHead: !fullHead,
+                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil
             )
 
             print("\n--- Debut du training ---")
@@ -266,8 +266,8 @@ extension LoRA {
                 resume: resume,
                 validationBatches: valBatches > 0 ? valBatches : nil,
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
-                responseOnlyHead: responseOnlyHead,
-                memoryPolicy: trainCacheLimitMb.map { Gemma4TrainingMemoryPolicy(cacheLimitMB: $0) }
+                responseOnlyHead: !fullHead,
+                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil
             )
 
             print("\n--- Debut du training multimodal ---")

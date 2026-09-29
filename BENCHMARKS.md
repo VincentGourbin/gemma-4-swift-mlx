@@ -1,14 +1,13 @@
 
 
-## LoRA — porte qualité director (K-29) — 2026-09-29
+### K-30 : leviers mémoire de l'entraînement (director, pas 1-200, même graine que K-29 b)
 
-E2B bf16, `--mask-prompt --num-layers 16 --rank 8 --scale 20 --learning-rate 1e-4 --iterations 898 --seed 0 --val-batches 0`, dataset director de Fluxforge Studio (898/100, commit `f44da1aa`). Éval E7 : 30 briefs tenus à l'écart, `Scripts/quality/director-e7.py` (reproduit les références archivées : director-v3 29, base 17, professeur 27 ; et director-v3 relancé avec le binaire actuel : 29).
-
-| Run | Troncature | Val loss finale | E7 | Durée | Pic MLX / empreinte |
+| Variante | Perte @200 | Val @200 | Débit | Pic MLX | Empreinte |
 |---|---|---|---|---|---|
-| director-v3 (référence, avant audit) | non | 1,039 | 29/30 | ~2 h 40 | — |
-| K-29 a (`benchmarks/lora-director-k29-*`) | 2048 (défaut éphémère) : 531/899 exemples coupés | 1,035 (valid. tronquée) | 27/30 | 2 h 17 | 36,3 / 76 Go |
-| **K-29 b** (`benchmarks/lora-director-k29b-*`) | non (597 exemples > 2048, max 3 320) | **1,034** | **30/30** | 2 h 59 | 54,4 / 76 Go |
+| Baseline K-29 b | 1,147 | 1,1361 | 0,168 it/s (384 tok traités/s) | 50,3 Go | 76,0 Go |
+| (b) cache MLX limité à 2 Go | 1,147 | 1,1361 | 0,180 (+7 %) | 50,4 Go | **15,8 Go** |
+| (a) tête sur la réponse seule | 1,147 | 1,1361 | 0,191 (+13 %) | **40,7 Go** | 76,0 Go |
+| **(a + b)** | **1,147** | **1,1361** | **0,211 (+26 %)** | **40,7 Go (−19 %)** | **15,9 Go (−79 %)** |
 
-La troncature par défaut (parité mlx-lm) coupait la fin des réponses sous `--mask-prompt` : retirée (`d3bd5a42`). K-29 b est la référence des A/B de K-30 (loss par pas dans `benchmarks/lora-director-k29b-20260929.jsonl`).
+Pertes identiques à 4 décimales. (a + b) devient le défaut (`--full-head`, `--train-cache-limit-mb 0` pour revenir en arrière). Lignes : `benchmarks/lora-k30-{a,b,ab}-20260929.jsonl`.
 
