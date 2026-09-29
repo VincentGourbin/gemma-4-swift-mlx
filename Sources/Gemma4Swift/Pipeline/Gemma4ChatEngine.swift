@@ -85,6 +85,21 @@ public struct Gemma4ChatUsage: Sendable, Equatable {
     public let timeToFirstToken: TimeInterval?
     public let peakMemoryBytes: Int
     public let finishReason: FinishReason
+
+    public init(
+        promptTokens: Int, completionTokens: Int, prefillSeconds: Double = 0,
+        promptTokensPerSecond: Double = 0, tokensPerSecond: Double = 0,
+        timeToFirstToken: TimeInterval? = nil, peakMemoryBytes: Int = 0, finishReason: FinishReason
+    ) {
+        self.promptTokens = promptTokens
+        self.completionTokens = completionTokens
+        self.prefillSeconds = prefillSeconds
+        self.promptTokensPerSecond = promptTokensPerSecond
+        self.tokensPerSecond = tokensPerSecond
+        self.timeToFirstToken = timeToFirstToken
+        self.peakMemoryBytes = peakMemoryBytes
+        self.finishReason = finishReason
+    }
 }
 
 public enum Gemma4ChatEvent: Sendable {
@@ -113,7 +128,33 @@ public enum Gemma4ChatEngineError: LocalizedError, Equatable {
     }
 }
 
-public actor Gemma4ChatEngine {
+/// Une generation en cours : ses evenements, son annulation, et sa fin **reelle** (le
+/// calcul MLX termine et la porte K-9 rendue), distincte de la fin du flux cote client.
+public struct Gemma4ChatRun: Sendable {
+    public let events: AsyncThrowingStream<Gemma4ChatEvent, Error>
+    let task: Task<Void, Never>
+
+    public init(events: AsyncThrowingStream<Gemma4ChatEvent, Error>, task: Task<Void, Never>) {
+        self.events = events
+        self.task = task
+    }
+
+    public func cancel() { task.cancel() }
+    public func waitUntilFinished() async { await task.value }
+}
+
+/// Ce dont un adaptateur (serveur HTTP) a besoin : testable avec un faux moteur.
+public protocol Gemma4ChatBackend: Sendable {
+    func start(
+        messages: [Gemma4ChatMessage], tools: [[String: any Sendable]], options: Gemma4ChatOptions
+    ) async -> Gemma4ChatRun
+    /// Plafond de `max_tokens` (profil), s'il y en a un.
+    var maxTokensCap: Int? { get async }
+    /// Le modele accepte-t-il des images ?
+    var acceptsImages: Bool { get async }
+}
+
+public actor Gemma4ChatEngine: Gemma4ChatBackend {
     public let container: ModelContainer
     public let profile: Gemma4ReferenceProfile?
 
@@ -196,36 +237,53 @@ public actor Gemma4ChatEngine {
 
     // MARK: - Reponse
 
+    public var maxTokensCap: Int? { nil }
+
+    public var acceptsImages: Bool {
+        get async { await container.perform { $0.model is Gemma4MultimodalLLMModel } }
+    }
+
+    /// Flux d'evenements ; arreter de l'iterer annule la generation.
     public func respond(
         to messages: [Gemma4ChatMessage],
         tools: [[String: any Sendable]] = [],
         options: Gemma4ChatOptions = .init()
     ) -> AsyncThrowingStream<Gemma4ChatEvent, Error> {
+        start(messages: messages, tools: tools, options: options).events
+    }
+
+    /// Lance une generation et rend la main tout de suite : evenements, annulation et
+    /// attente de la fin reelle (`Gemma4ChatRun`).
+    public func start(
+        messages: [Gemma4ChatMessage],
+        tools: [[String: any Sendable]] = [],
+        options: Gemma4ChatOptions = .init()
+    ) -> Gemma4ChatRun {
         let container = container
         let profile = profile
-        return AsyncThrowingStream { continuation in
-            let task = Task {
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
-                do { try Gemma4ComputeGate.shared.beginInference() } catch {
-                    continuation.finish(throwing: error)
-                    return
-                }
-                defer { Gemma4ComputeGate.shared.endInference() }
-                do {
-                    try await container.perform { context in
-                        try await Self.run(
-                            messages: messages, tools: tools, options: options, profile: profile,
-                            context: context, continuation: continuation)
-                    }
-                    if profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
-                    continuation.finish()
-                } catch {
-                    if profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
-                    continuation.finish(throwing: error)
-                }
+        let (events, continuation) = AsyncThrowingStream<Gemma4ChatEvent, Error>.makeStream()
+        let task = Task {
+            // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+            do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                continuation.finish(throwing: error)
+                return
             }
-            continuation.onTermination = { _ in task.cancel() }
+            defer { Gemma4ComputeGate.shared.endInference() }
+            do {
+                try await container.perform { context in
+                    try await Self.run(
+                        messages: messages, tools: tools, options: options, profile: profile,
+                        context: context, continuation: continuation)
+                }
+                if profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                continuation.finish()
+            } catch {
+                if profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                continuation.finish(throwing: error)
+            }
         }
+        continuation.onTermination = { _ in task.cancel() }
+        return Gemma4ChatRun(events: events, task: task)
     }
 
     private static func run(
