@@ -74,6 +74,9 @@ struct Bench: AsyncParsableCommand {
     @Flag(name: .long, help: "Diagnostic K-18 : encodeur vision paddé a maxPatches (ancien chemin)")
     var visionPadded = false
 
+    @Flag(name: .long, help: "Avec --image : charger le modele sans tour audio (K-16)")
+    var noAudio = false
+
     @Flag(name: .long, help: "Ne pas faire la passe d'echauffement (compilation Metal) non chronometree")
     var noWarmup = false
 
@@ -87,9 +90,10 @@ struct Bench: AsyncParsableCommand {
 
         let loadStart = Date()
         let container = try await Gemma4Registration.loadContainer(
-            from: modelURL, using: LocalTokenizerLoader(), multimodal: multimodal)
+            from: modelURL, using: LocalTokenizerLoader(), multimodal: multimodal, audio: !noAudio)
         await container.perform { context in eval(context.model) }
         let loadSeconds = Date().timeIntervalSince(loadStart)
+        let loadActiveMB = Memory.activeMemory / 1_048_576
 
         let profile = try reference.map { id in
             guard let profile = Gemma4ReferenceProfile.named(id) else {
@@ -106,6 +110,8 @@ struct Bench: AsyncParsableCommand {
         }
         let filler = try promptFile.map { try String(contentsOfFile: $0, encoding: .utf8) } ?? Self.defaultFiller
         var context = BenchContext.collect(modelURL: modelURL, loadSeconds: loadSeconds)
+        context.fields["load_active_mlx_mb"] = loadActiveMB
+        if multimodal { context.fields["audio_loaded"] = !noAudio }
         if let profile {
             context.fields["profile"] = profile.qualifiedID
             // Les poids mesures doivent etre ceux du profil, sinon la ligne ne le
