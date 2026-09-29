@@ -349,4 +349,33 @@ struct NoRepeatNGramTests {
         #expect(out.shape == [8])
         #expect(values(out)[2] == -Float.infinity)
     }
+
+    @Test("K-15 : chemin GPU = chemin CPU sur des sequences aleatoires (n = 1...5)")
+    func testDeviceMatchesHostPath() {
+        // Vocabulaire de 12 : aucun jeton de canal (98, 100, 101...), l'automate du
+        // chemin CPU (includeThinkingInWindow: false) ne change donc rien.
+        var rng = SystemRandomNumberGenerator()
+        for n in 1 ... 5 {
+            for _ in 0 ..< 20 {
+                let promptLength = Int.random(in: 0 ... 12, using: &rng)
+                let prompt = (0 ..< promptLength).map { _ in Int32.random(in: 0 ..< 4, using: &rng) }
+                var device = NoRepeatNGramLogitProcessor(ngramSize: n)
+                var host = NoRepeatNGramLogitProcessor(ngramSize: n, includeThinkingInWindow: false)
+                if !prompt.isEmpty {
+                    device.prompt(MLXArray(prompt).reshaped(1, -1))
+                    host.prompt(MLXArray(prompt).reshaped(1, -1))
+                }
+                for _ in 0 ..< 15 {
+                    let logits = MLXArray((0 ..< 12).map { Float($0) }).reshaped(1, 12)
+                    let a = values(device.process(logits: logits))
+                    let b = values(host.process(logits: logits))
+                    #expect(a == b, "n=\(n) prompt=\(prompt)")
+                    let token = MLXArray([Int32.random(in: 0 ..< 4, using: &rng)])
+                    device.didSample(token: token)
+                    host.didSample(token: token)
+                }
+            }
+        }
+    }
 }
+
