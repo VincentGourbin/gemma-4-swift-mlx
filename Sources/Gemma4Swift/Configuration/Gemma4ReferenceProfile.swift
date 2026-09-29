@@ -44,6 +44,11 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
     public let clearCacheAfterAnswer: Bool
     /// Tours vision/audio charges (`load(multimodal:)`). Variante : `textOnlyVariant()`.
     public let multimodal: Bool
+    /// Tour audio chargee (K-44 : non en `lean`, 0,61 Go en bf16 meme dans un pack 4 bits).
+    /// Variante : `withAudioVariant()`.
+    public let audio: Bool
+    /// Tours liberees apres un prefill avec media et rechargees a la demande (K-43, `lean`).
+    public let releaseEncodersAfterPrefill: Bool
     public let summary: String
 
     public var id: String { "\(bits.rawValue)bit-\(kind.rawValue)" }
@@ -70,7 +75,18 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
             family: family, bits: bits, kind: kind, model: model, kvBits: kvBits,
             prefillStepSize: prefillStepSize, cacheLimitMB: cacheLimitMB,
             memoryLimitMB: memoryLimitMB, clearCacheAfterAnswer: clearCacheAfterAnswer,
-            multimodal: false, summary: summary + " Variante texte seul.")
+            multimodal: false, audio: false, releaseEncodersAfterPrefill: false,
+            summary: summary + " Variante texte seul.")
+    }
+
+    /// Meme profil avec la tour audio (les profils `lean` la laissent de cote).
+    public func withAudioVariant() -> Gemma4ReferenceProfile {
+        Gemma4ReferenceProfile(
+            family: family, bits: bits, kind: kind, model: model, kvBits: kvBits,
+            prefillStepSize: prefillStepSize, cacheLimitMB: cacheLimitMB,
+            memoryLimitMB: memoryLimitMB, clearCacheAfterAnswer: clearCacheAfterAnswer,
+            multimodal: true, audio: true, releaseEncodersAfterPrefill: releaseEncodersAfterPrefill,
+            summary: summary + " Variante avec audio.")
     }
 
     /// Profil par identifiant (`4bit-fast`) dans une famille, ou identifiant complet
@@ -163,7 +179,9 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
             notes.append("12B 4 bits : qualite degradee (MMLU 37 % contre 57 % en bf16, 100 questions) ; preferer 8 bits.")
         }
         if family == .a4b || family == .b31b { notes.append("Pas d'audio.") }
-        notes.append(lean ? "Econome : limites memoire adaptees a la machine." : "Rapide : tout resident.")
+        notes.append(lean
+            ? "Econome : limites memoire adaptees a la machine, sans audio, tours liberees apres le prefill."
+            : "Rapide : tout resident.")
         notes.append("Valeurs initiales non mesurees.")
         return Gemma4ReferenceProfile(
             family: family, bits: bits, kind: kind, model: model,
@@ -175,6 +193,8 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
             memoryLimitMB: macCaches ? nil : max(4096, available - 2048),
             clearCacheAfterAnswer: lean,
             multimodal: true,
+            audio: !lean && family != .a4b && family != .b31b,
+            releaseEncodersAfterPrefill: lean,
             summary: notes.joined(separator: " "))
     }
 }

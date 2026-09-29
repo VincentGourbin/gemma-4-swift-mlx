@@ -77,6 +77,9 @@ struct Bench: AsyncParsableCommand {
     @Flag(name: .long, help: "Avec --image : charger le modele sans tour audio (K-16)")
     var noAudio = false
 
+    @Flag(name: .long, help: "Garder les tours residentes meme si le profil les libere (A/B de K-43)")
+    var keepEncoders = false
+
     @Flag(name: .long, help: "Ne pas faire la passe d'echauffement (compilation Metal) non chronometree")
     var noWarmup = false
 
@@ -88,19 +91,26 @@ struct Bench: AsyncParsableCommand {
         let modelURL = URL(fileURLWithPath: modelPath)
         let multimodal = image != nil
 
-        let loadStart = Date()
-        let container = try await Gemma4Registration.loadContainer(
-            from: modelURL, using: LocalTokenizerLoader(), multimodal: multimodal, audio: !noAudio)
-        await container.perform { context in eval(context.model) }
-        let loadSeconds = Date().timeIntervalSince(loadStart)
-        let loadActiveMB = Memory.activeMemory / 1_048_576
-
         let profile = try reference.map { id in
             guard let profile = Gemma4ReferenceProfile.named(id) else {
                 throw ValidationError("profil inconnu : \(id) (voir `gemma4-cli references`)")
             }
             return profile
         }
+        // Le profil decide de l'audio et de la liberation des tours (K-43/K-44) ;
+        // --no-audio et --keep-encoders l'emportent.
+        let audio = !noAudio && (profile?.audio ?? true)
+        let release = !keepEncoders && (profile?.releaseEncodersAfterPrefill ?? false)
+
+        let loadStart = Date()
+        let container = try await Gemma4Registration.loadContainer(
+            from: modelURL, using: LocalTokenizerLoader(), multimodal: multimodal, audio: audio)
+        await container.perform { context in
+            eval(context.model)
+            (context.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = release
+        }
+        let loadSeconds = Date().timeIntervalSince(loadStart)
+        let loadActiveMB = Memory.activeMemory / 1_048_576
         profile?.applyGlobalPolicy()
 
         let pixels: MLXArray? = try image.map { path in
@@ -111,7 +121,10 @@ struct Bench: AsyncParsableCommand {
         let filler = try promptFile.map { try String(contentsOfFile: $0, encoding: .utf8) } ?? Self.defaultFiller
         var context = BenchContext.collect(modelURL: modelURL, loadSeconds: loadSeconds)
         context.fields["load_active_mlx_mb"] = loadActiveMB
-        if multimodal { context.fields["audio_loaded"] = !noAudio }
+        if multimodal {
+            context.fields["audio_loaded"] = audio
+            context.fields["release_encoders"] = release
+        }
         if let profile {
             context.fields["profile"] = profile.qualifiedID
             // Les poids mesures doivent etre ceux du profil, sinon la ligne ne le

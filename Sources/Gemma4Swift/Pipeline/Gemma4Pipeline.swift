@@ -250,6 +250,10 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     public func apply(profile: Gemma4ReferenceProfile?) {
         self.profile = profile
         profile?.applyGlobalPolicy()
+        let release = profile?.releaseEncodersAfterPrefill ?? false
+        if let container {
+            Task { await container.perform { ($0.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = release } }
+        }
     }
 
     /// Charge les poids recommandes d'un profil, puis l'applique.
@@ -260,8 +264,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
     ) async throws {
         try await load(
-            profile.model, multimodal: profile.multimodal,
+            profile.model, multimodal: profile.multimodal, audio: profile.audio,
             downloadIfNeeded: downloadIfNeeded, hfToken: hfToken, progress: progress)
+        await container?.perform {
+            ($0.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = profile.releaseEncodersAfterPrefill
+        }
         apply(profile: profile)
     }
 
@@ -286,6 +293,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     public func load(
         _ model: Model,
         multimodal: Bool = true,
+        audio: Bool = true,
         downloadIfNeeded: Bool = false,
         hfToken: String? = nil,
         progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
@@ -306,7 +314,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let localPath = Gemma4ModelCache.localPath(for: model) else {
             throw Gemma4PipelineError.modelNotDownloaded(model.rawValue)
         }
-        try await load(from: localPath, multimodal: multimodal)
+        try await load(from: localPath, multimodal: multimodal, audio: audio)
     }
 
     /// Charge un modele Gemma 4 depuis un chemin local arbitraire.

@@ -74,4 +74,18 @@ struct ReferenceProfileTests {
         #expect(!text.multimodal)
         #expect(text.model == profile.model && text.prefillStepSize == profile.prefillStepSize)
     }
+
+    @Test("lean : sans audio et tours liberees ; fast : tout resident ; variante avec audio")
+    func testResidency() throws {
+        for profile in Gemma4ReferenceProfile.all {
+            #expect(profile.releaseEncodersAfterPrefill == (profile.kind == .lean), "\(profile.qualifiedID)")
+            if profile.kind == .lean { #expect(!profile.audio, "\(profile.qualifiedID)") }
+        }
+        let fast = try #require(Gemma4ReferenceProfile.named("e2b/4bit-fast"))
+        #expect(fast.audio)
+        let lean = try #require(Gemma4ReferenceProfile.named("e2b/4bit-lean"))
+        #expect(lean.withAudioVariant().audio && lean.withAudioVariant().releaseEncodersAfterPrefill)
+        #expect(!lean.textOnlyVariant().audio && !lean.textOnlyVariant().multimodal)
+    }
 }
+

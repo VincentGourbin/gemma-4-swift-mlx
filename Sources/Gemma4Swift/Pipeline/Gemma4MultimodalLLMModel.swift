@@ -327,15 +327,39 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     /// quantifiee (quantification a la volee : on ne saurait pas la recharger a l'identique)
     /// ou si le dossier du modele est inconnu.
     public func releaseEncoders() {
-        guard !encodersReleased, weightsDirectory != nil else { return }
-        guard !encoderModules.contains(where: { m in
-            m.leafModules().flattened().contains { $0.1 is Quantized } }) else { return }
+        guard !encodersReleased, let directory = weightsDirectory else { return }
+        guard encodersReloadable(from: directory) else { return }
         for module in encoderModules {
             let empty = module.parameters().flattened().map { ($0.0, MLXArray.zeros([0])) }
             module.update(parameters: ModuleParameters.unflattened(empty))
         }
         encodersReleased = true
         Memory.clearCache()
+    }
+
+    /// Les tours se rechargent a l'identique si chaque module quantifie en memoire l'est
+    /// aussi sur disque (pack pre-quantifie : `embed_vision.embedding_projection` du pack
+    /// E2B 4 bits) ; pas une tour quantifiee a la volee depuis un checkpoint bf16.
+    /// Lecture des seules cles (chargement paresseux).
+    private var reloadableCache: Bool?
+    private func encodersReloadable(from directory: URL) -> Bool {
+        if let reloadableCache { return reloadableCache }
+        let quantizedPaths = [("vision_tower", visionTower as Module?), ("embed_vision", embedVision as Module?),
+                              ("audio_tower", audioTower as Module?), ("embed_audio", embedAudio as Module?)]
+            .flatMap { name, module -> [String] in
+                guard let module else { return [] }
+                return module.leafModules().flattened().filter { $0.1 is Quantized }.map { "\(name).\($0.0)" }
+            }
+        var reloadable = true
+        if !quantizedPaths.isEmpty {
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "safetensors" }) ?? []
+            var keys = Set<String>()
+            for file in files { keys.formUnion((try? loadArrays(url: file).keys).map(Array.init) ?? []) }
+            reloadable = quantizedPaths.allSatisfy { keys.contains("\($0).scales") }
+        }
+        reloadableCache = reloadable
+        return reloadable
     }
 
     /// Recharge les tours liberees depuis `weightsDirectory` (lecture paresseuse : seuls
@@ -358,7 +382,8 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         let weights = sanitize(weights: raw).filter { key, _ in
             Self.encoderPrefixes.contains { key.hasPrefix($0) }
         }
-        try update(parameters: ModuleParameters.unflattened(weights), verify: [.noUnusedKeys, .shapeMismatch])
+        // Pas de .shapeMismatch : les poids liberes sont des tableaux vides, toute forme differe.
+        try update(parameters: ModuleParameters.unflattened(weights), verify: [.noUnusedKeys])
         for module in encoderModules { eval(module) }
         encodersReleased = false
     }

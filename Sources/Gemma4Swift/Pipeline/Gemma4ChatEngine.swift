@@ -246,7 +246,12 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         from directory: URL, profile: Gemma4ReferenceProfile? = nil, audio: Bool = true
     ) async throws -> Gemma4ChatEngine {
         let container = try await Gemma4Registration.loadContainer(
-            from: directory, multimodal: profile?.multimodal ?? true, audio: audio)
+            from: directory, multimodal: profile?.multimodal ?? true, audio: audio && (profile?.audio ?? true))
+        if let profile {
+            await container.perform {
+                ($0.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = profile.releaseEncodersAfterPrefill
+            }
+        }
         profile?.applyGlobalPolicy()
         return Gemma4ChatEngine(container: container, profile: profile)
     }
