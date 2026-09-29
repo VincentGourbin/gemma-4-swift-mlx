@@ -309,6 +309,49 @@ public class Gemma4TextModel: Module {
     /// `forwardCollectingIntermediates` (avec intermediates pour KV-sharing /
     /// MTP). La logique embedding, masks, layer loop et norm est identique ;
     /// seul l'enregistrement des K/V dans un array `intermediates[]` differe.
+    /// Gradient checkpointing par couche (K-32) : a l'entrainement (sans cache), chaque couche
+    /// devient une fonction personnalisee dont le forward ne garde pas ses intermediaires et
+    /// dont le VJP refait le forward. Les parametres entrainables de la couche en sont des
+    /// entrees, pour que leurs gradients remontent (comme `nn.utils.checkpoint` en Python).
+    public var gradientCheckpointing = false
+
+    private func checkpointedLayer(
+        _ layer: Gemma4DecoderLayer, _ x: MLXArray,
+        mask: MLXFast.ScaledDotProductAttentionMaskMode, perLayerInput: MLXArray?,
+        sharedKV: (keys: MLXArray, values: MLXArray)?, sharedOffset: Int?
+    ) -> (output: MLXArray, kv: (keys: MLXArray, values: MLXArray), offset: Int) {
+        let parameters = layer.trainableParameters().flattened()
+        let keys = parameters.map(\.0)
+        var inputs = [x]
+        if let perLayerInput { inputs.append(perLayerInput) }
+        if let sharedKV { inputs += [sharedKV.keys, sharedKV.values] }
+        let fixed = inputs.count
+        inputs += parameters.map(\.1)
+        let hasPerLayerInput = perLayerInput != nil
+        let hasShared = sharedKV != nil
+        var offsetOut = 0
+
+        let forward: ([MLXArray]) -> [MLXArray] = { a in
+            var index = 1
+            let pli = hasPerLayerInput ? a[index] : nil
+            if hasPerLayerInput { index += 1 }
+            let shared = hasShared ? (keys: a[index], values: a[index + 1]) : nil
+            if !keys.isEmpty {
+                layer.update(parameters: ModuleParameters.unflattened(Array(zip(keys, a[fixed...]))))
+            }
+            let (output, kv, offset) = layer(
+                a[0], mask: mask, cache: nil, perLayerInput: pli, sharedKV: shared, sharedOffset: sharedOffset)
+            offsetOut = offset
+            return [output, kv.keys, kv.values]
+        }
+        let function = CustomFunction {
+            Forward(forward)
+            VJP { primals, cotangents in vjp(forward, primals: primals, cotangents: cotangents).1 }
+        }
+        let out = function(inputs)
+        return (out[0], (out[1], out[2]), offsetOut)
+    }
+
     private func runForward(
         inputs: MLXArray?,
         inputsEmbeds: MLXArray?,
@@ -423,7 +466,14 @@ public class Gemma4TextModel: Module {
                 sharedOffset = nil
             }
 
-            if collectIntermediates {
+            if gradientCheckpointing && cache == nil {
+                // K-32 : couche recalculee au backward (entrainement seulement, sans cache).
+                let (output, kv, offset) = checkpointedLayer(
+                    layer, h, mask: localMask, perLayerInput: perLayerInput,
+                    sharedKV: sharedKV, sharedOffset: sharedOffset)
+                h = output
+                if collectIntermediates { intermediates[i] = (kv: kv, offset: offset) }
+            } else if collectIntermediates {
                 let (output, kv, offset) = layer(
                     h, mask: localMask, cache: c, perLayerInput: perLayerInput,
                     sharedKV: sharedKV, sharedOffset: sharedOffset

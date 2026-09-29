@@ -74,6 +74,8 @@ public enum Gemma4LoRATrain {
         /// Multimodal : tout le modele en fp32 (ancien chemin, poids x 2). `false` (defaut, K-31) :
         /// base bf16, parametres LoRA fp32 — TB3 : pic 24,1 -> 14,2 Go, +16 % de debit, sans NaN.
         public var multimodalFloat32: Bool
+        /// Gradient checkpointing par couche (K-32) : pic reduit, pas recalcule au backward.
+        public var gradientCheckpointing: Bool
         /// Limite de cache MLX et vidage apres validation (K-30 b ; director : empreinte
         /// 76 -> 16 Go, perte identique) ; nil = aucune politique.
         public var memoryPolicy: Gemma4TrainingMemoryPolicy?
@@ -101,7 +103,8 @@ public enum Gemma4LoRATrain {
             metricsURL: URL? = nil,
             responseOnlyHead: Bool = true,
             memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048),
-            multimodalFloat32: Bool = false
+            multimodalFloat32: Bool = false,
+            gradientCheckpointing: Bool = false
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -126,6 +129,7 @@ public enum Gemma4LoRATrain {
             self.responseOnlyHead = responseOnlyHead
             self.memoryPolicy = memoryPolicy
             self.multimodalFloat32 = multimodalFloat32
+            self.gradientCheckpointing = gradientCheckpointing
         }
     }
 
@@ -180,6 +184,13 @@ public enum Gemma4LoRATrain {
             context.model.train(false)
             return evaluateTraining(model: context.model, samples: prepared, batchSize: batchSize)
         }
+    }
+
+    /// Modele texte (couches decodeur) d'un modele Gemma 4 texte ou multimodal.
+    static func textModel(of model: Module) -> Gemma4TextModel? {
+        if let llm = model as? Gemma4LLMModel { return llm.languageModel.model }
+        if let mm = model as? Gemma4MultimodalLLMModel { return mm.languageModel.model }
+        return nil
     }
 
     /// `full` n'a de sens que si les poids ne sont pas quantifies (A-07).
@@ -374,6 +385,8 @@ public enum Gemma4LoRATrain {
             print("Train: \(trainSamples.count) samples (avg \(config.maskPrompt ? "response" : "total"): \(avgResp) tokens)")
 
             // Training loop custom (ref: mlx-lm train())
+            Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = config.gradientCheckpointing
+            defer { Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = false }
             try trainLoRA(
                 model: model,
                 trainSamples: trainSamples,
@@ -582,6 +595,8 @@ public enum Gemma4LoRATrain {
             let imageCount = capturedTrainData.filter { $0.pixelValues != nil }.count
             print("Train multimodal: \(capturedTrainData.count) samples (\(audioCount) audio, \(imageCount) image)")
 
+            Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = config.gradientCheckpointing
+            defer { Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = false }
             try trainMultimodalLoRA(
                 model: model,
                 trainSamples: capturedTrainData,

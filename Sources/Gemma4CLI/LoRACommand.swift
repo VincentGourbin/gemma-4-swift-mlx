@@ -81,6 +81,9 @@ extension LoRA {
         @Flag(name: .long, help: "Multimodal : tout le modele en fp32 (ancien chemin ; defaut : base bf16, LoRA fp32)")
         var fp32Model: Bool = false
 
+        @Flag(name: .long, help: "Gradient checkpointing par couche : pic reduit, pas plus lent (K-32)")
+        var gradCheckpoint: Bool = false
+
         @Flag(name: .long, help: "Reprendre au dernier checkpoint du dossier de sortie (poids, optimiseur, pas)")
         var resume: Bool = false
 
@@ -166,7 +169,8 @@ extension LoRA {
                 validationBatches: valBatches > 0 ? valBatches : nil,
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
                 responseOnlyHead: !fullHead,
-                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil
+                memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil,
+                gradientCheckpointing: gradCheckpoint
             )
 
             print("\n--- Debut du training ---")
@@ -271,7 +275,8 @@ extension LoRA {
                 metricsURL: metricsOut.map { URL(fileURLWithPath: $0) },
                 responseOnlyHead: !fullHead,
                 memoryPolicy: trainCacheLimitMb > 0 ? Gemma4TrainingMemoryPolicy(cacheLimitMB: trainCacheLimitMb) : nil,
-                multimodalFloat32: fp32Model
+                multimodalFloat32: fp32Model,
+                gradientCheckpointing: gradCheckpoint
             )
 
             print("\n--- Debut du training multimodal ---")
