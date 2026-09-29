@@ -644,3 +644,12 @@ Jeu recréé et archivé : `Scripts/quality/mmlu-sample.py` → 1 140 questions 
 
 Réponses concordantes à 195/200 : découper le calcul (préfixe puis suite) change les arrondis bf16 et fait basculer quelques argmax, comme en K-19 ; aucun repli de tokenisation (0 sur 1 140).
 
+### K-32 : gradient checkpointing par couche (director, 200 pas, même graine)
+
+| Variante | Perte @200 | Val @200 | Débit | Pic MLX | Empreinte |
+|---|---|---|---|---|---|
+| défauts K-30 | 1,1475 | 1,1378 | 0,202 it/s | 38,6 Go | 15,9 Go |
+| **`--grad-checkpoint`** | **1,1475** | **1,1378** | 0,150 it/s (temps +35 %) | **21,1 Go (−45 %)** | 16,1 Go |
+
+Pertes identiques ; porte « pic −30 %, temps ≤ +35 % » tenue, au bord pour le temps : option à activer quand la mémoire manque (Mac 32 Go, gros modèles), pas par défaut. Lignes : `benchmarks/lora-k32-{gc,base}-20260929.jsonl`.
+
