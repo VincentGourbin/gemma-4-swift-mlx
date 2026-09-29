@@ -135,6 +135,16 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
 - **Suivi 4 bits** (`benchmarks/diffusion-4bit-followup-20260928.jsonl`, 2 passes chacun, sorties identiques entre passes) :
   - `--quant-variant 4bit-aggressive` (couches 0-1 et 28-29 en 8 bits), d1 : 20,5 passes/canvas, 27,0 tok/s, 17 227 Mo actifs, 19 303 Mo d'empreinte — sous 18 Go en actif seulement, et −30 % de débit contre le mixte pour −1,5 Go : le mixte reste le défaut.
   - `4bit-fast` (mixte), avec le correctif vision : d2 8 passes, 58,7 tok/s, empreinte 22,2 Go ; d3 9 passes, 47,4 tok/s, 22,6 Go. Remplace les lignes d2 perturbées par ollama.
+- **Packs pré-quantifiés (K-D12)** — `gemma4-cli export-diffusion --model-path <bf16> --reference a4bdiff/8bit-fast --out <pack>` ; le pack se passe ensuite partout comme `--model-path` (format `gemma4-diffusion-prequantized-v1`, SHA-256 par fichier, une seule copie des modules partagés). Mesures d1 (`benchmarks/diffusion-packs-20260929.jsonl`, Lexar USB) :
+
+  | Poids | Taille | Chargement | Pic au chargement | Passes/canvas | Débit | Sortie |
+  |---|---|---|---|---|---|---|
+  | 8 bits, à la volée depuis le bf16 | — | 64 s | 51,0 Go | 16,5 | 29,0 tok/s | référence |
+  | **8 bits, pack** | 28,0 Go | **32 s** | **26,7 Go** | 16,5 | 28,9 tok/s | identique |
+  | 4 bits mixte, à la volée | — | 62 s | 51,0 Go | 14,5 | 38,5 tok/s | référence |
+  | **4 bits mixte, pack** | 19,7 Go | **11 s** | **18,8 Go** | 14,5 | 38,7 tok/s | identique |
+
+  Porte « chargement ≤ ⅓ du bf16 (58 s) » : 4 bits tenue (11 s), 8 bits non (32 s, lecture de 28 Go limitée par le disque USB). Sorties identiques (début de réponse, passes, mémoire active) ; aller-retour bit-exact vérifié en test unitaire.
 - **Pic de chargement corrigé** : la quantification se fait maintenant couche par couche (chaque couche de l'encodeur quantifiée, évaluée, reprise aussitôt par le décodeur). Pic mesuré (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`) : 8 bits 77,2 → 51,0 Go, 4 bits mixte 68,7 → 51,0 Go, soit le bf16 seul ; mémoire en régime et passes inchangées.
 - **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
 - ❌ **`lean` + image (d2), lignes ci-dessus invalides** : l'échauffement déchargeait la vision et la passe mesurée ignorait l'image, sans erreur (bug de bibliothèque, pas seulement du bench : tout appel avec image après un déchargement). Corrigé (`9ffc8871`, rechargement à la demande) ; remesuré (`benchmarks/diffusion-vision-reload-20260928.jsonl`) : `8bit-lean` d2 10 passes, même réponse que `8bit-fast`, 25,6 Go actifs contre 26,7.
@@ -152,6 +162,7 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
 
 **Choisir, en l'état** : `a4bdiff/16bit-*` pour la qualité de référence ; `a4bdiff/8bit-*`
 (~27 Go en régime) ; `a4bdiff/4bit-*` (désormais quantification mixte, ~21 Go, 38,5 tok/s en texte ;
-`bench-diffusion --quant-variant 4bit-uniform` pour l'ancien 4 bits) ; ScreenSpot bf16 80, 8 bits 78, 4 bits 76. Tous passent par ~51 Go au chargement
-(quantification à la volée depuis le bf16) : sous 64 Go de RAM, il faut des poids pré-quantifiés.
+`bench-diffusion --quant-variant 4bit-uniform` pour l'ancien 4 bits) ; ScreenSpot bf16 80, 8 bits 78, 4 bits 76. À la volée, tous passent par ~51 Go au
+chargement ; avec un pack exporté (`export-diffusion`), le 8 bits charge en 26,7 Go et le 4 bits en
+18,8 Go : c'est la voie pour les Mac de 32-48 Go.
 

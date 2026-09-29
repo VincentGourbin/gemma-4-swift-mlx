@@ -250,3 +250,9 @@ puis d2/d3 (`--image`). Ordre (audit-diffusion §E.2) : K-D10 base bf16 D1/D2/D3
 - Bug : `unloadVisionAfterFirstCanvas` (défaut de `DiffusionMemoryConfig`, profils lean) déchargeait la vision pour de bon ; toute image suivante était ignorée sans erreur. Rechargement à la demande depuis `modelDirectory`, `invalidInput` sinon (`9ffc8871`). Vérifié : `8bit-lean` d2 = 10 passes, même réponse que `fast`.
 - `gemma4-cli eval-screenspot` + `Scripts/quality/screenspot-sample.py` (`5c50f47e`) : bf16 80, 8 bits 78, 4 bits mixte 76, 4 bits uniforme 77 (sur 100). Porte qualité 8 bits tenue ; 4 bits −4 pts, dans le bruit d'un échantillon de 100.
 - `aggressive` mesuré : 17,2 Go actifs, 19,3 Go d'empreinte, 20,5 passes, 27 tok/s → le mixte reste le défaut. Reste diffusion : K-D12 (poids pré-quantifiés, pour passer sous 51 Go au chargement), échantillon ScreenSpot plus large pour trancher le 4 bits.
+
+### 2026-09-29 — K-D12 packs, K-15, K-18
+- K-D12 (`3c869e5e`) : `export-diffusion`, format `gemma4-diffusion-prequantized-v1`, chargement direct détecté automatiquement. Packs sur `/Volumes/Lexar/models/local/diffusiongemma-26B-A4B-it-{8bit,4bit}` : 8 bits 32 s / 26,7 Go au chargement, 4 bits 11 s / 18,8 Go (contre 62-64 s / 51 Go à la volée), sorties identiques. Porte ⅓ tenue en 4 bits, pas en 8 bits (disque USB). Publication HF : décision de Vincent.
+- K-15 (`1ab24fc2`) : historique n-gramme sur GPU (parité aléatoire GPU = CPU). Mesure B7 en cours.
+- K-18 (`af8e647b`) : vision sans padding, pooler au dtype d'entrée ; parité < 1e-4. Mesure B3 en cours.
+
