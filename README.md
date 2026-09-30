@@ -6,15 +6,15 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| Text generation | ✅ **Working** | All 4 families, 4 quantizations each. 8-103 tok/s |
-| Vision (image understanding) | ✅ **Working** | Single + multi-image. All 4 families validated |
+| Text generation | ✅ **Working** | 5 families (E2B, E4B, 12B, 26B-A4B, 31B), 4/8/16-bit packs. 4.5–134 tok/s decode (M3 Max, measured profiles) |
+| Vision (image understanding) | ✅ **Working** | Single + multi-image. E2B, E4B, 26B-A4B, 31B validated |
 | Video (frame-by-frame) | ✅ **Working** | ~1fps, 70 tokens/frame, MM:SS timestamps. All 4 families validated |
 | Audio (speech understanding) | ✅ **Working** | Conformer encoder, 30s max, ASR/comprehension. E2B + E4B validated |
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
 | LoRA/DoRA fine-tuning | ✅ **Working** | LoRA, DoRA, full SFT. Response masking, chat template. 97% accuracy on classifier benchmark |
 | Multimodal LoRA | ✅ **Working** | Audio + vision fine-tuning. 50% accuracy on 20-species bird call classification, LaTeX OCR verified |
 | Speculative decoding (MTP) | ✅ **Working** | Gemma 4 Assistant drafter. Matches greedy decoding except on near-ties of logits (not bit-exact in general). Fine-tuneable: ×2.5 acceptance on domain-specific dataset |
-| KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
+| KV cache quantization | ✅ **Working** | mlx-swift-lm native `QuantizedKVCache` via `kvBits`, all families (8-bit KV in the `lean` profiles of 26B-A4B and 31B). TurboQuant kept, explicit only. See [KV Cache Quantization](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming, or `Gemma4ChatEngine` (tools, thinking channel, images, prefix reuse: TTFT −78 % on the next turn) |
 | OpenAI-compatible server | ✅ **Working** | `Server/` package, `gemma4-server` (SSE, tools, images, API key, per-client conversation cache). See [Inference Server](#inference-server-openai-compatible) |
 | Reference profiles | ✅ **Measured** | `<bits>bit-<fast\|lean>` for inference (30 profiles), `lora-<bits>bit-<fast\|lean>` for training (11 profiles), `a4bdiff/*` for diffusion. `gemma4-cli references`, `lora profiles` |
@@ -119,7 +119,7 @@ gemma4-cli lora train \
   --model-path ~/Library/Caches/models/mlx-community/gemma-4-e2b-it-bf16 \
   --data /path/to/dataset \
   --output ./my-adapter \
-  --mask-prompt --num-layers 16 --iterations 1300 --learning-rate 1e-4
+  --reference lora-16bit-fast --mask-prompt --iterations 1300   # measured profile, see below
 
 # Generate with adapter
 gemma4-cli lora generate \
@@ -203,6 +203,7 @@ For the Toolathlon tool-use benchmark POC (CLI + OpenAI-compatible proxy
 |--------|:---:|:---:|:---:|:---:|---|
 | **E2B** | 5.1B | 2.3B | No | Yes | Fastest. Text + Vision + Audio + Video |
 | **E4B** | 9.6B | 4.5B | No | Yes | Best quality/size ratio. Full multimodal |
+| **12B** | ~12B | ~12B | No | — | Unified multimodal checkpoint. **8-bit recommended** (4-bit loses 20 MMLU points) |
 | **31B** | 31.3B | 31.3B | No | No | Highest quality. Text + Vision + Video |
 | **26B-A4B** | 25.8B | 3.8B | Yes (128 experts, top-8) | No | MoE efficiency. Text + Vision + Video |
 
@@ -212,6 +213,7 @@ For the Toolathlon tool-use benchmark POC (CLI + OpenAI-compatible proxy
 |-------|:---:|:---:|:---:|:---:|---|
 | **E2B** | ~3.6 GB | ~4.2 GB | ~5.2 GB | ~10 GB | `mlx-community/gemma-4-e2b-it-{quant}` |
 | **E4B** | ~5 GB | ~6.5 GB | ~8 GB | ~19 GB | `mlx-community/gemma-4-e4b-it-{quant}` |
+| **12B** | ~7 GB | ~10 GB | ~13 GB | ~24 GB | `mlx-community/gemma-4-12B-it-{quant}` |
 | **31B** | ~17 GB | ~25 GB | ~33 GB | ~63 GB | `mlx-community/gemma-4-31b-it-{quant}` |
 | **26B-A4B** | ~14 GB | ~21 GB | ~27 GB | ~52 GB | `mlx-community/gemma-4-26b-a4b-it-{quant}` |
 
@@ -219,16 +221,23 @@ For the Toolathlon tool-use benchmark POC (CLI + OpenAI-compatible proxy
 
 ## Performance (Apple M3 Max, 96 GB)
 
-All 16 model variants (4 families × 4 quantizations) benchmarked. Full results in [benchmarks/](benchmarks/results/).
+### Text Generation (decode tok/s)
 
-### Text Generation (tok/s)
+Median decode speed of the `fast` reference profiles, 128-token prompt, measured with
+`gemma4-cli bench` on the library's own generation path (`TokenIterator`, release build). Prefill,
+TTFT and memory at 128 / 1k / 4k tokens, `lean` profiles and images: [docs/References.md](docs/References.md).
 
-| Model | 4-bit | 6-bit | 8-bit | BF16 |
-|-------|:-----:|:-----:|:-----:|:----:|
-| **E2B** | **97** | 62 | 72 | 42 |
-| **E4B** | **61** | 48 | 42 | 25 |
-| **26B-A4B** | **56** | 43 | 41 | 10 |
-| **31B** | **12** | 9 | 7 | 3 |
+| Model | 4-bit | 8-bit | BF16 |
+|-------|:-----:|:-----:|:----:|
+| **E2B** | **134.5** | 87.5 | 53.6 |
+| **E4B** | **78.0** | 47.8 | 27.6 |
+| **12B** | 36.2 | **20.9** | 11.6 |
+| **26B-A4B** | **81.3** | 50.9 | 32.6 |
+| **31B** | **15.1** | 8.2 | 4.6 |
+
+> Older figures (6-bit column, video and audio tables below) came from the `profile` command,
+> whose decode loop missed the library's `asyncEval` pipelining; they are kept for the quality
+> observations, not as speed references. Full raw results: [benchmarks/](benchmarks/results/).
 
 ### Vision Quality (vehicle identification across quantizations)
 
@@ -239,7 +248,7 @@ All 16 model variants (4 families × 4 quantizations) benchmarked. Full results 
 | **26B-A4B** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** |
 | **31B** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** | **"Citroën 2CV"** |
 
-> **Key finding:** Quality depends on architecture, not quantization. 26B-A4B/31B identify the vehicle correctly at all quantizations. 4-bit is the sweet spot — fastest with no quality loss. BF16 is 2-24x slower with no gain. See [docs/examples/](docs/examples/) and [benchmarks/](benchmarks/results/) for full results.
+> **Key finding:** Quality depends on architecture more than quantization. 26B-A4B/31B identify the vehicle correctly at all quantizations, and 4-bit is the sweet spot for E2B, E4B, 26B-A4B and 31B. **Exception: 12B**, where 4-bit drops MMLU from 57 % to 37 % (100 questions): use 8-bit. See [docs/examples/](docs/examples/) and [benchmarks/](benchmarks/results/) for full results.
 
 ### Video (4-bit models, 9 frames ~1fps, 70 tokens/frame)
 
@@ -272,11 +281,14 @@ Train LoRA, DoRA, or full SFT adapters entirely on-device. Compatible with [mlx-
 
 ### Supported modes
 
-| Mode | Description | Memory (E2B bf16) |
+| Mode | Description | Memory (E2B bf16, short sequences) |
 |------|-------------|:---:|
 | **LoRA** | Low-rank adaptation (default) | ~11 GB |
 | **DoRA** | Weight-Decomposed LoRA | ~11 GB |
 | **Full SFT** | All weights trainable | ~20 GB |
+
+Memory grows with sequence length: see [Training profiles](#training-profiles) for measured peaks on
+examples up to 3,320 tokens.
 
 ### Dataset format
 
@@ -372,22 +384,20 @@ M3 Max 96 GB); throughput counts trained (response) tokens:
 import Gemma4Swift
 
 // Load model + adapter for inference
-let container = try await loadLocalModel(path: modelPath)
+let container = try await Gemma4Registration.loadContainer(from: modelURL)
 try await Gemma4LoRAInference.loadAdapter(into: container, from: adapterURL)
 
 // Or fuse permanently
 try await Gemma4LoRAInference.fuseAdapter(into: container, from: adapterURL)
 
 // Training
-let config = Gemma4LoRATrain.TrainingConfig(
-    loraRank: 8,
-    loraScale: 20.0,
-    numLayers: 16,
-    learningRate: 1e-4,
+var config = Gemma4LoRATrain.TrainingConfig(
+    modelFamily: .e2b,
     iterations: 1300,
-    maskPrompt: true,
-    outputDirectory: outputURL
+    outputDirectory: outputURL,
+    maskPrompt: true
 )
+Gemma4TrainingProfile.named("e2b/lora-16bit-fast")?.apply(to: &config)  // measured settings
 try await Gemma4LoRATrain.train(
     container: container,
     trainData: trainTokens,    // [[Int]] — pre-tokenized sequences
@@ -452,7 +462,9 @@ gemma4-cli lora bench-multimodal \
 - Use **rich JSON responses** (50+ tokens) rather than short labels — more gradient signal for the frozen audio encoder
 - Model produces valid, internally consistent JSON with species name, scientific name, and call description
 - Use `--multimodal` flag to load the full multimodal model (vision + audio encoders)
-- bf16 model required (not quantized) — model is converted to float32 internally for training stability
+- bf16 model recommended: the base stays in bf16 and only the LoRA parameters and the loss run in float32
+  (peak 24 → 14 GB, +24 % throughput, same validation loss). `--fp32-model` restores the old full-float32 path,
+  which the peak figures in these two examples were measured with.
 
 ### Example: LaTeX OCR
 
@@ -936,7 +948,10 @@ Gemma4Swift/
 
 ### KV Cache Quantization
 
-The project includes a custom TurboQuant implementation (rotation + Beta-optimal codebook) in `TurboQuant/`. After thorough audit, we recommend migrating to **mlx-swift-lm's native `QuantizedKVCache`** instead:
+`kvBits` uses **mlx-swift-lm's native `QuantizedKVCache`** for every family (the KV-shared layers of
+E2B/E4B read their source layers correctly). The project also includes a custom TurboQuant implementation
+(rotation + Beta-optimal codebook) in `TurboQuant/`, reachable only explicitly through
+`languageModel.makeCache(kvBits:)`:
 
 ```swift
 // Native KV cache quantization — no custom code needed
@@ -945,12 +960,12 @@ let params = GenerateParameters(kvBits: 4, kvGroupSize: 64, quantizedKVStart: 50
 
 **Why migrate:** TurboQuant's theoretical 3.85x compression is real, but runtime intermediate tensor materialization erases memory gains. The disabled Fast Hadamard Transform (O(D^2) dense rotation instead of O(D log D)) adds significant compute overhead. Meanwhile, mlx-swift-lm ships battle-tested 4/8-bit KV quantization with Metal-accelerated `quantizedMM()`, automatic attention routing, and zero maintenance.
 
-The `TurboQuant/` directory is retained for reference but is not used in the default inference pipeline.
+The `TurboQuant/` directory is retained for reference but is not used by the default inference pipeline.
 
 ### Key design decisions
 
 - **Gemma 4 ≠ Gemma 3n**: No AltUp, no Laurel blocks, no activation sparsity. Simpler decoder with `global_head_dim`, `partial_rotary_factor`, `use_double_wide_mlp`, and optional K=V attention.
-- **Registration-based**: Registers `"gemma4"` and `"gemma4_text"` model types into mlx-swift-lm's `LLMTypeRegistry`.
+- **Private model factory**: `Gemma4Registration.loadContainer(from:)` loads through its own `LLMModelFactory` that only knows the Gemma 4 types, so neither upstream's own Gemma 4 nor `MLXVLM` (VLM-first trampoline) can answer instead. `register()` remains for code that loads through `LLMModelFactory.shared`.
 - **Multimodal via masked_scatter**: Image/audio/video embeddings replace special token positions in the text embedding sequence.
 - **Video aligned with Google reference**: `video_token` (258884), 70 soft tokens/frame, MM:SS timestamps, ~1fps sampling.
 - **Audio aligned with Google reference**: Conformer with relative position embeddings, causal chunked attention, mel spectrogram matching `feature_extraction_gemma4.py`.

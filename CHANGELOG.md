@@ -168,6 +168,9 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   `Gemma4StreamingDetokenizer`. Conséquence : ces chemins ne passent plus par
   l'analyse d'appels d'outils de l'amont (dont les événements `.toolCall` étaient
   de toute façon ignorés). (44858e01)
+- README revu : 5 familles (12B ajouté), vitesses remplacées par la matrice mesurée des profils
+  (`gemma4-cli bench`), 12B en 8 bits conseillé, KV quantifié natif, exemples d'API corrigés
+  (`Gemma4Registration.loadContainer`, ordre des arguments de `TrainingConfig`), MTP non bit-exact.
 - Le dépôt allège son historique suivi : 990 sorties brutes du bench OCR retirées
   (toujours consultables au commit c9543739), doublons d'images à la racine
   retirés, chemins personnels remplacés par des variables d'environnement dans
@@ -250,7 +253,7 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   mlx-swift-lm.
 - MTP : même en contexte court, la génération spéculative peut diverger de la
   génération standard sur des quasi-égalités de logits. Défaut préexistant ;
-  l'affirmation « bit-exact » du README est fausse en général.
+  le README ne l'annonce plus « bit-exact ».
 - Deux avertissements « sending 'session' risks causing data races » subsistent
   (la `ChatSession` non `Sendable` conservée par le pipeline pour `continueChat`).
 - Plusieurs correctifs restent à valider sur de vrais modèles au-delà d'E2B
