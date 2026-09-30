@@ -264,16 +264,9 @@ extension LoRA {
                 (context: ModelContext) -> ([MultimodalTrainingSample], [MultimodalTrainingSample]) in
                 let tok = context.tokenizer
                 let formatter: ([[String: String]]) throws -> String = { messages in
-                    var ids = try tok.applyChatTemplate(messages: messages)
-                    // Retirer add_generation_prompt suffix
-                    if ids.count >= 3 {
-                        let last3 = Array(ids.suffix(3))
-                        if last3 == [105, 4368, 107] {
-                            ids = Array(ids.dropLast(3))
-                        }
-                    }
-                    return tok.decode(
-                        tokenIds: Gemma4Processor.strippingTemplateArtifacts(ids))
+                    let ids = try tok.applyChatTemplate(messages: messages)
+                    return tok.decode(tokenIds: Gemma4Processor.strippingTemplateArtifacts(
+                        Gemma4Processor.droppingGenerationPrompt(ids)))
                 }
 
                 let train = try loadGemma4MultimodalJSONL(
@@ -821,16 +814,10 @@ func tokenizeTrainingFile(_ url: URL, tokenizer tok: any MLXLMCommon.Tokenizer) 
         if let msgs = sample.messages, !msgs.isEmpty {
             // Chat format: tokeniser DIRECTEMENT via applyChatTemplate
             let msgDicts = msgs.map { ["role": $0.role, "content": $0.content] }
-            var ids = try tok.applyChatTemplate(messages: msgDicts)
-            // Retirer les 3 derniers tokens (add_generation_prompt: <|turn>model\n)
-            if ids.count >= 3 {
-                let last3 = Array(ids.suffix(3))
-                if last3 == [105, 4368, 107] { // <|turn> model \n
-                    ids = Array(ids.dropLast(3))
-                }
-            }
-            ids = Gemma4Processor.strippingTemplateArtifacts(ids)
-            return ids
+            let ids = try tok.applyChatTemplate(messages: msgDicts)
+            // Invite de generation retiree quelle que soit sa longueur (K-33 : 12B/26B/31B
+            // ajoutent un canal de pensee vide apres `<|turn>model\n`).
+            return Gemma4Processor.strippingTemplateArtifacts(Gemma4Processor.droppingGenerationPrompt(ids))
         } else if let text = sample.text {
             return tok.encode(text: text)
         }

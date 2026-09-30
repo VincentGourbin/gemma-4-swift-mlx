@@ -143,6 +143,21 @@ public struct Gemma4Processor {
     ///
     /// Les ids attendus sont ceux du rendu HF du meme `chat_template.jinja`,
     /// mesures token par token (voir `MultimodalSystemPromptTests`).
+    /// Retire l'invite de generation ouverte que le gabarit ajoute en fin de rendu : le
+    /// dernier `<|turn>model` s'il n'est suivi d'aucun `<turn|>`, et tout ce qui le suit.
+    ///
+    /// Selon la famille, cette invite fait 3 jetons (`<|turn>model\n`, E2B/E4B) ou plus :
+    /// 12B, 26B-A4B et 31B ajoutent `<|channel>thought\n<channel|>` quand la reflexion est
+    /// coupee. Ne retirer que les 3 jetons laissait l'invite en place, et le masque de
+    /// reponse (dernier `<|turn>model`) ne gardait que 4 jetons de « reponse » (K-33).
+    public static func droppingGenerationPrompt(_ ids: [Int]) -> [Int] {
+        guard let start = ids.indices.last(where: {
+            ids[$0] == Int(turnStartTokenId) && $0 + 1 < ids.count && ids[$0 + 1] == 4368
+        }), !ids[start...].contains(Int(turnEndTokenId))
+        else { return ids }
+        return Array(ids[..<start])
+    }
+
     public static func strippingTemplateArtifacts(_ ids: [Int]) -> [Int] {
         var out = ids
 
@@ -268,8 +283,7 @@ public struct Gemma4Processor {
             messages[user]["content"] = parts.joined(separator: "\n")
         }
         var ids = try tokenizer.applyChatTemplate(messages: messages, tools: nil, additionalContext: nil)
-        if ids.suffix(3) == [Int(turnStartTokenId), 4368, Int(newlineTokenId)] { ids.removeLast(3) }
-        ids = strippingTemplateArtifacts(ids)
+        ids = strippingTemplateArtifacts(droppingGenerationPrompt(ids))
 
         var expanded: [Int] = []
         for id in ids {

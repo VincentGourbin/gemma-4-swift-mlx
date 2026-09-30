@@ -263,7 +263,7 @@ struct MtpTrain: AsyncParsableCommand {
                 strMessages.append(["role": role, "content": content])
             }
             var ids = try tokenizer.applyChatTemplate(messages: strMessages)
-            if ids.suffix(3) == [105, 4368, 107] { ids.removeLast(3) }  // <|turn> model \n
+            ids = Gemma4Processor.droppingGenerationPrompt(ids)
             return Gemma4Processor.strippingTemplateArtifacts(ids)
         }
         throw NSError(domain: "MtpTrain", code: 3, userInfo: [
