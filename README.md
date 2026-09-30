@@ -1,5 +1,13 @@
 # Gemma 4 Swift MLX
 
+[![build](https://github.com/VincentGourbin/gemma-4-swift-mlx/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/VincentGourbin/gemma-4-swift-mlx/actions/workflows/build.yml)
+[![version](https://img.shields.io/github/v/tag/VincentGourbin/gemma-4-swift-mlx?label=version&sort=semver)](CHANGELOG.md)
+[![Swift 6.3+](https://img.shields.io/badge/Swift-6.3%2B-F05138?logo=swift&logoColor=white)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%2015%2B%20%7C%20iOS%2017%2B-lightgrey?logo=apple)](Package.swift)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-MLX%20Swift%200.31-black?logo=apple)](https://github.com/ml-explore/mlx-swift)
+[![License: MIT](https://img.shields.io/github/license/VincentGourbin/gemma-4-swift-mlx)](LICENSE)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20DiffusionGemma-8--bit%20%7C%204--bit%20packs-yellow)](https://huggingface.co/VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-4bit-mixed)
+
 Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://github.com/ml-explore/mlx-swift).
 
 ## Status
