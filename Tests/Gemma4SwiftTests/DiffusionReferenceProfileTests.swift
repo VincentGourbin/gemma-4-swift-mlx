@@ -38,4 +38,14 @@ struct DiffusionReferenceProfileTests {
         #expect(DiffusionReferenceProfile.recommended(availableMB: 32 * 1024)?.qualifiedID == "a4bdiff/4bit-lean")
         #expect(DiffusionReferenceProfile.recommended(availableMB: 16 * 1024)?.qualifiedID == "a4bdiff/4bit-lean")
     }
+
+    @Test("poids : bf16 de Google en 16 bits, packs publies en 8 et 4 bits")
+    func testWeightsRepository() throws {
+        #expect(try #require(DiffusionReferenceProfile.named("a4bdiff/16bit-fast")).weightsRepository
+            == DiffusionReferenceProfile.checkpointID)
+        #expect(try #require(DiffusionReferenceProfile.named("a4bdiff/8bit-lean")).weightsRepository
+            == "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit")
+        #expect(try #require(DiffusionReferenceProfile.named("a4bdiff/4bit-fast")).weightsRepository
+            == "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-4bit-mixed")
+    }
 }

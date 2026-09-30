@@ -161,6 +161,9 @@ struct Download: AsyncParsableCommand {
         // DiffusionGemma 26B-A4B (block-AR diffusion, experimental)
         "a4b-diff-bf16": "google/diffusiongemma-26B-A4B-it",
         "diff-bf16": "google/diffusiongemma-26B-A4B-it",
+        // Packs pre-quantifies des profils a4bdiff/8bit-* et a4bdiff/4bit-* (seul ce format se charge)
+        "diff-8bit": "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit",
+        "diff-4bit": "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-4bit-mixed",
     ]
 
     func run() async throws {

@@ -64,6 +64,19 @@ public struct DiffusionReferenceProfile: Sendable, Identifiable, Equatable {
     public var id: String { "\(bits.rawValue)bit-\(kind.rawValue)" }
     public var qualifiedID: String { "a4bdiff/\(id)" }
 
+    /// Depot Hugging Face des poids a telecharger pour ce profil : le bf16 de Google en
+    /// 16 bits, sinon le pack pre-quantifie publie (format `gemma4-diffusion-prequantized-v1`,
+    /// SHA-256 verifiees au chargement). Les packs mlx-community de DiffusionGemma ne se
+    /// chargent pas ici. Charger le bf16 et quantifier a la volee donne la meme sortie, avec
+    /// un pic de chargement de 51 Go au lieu de 18,8 (4 bits) ou 26,7 Go (8 bits).
+    public var weightsRepository: String {
+        switch bits {
+        case .sixteen: return Self.checkpointID
+        case .eight: return "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit"
+        case .four: return "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-4bit-mixed"
+        }
+    }
+
     /// Politique memoire a passer au pipeline.
     public var memoryConfig: DiffusionMemoryConfig {
         DiffusionMemoryConfig(
