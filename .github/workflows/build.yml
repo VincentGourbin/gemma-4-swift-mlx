@@ -11,15 +11,17 @@ on:
 
 jobs:
   build:
-    runs-on: macos-15
+    # mlx-swift 0.31.6 declare swift-tools-version 6.3 : Xcode 16.4 (Swift 6.1) de
+    # macos-15 ne resout pas les dependances. macos-26 : Xcode 26.6 par defaut.
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - name: Xcode
         run: xcodebuild -version
       - name: Metal toolchain
-        # Xcode 26+ telecharge la chaine Metal a part ; Xcode 16 l'embarque et ne connait
-        # pas -downloadComponent (premier run de la CI, PR #55).
+        # Xcode 26+ telecharge la chaine Metal a part ; Xcode 16 l'embarquait et ne
+        # connaissait pas -downloadComponent.
         run: |
           if xcodebuild -help 2>&1 | grep -q -- '-downloadComponent'; then
             xcodebuild -downloadComponent MetalToolchain
