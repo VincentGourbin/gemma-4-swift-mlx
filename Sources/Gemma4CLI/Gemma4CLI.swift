@@ -45,7 +45,7 @@ struct Gemma4CLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "gemma4-cli",
         abstract: "Inference Gemma 4 via MLX Swift",
-        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self, DiffusionCommand.self, ProfileDiffusion.self],
+        subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Bench.self, BenchDiffusion.self, ExportDiffusion.self, EvalScreenSpot.self, References.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self, DiffusionCommand.self, ProfileDiffusion.self],
         defaultSubcommand: Generate.self
     )
 }
@@ -128,6 +128,9 @@ struct Download: AsyncParsableCommand {
     @Flag(name: .long, help: "Forcer le re-telechargement meme si deja present")
     var force: Bool = false
 
+    @Option(name: .long, help: "Dossier racine des modeles (defaut ~/Library/Caches/models), ex. un disque externe")
+    var modelsDir: String?
+
     /// Mappe les raccourcis vers les IDs complets
     static let shortcuts: [String: String] = [
         // E2B
@@ -158,13 +161,23 @@ struct Download: AsyncParsableCommand {
         // DiffusionGemma 26B-A4B (block-AR diffusion, experimental)
         "a4b-diff-bf16": "google/diffusiongemma-26B-A4B-it",
         "diff-bf16": "google/diffusiongemma-26B-A4B-it",
+        // Packs pre-quantifies des profils a4bdiff/8bit-* et a4bdiff/4bit-* (seul ce format se charge)
+        "diff-8bit": "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit",
+        "diff-4bit": "VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-4bit-mixed",
     ]
 
     func run() async throws {
+        if let modelsDir {
+            Gemma4ModelCache.customModelsDirectory = URL(fileURLWithPath: (modelsDir as NSString).expandingTildeInPath)
+            print("Dossier des modeles : \(Gemma4ModelCache.modelsDirectory.path)")
+        }
         let modelsToDownload: [Gemma4Pipeline.Model]
 
         if all {
-            modelsToDownload = Gemma4Pipeline.Model.allCases.sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
+            // DiffusionGemma (~50 Go, pipeline a part) seulement sur demande explicite.
+            modelsToDownload = Gemma4Pipeline.Model.allCases
+                .filter { !$0.isDiffusion }
+                .sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
         } else if recommended {
             let ram = Gemma4ModelCache.systemRAMGB
             modelsToDownload = Gemma4Pipeline.Model.recommended(forRAMGB: ram)
@@ -213,18 +226,14 @@ struct Download: AsyncParsableCommand {
             print("  ID: \(model.rawValue)")
 
             let startTime = Date()
-            let parts = model.rawValue.split(separator: "/")
-            let destDir = Gemma4ModelCache.modelsDirectory
-                .appendingPathComponent(String(parts[0]))
-                .appendingPathComponent(String(parts[1]))
 
             do {
-                try await LocalModelDownloader.download(
+                try await Gemma4ModelDownloader.download(
                     modelId: model.rawValue,
-                    to: destDir,
-                    token: token
-                ) { pct in
-                    print("\r  Progression: \(Int(pct * 100))%", terminator: "")
+                    token: token,
+                    force: force
+                ) { p in
+                    print("\r  Progression: \(Int(p.fraction * 100))%", terminator: "")
                     fflush(stdout)
                 }
 
@@ -339,7 +348,7 @@ struct Generate: AsyncParsableCommand {
         }
 
         // 4. Stats GPU
-        print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
+        print("GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.Memory.peakMemory / (1024 * 1024)) Mo pic")
 
         // 5. Generer
         print("\n--- Generation ---")
@@ -373,7 +382,7 @@ struct Generate: AsyncParsableCommand {
             print("Tokens emis: \(stats.emittedTokens)")
             print("Rounds: \(stats.rounds), drafts acceptes: \(stats.acceptedDrafts)/\(stats.totalDrafts) (\(Int(stats.acceptRate * 100))%)")
             print("Temps: \(String(format: "%.2f", genTime))s = \(String(format: "%.1f", tokPerSec)) tok/s")
-            print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+            print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
             return
         }
 
@@ -401,7 +410,7 @@ struct Generate: AsyncParsableCommand {
         print("Tokens generes: \(tokenCount)")
         print("Temps: \(String(format: "%.2f", genTime))s")
         print("Vitesse: \(String(format: "%.1f", tokPerSec)) tokens/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 }
 
@@ -461,16 +470,7 @@ struct Chat: AsyncParsableCommand {
             if let weightPath = drafterPath {
                 let url = URL(fileURLWithPath: weightPath)
                 var rawWeights: [String: MLXArray] = [:]
-                let urls: [URL]
-                var isDir: ObjCBool = false
-                FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-                if isDir.boolValue {
-                    urls = try FileManager.default
-                        .contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-                        .filter { $0.pathExtension == "safetensors" }
-                } else {
-                    urls = [url]
-                }
+                let urls = try Gemma4DrafterWeights.files(at: url)
                 for u in urls {
                     for (k, v) in try MLX.loadArrays(url: u) { rawWeights[k] = v }
                 }
@@ -860,11 +860,13 @@ struct Describe: AsyncParsableCommand {
             let maxTotalTokens = self.maxTokens * 3
             var visibleTokens = 0
 
+            // Detokenisation incrementale (caracteres UTF-8 repartis sur plusieurs tokens).
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
             for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
 
                 // Filtrer le thinking mode et afficher
-                let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
+                let text = detokenizer.append(token: Int(nextToken)) ?? ""
                 let filtered = tokenFilter.process(tokenId: nextToken, text: text)
                 if !filtered.isEmpty {
                     print(filtered, terminator: "")
@@ -900,7 +902,7 @@ struct Describe: AsyncParsableCommand {
             print("Tokens: \(tokenCount)")
         }
         print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 
     // MARK: - gemma4_unified (12B) path
@@ -1108,9 +1110,11 @@ struct Describe: AsyncParsableCommand {
             let maxTotalTokens = self.maxTokens * 3
             var visibleTokens = 0
 
+            // Detokenisation incrementale (caracteres UTF-8 repartis sur plusieurs tokens).
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
             for _ in 0 ..< maxTotalTokens {
                 generatedTokens.append(Int(nextToken))
-                let text = context.tokenizer.decode(tokenIds: [Int(nextToken)])
+                let text = detokenizer.append(token: Int(nextToken)) ?? ""
                 let filtered = tokenFilter.process(tokenId: nextToken, text: text)
                 if !filtered.isEmpty {
                     print(filtered, terminator: "")
@@ -1138,6 +1142,6 @@ struct Describe: AsyncParsableCommand {
         print("\n\n--- Stats ---")
         print("Tokens: \(tokenCount)")
         print("Temps: \(String(format: "%.2f", elapsed))s, Vitesse: \(String(format: "%.1f", Double(tokenCount) / max(0.01, elapsed))) t/s")
-        print("GPU pic: \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic: \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 }

@@ -77,6 +77,11 @@ public class VisionModel: Module {
         return (batchPos, paddingMask)
     }
 
+    /// Ancien chemin : completer a `maxPatches` (2 520) avec un masque `[B,1,L,L]`.
+    /// Garde pour le test de parite (K-18) ; le chemin par defaut n'encode que les
+    /// patches reels. Public pour la mesure A/B (`gemma4-cli bench --vision-padded`).
+    public var padToMaxPatches = false
+
     public func callAsFunction(_ pixelValues: MLXArray) -> MLXArray {
         let B = pixelValues.dim(0)
         let H = pixelValues.dim(2)
@@ -90,39 +95,48 @@ public class VisionModel: Module {
         // Embed les patches
         var inputsEmbeds = patchEmbedder(pixelValues: pixelValues, patchPositions: realPositions, paddingPositions: realPadding)
 
-        // Padding a maxPatches si necessaire
+        let hiddenStates: MLXArray
+        let poolPositions: MLXArray
+        let poolPadding: MLXArray
         let numPadding = maxPatches - numReal
-        if numPadding > 0 {
+        if padToMaxPatches && numPadding > 0 {
             let padEmbeds = MLXArray.zeros([B, numPadding, config.hiddenSize], dtype: inputsEmbeds.dtype)
             inputsEmbeds = concatenated([inputsEmbeds, padEmbeds], axis: 1)
+
+            // Masque d'attention bidirectionnel [B, 1, L, L]
+            let validMask = logicalNot(allPadding)
+            let attnMask2d = expandedDimensions(validMask, axis: 1) * expandedDimensions(validMask, axis: 2)
+            let negInf = MLXArray(Float(-Float.infinity), dtype: inputsEmbeds.dtype)
+            let zero = MLXArray(Float(0.0), dtype: inputsEmbeds.dtype)
+            let attnMask = expandedDimensions(MLX.where(attnMask2d, zero, negInf), axis: 1)
+            hiddenStates = encoder(inputsEmbeds, positions: allPositions, mask: attnMask)
+            poolPositions = allPositions
+            poolPadding = allPadding
+        } else {
+            // Patches reels seulement (K-18) : les requetes reelles n'attendaient deja que
+            // les cles reelles (le masque mettait le padding a -inf), et les sorties du
+            // padding etaient mises a zero par le pooler. Meme resultat aux arrondis pres,
+            // sans les 2 520 x 2 520 scores (une frame video a 70 jetons = 630 patches).
+            hiddenStates = encoder(inputsEmbeds, positions: realPositions, mask: nil)
+            poolPositions = realPositions
+            poolPadding = realPadding
         }
 
-        // Masque d'attention bidirectionnel [B, 1, L, L]
-        let validMask = logicalNot(allPadding)
-        let attnMask2d = expandedDimensions(validMask, axis: 1) * expandedDimensions(validMask, axis: 2)
-        let negInf = MLXArray(Float(-Float.infinity), dtype: inputsEmbeds.dtype)
-        let zero = MLXArray(Float(0.0), dtype: inputsEmbeds.dtype)
-        var attnMask = MLX.where(attnMask2d, zero, negInf)
-        attnMask = expandedDimensions(attnMask, axis: 1) // [B, 1, L, L]
-
-        // Transformer
-        var hiddenStates = encoder(inputsEmbeds, positions: allPositions, mask: attnMask)
-
-        // Pooling
-        let (pooled, poolMask) = pooler(
-            hiddenStates: hiddenStates, patchPositions: allPositions,
-            paddingPositions: allPadding
+        // Pooling ; noyau fixe = pooling_kernel_size (sqrt(2520 / 280) avec le padding).
+        let (pooled, _) = pooler(
+            hiddenStates: hiddenStates, patchPositions: poolPositions,
+            paddingPositions: poolPadding, kernelSize: poolingKernelSize
         )
 
         // Extraire les tokens valides (non-padding)
         // Pour simplifier: prendre les defaultOutputLength premiers tokens valides
-        hiddenStates = pooled[0..., 0 ..< defaultOutputLength]
+        var output = pooled[0..., 0 ..< defaultOutputLength]
 
         if config.standardize, let bias = stdBias, let scale = stdScale {
-            hiddenStates = (hiddenStates - bias) * scale
+            output = (output - bias) * scale
         }
 
-        return hiddenStates
+        return output
     }
 }
 
@@ -137,7 +151,7 @@ public class VisionTransformerModel: Module {
         super.init()
     }
 
-    public func callAsFunction(_ hiddenStates: MLXArray, positions: MLXArray, mask: MLXArray) -> MLXArray {
+    public func callAsFunction(_ hiddenStates: MLXArray, positions: MLXArray, mask: MLXArray?) -> MLXArray {
         var h = hiddenStates
         for layer in layers {
             h = layer(h, positions: positions, mask: mask)

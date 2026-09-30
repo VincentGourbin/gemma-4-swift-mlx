@@ -99,17 +99,7 @@ struct MtpGenerate: AsyncParsableCommand {
         // Choisir source des poids: override local (drafterPath) ou HF default (drafterDir)
         let weightURLs: [URL]
         if let pathStr = drafterPath {
-            let pathURL = URL(fileURLWithPath: pathStr)
-            // Si c'est un fichier .safetensors, juste celui-la. Sinon repertoire.
-            var isDir: ObjCBool = false
-            FileManager.default.fileExists(atPath: pathURL.path, isDirectory: &isDir)
-            if isDir.boolValue {
-                weightURLs = try FileManager.default
-                    .contentsOfDirectory(at: pathURL, includingPropertiesForKeys: nil)
-                    .filter { $0.pathExtension == "safetensors" }
-            } else {
-                weightURLs = [pathURL]
-            }
+            weightURLs = try Gemma4DrafterWeights.files(at: URL(fileURLWithPath: pathStr))
             print("  drafter weights from local path: \(weightURLs.map { $0.lastPathComponent })")
         } else {
             weightURLs = try FileManager.default

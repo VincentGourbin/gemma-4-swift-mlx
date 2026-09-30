@@ -16,9 +16,12 @@ public class VisionPooler: Module {
         super.init()
     }
 
-    func avgPoolByPositions(_ x: MLXArray, patchPositions: MLXArray, length: Int) -> (MLXArray, MLXArray) {
-        let inputSeqLen = x.dim(1)
-        let k = Int((Float(inputSeqLen) / Float(length)).squareRoot())
+    func avgPoolByPositions(
+        _ x: MLXArray, patchPositions: MLXArray, length: Int, kernelSize: Int? = nil
+    ) -> (MLXArray, MLXArray) {
+        // Sans `kernelSize`, deduit de la longueur d'entree : suppose l'entree completee
+        // a length * k^2 positions (ancien chemin paddé).
+        let k = kernelSize ?? Int((Float(x.dim(1)) / Float(length)).squareRoot())
         let kSquared = Float(k * k)
 
         let clamped = clip(patchPositions, min: Int32(0))
@@ -38,19 +41,25 @@ public class VisionPooler: Module {
         hiddenStates: MLXArray,
         patchPositions: MLXArray,
         paddingPositions: MLXArray,
-        outputLength: Int? = nil
+        outputLength: Int? = nil,
+        kernelSize: Int? = nil
     ) -> (MLXArray, MLXArray) {
-        // Zero out padding
-        var states = MLX.where(expandedDimensions(paddingPositions, axis: -1), MLXArray(Float(0.0)), hiddenStates)
+        // Zero out padding (au dtype des etats : une constante fp32 promouvait la sortie)
+        var states = MLX.where(
+            expandedDimensions(paddingPositions, axis: -1),
+            MLXArray(Float(0.0)).asType(hiddenStates.dtype), hiddenStates)
 
         let length = outputLength ?? defaultOutputLength
         let mask: MLXArray
-        if states.dim(1) == length {
+        // Noyau impose (entree non paddee) : toujours pooler, meme si le nombre de
+        // patches reels vaut `length` (l'entree paddee ne l'egalait jamais).
+        if kernelSize == nil && states.dim(1) == length {
             mask = paddingPositions
         } else {
-            (states, mask) = avgPoolByPositions(states, patchPositions: patchPositions, length: length)
+            (states, mask) = avgPoolByPositions(
+                states, patchPositions: patchPositions, length: length, kernelSize: kernelSize)
         }
-        states = states * MLXArray(rootHiddenSize)
+        states = states * MLXArray(rootHiddenSize).asType(states.dtype)
         return (states, mask)
     }
 }

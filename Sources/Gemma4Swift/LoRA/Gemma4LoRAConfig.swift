@@ -8,18 +8,20 @@ public enum Gemma4LoRADefaults {
 
     /// Famille de modele Gemma 4
     public enum ModelFamily: String, CaseIterable, Sendable {
-        case e2b    // 2.3B effectif, 26 layers
-        case e4b    // 4.5B effectif, 34 layers
-        case dense31b  // 31B dense, 46 layers
-        case a4b    // 26B-A4B MoE, 26 layers
+        case e2b       // 2.3B effectif, 35 couches
+        case e4b       // 4.5B effectif, 42 couches
+        case b12b      // 12B unified, 48 couches
+        case a4b       // 26B-A4B MoE, 30 couches
+        case dense31b  // 31B dense, 60 couches
 
-        /// Nombre total de couches decoder
+        /// Nombre total de couches decoder (`text_config.num_hidden_layers`).
         public var totalLayers: Int {
             switch self {
             case .e2b: return 35
             case .e4b: return 42
-            case .dense31b: return 50
-            case .a4b: return 34
+            case .b12b: return 48
+            case .a4b: return 30
+            case .dense31b: return 60
             }
         }
 
@@ -28,20 +30,37 @@ public enum Gemma4LoRADefaults {
             switch self {
             case .e2b: return 8
             case .e4b: return 12
+            case .b12b: return 16
             case .dense31b: return 16
             case .a4b: return 10
             }
         }
 
-        /// Detecte la famille a partir d'un ID de modele HuggingFace
+        /// Detecte la famille a partir d'un ID de modele HuggingFace (repli : E2B).
+        /// Preferer `from(directory:)`, qui lit `config.json`.
         public static func from(modelId: String) -> ModelFamily {
             let id = modelId.lowercased()
             if id.contains("e2b") { return .e2b }
             if id.contains("e4b") { return .e4b }
+            if id.contains("12b") { return .b12b }
             if id.contains("26b") || id.contains("a4b") { return .a4b }
             if id.contains("31b") { return .dense31b }
             // Default E2B pour les modeles inconnus
             return .e2b
+        }
+
+        /// Famille lue dans `config.json` (A-06 : le chemin ne dit rien d'un dossier renomme,
+        /// et tout modele inconnu prenait les defauts d'E2B). `nil` si non reconnue.
+        public static func from(directory: URL) -> ModelFamily? {
+            guard let data = try? Data(contentsOf: directory.appendingPathComponent("config.json")),
+                  let config = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return nil }
+            let text = config["text_config"] as? [String: Any] ?? config
+            let modelType = (config["model_type"] as? String ?? "").lowercased()
+            let layers = text["num_hidden_layers"] as? Int ?? 0
+            if modelType.hasPrefix("gemma4_unified") { return .b12b }
+            if text["enable_moe_block"] as? Bool == true { return .a4b }
+            return allCases.first { $0 != .a4b && $0 != .b12b && $0.totalLayers == layers }
         }
     }
 

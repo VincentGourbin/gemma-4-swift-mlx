@@ -67,7 +67,7 @@ public final class EntropyBoundSampler: @unchecked Sendable {
     /// Version compilee de tokenEntropy via MLX.compile.
     /// Le JIT MLX fuse les kernels logSoftmax + exp + multiply + sum.
     /// Shapeless: true permet de varier la batch size sans recompiler.
-    nonisolated(unsafe) static let compiledTokenEntropy: @Sendable (MLXArray) -> MLXArray = MLX.compile(shapeless: true) { logits -> MLXArray in
+    static let compiledTokenEntropy: @Sendable (MLXArray) -> MLXArray = MLX.compile(shapeless: true) { logits -> MLXArray in
         let logProbs = MLXNN.logSoftmax(logits, axis: -1)
         let probs = exp(logProbs)
         let mixed: MLXArray = probs * logProbs
@@ -92,9 +92,22 @@ public final class EntropyBoundSampler: @unchecked Sendable {
         denoiserCanvas: MLXArray,
         logits: MLXArray
     ) -> MLXArray {
-        let entropy = useCompiledEntropy
-            ? Self.compiledTokenEntropy(logits)
-            : Self.tokenEntropy(logits)  // [B, T]
+        accept(currentCanvas: currentCanvas, denoiserCanvas: denoiserCanvas, entropy: entropy(of: logits))
+    }
+
+    /// Entropie par position selon `useCompiledEntropy`. A calculer une fois par pas et
+    /// a passer a `accept(…entropy:)` et `StableConfidentStopping.shouldStop(…entropy:)` :
+    /// les deux la recalculaient sur les logits `[B, T, V]` (D-12).
+    public func entropy(of logits: MLXArray) -> MLXArray {
+        useCompiledEntropy ? Self.compiledTokenEntropy(logits) : Self.tokenEntropy(logits)
+    }
+
+    /// `accept` a partir d'une entropie deja calculee (`entropy(of:)`), `[B, T]`.
+    public func accept(
+        currentCanvas: MLXArray,
+        denoiserCanvas: MLXArray,
+        entropy: MLXArray
+    ) -> MLXArray {
 
         // Tri ascendant par entropie le long de T
         let sortedIdx = argSort(entropy, axis: -1)        // [B, T]

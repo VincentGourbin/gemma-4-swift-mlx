@@ -81,39 +81,29 @@ struct MultimodalSystemPromptTests {
         #expect(ids == expandingImageMarkers(Self.hfSystemAndUser))
     }
 
-    @Test("Les sauts de ligne parasites de swift-jinja sont reparés",
+    @Test("Gabarit normalise : plus de sauts de ligne parasites, reparation idempotente",
           .enabled(if: integrationModelPath != nil))
     func testJinjaWhitespaceArtifactsAreStripped() async throws {
         let tokenizer = try await loadTokenizer()
         let bos = Int(Gemma4Processor.bosTokenId)
         let turnStart = Int(Gemma4Processor.turnStartTokenId)
-        let turnEnd = Int(Gemma4Processor.turnEndTokenId)
-        let newline = Int(Gemma4Processor.newlineTokenId)
         let doubleNewline = Int(Gemma4Processor.doubleNewlineTokenId)
 
-        // Ce que rend swift-jinja aujourd'hui : \n parasite apres <bos> quand il
-        // n'y a pas de tour systeme, \n\n entre les tours quand il y en a un.
+        // Le pont applique le controle d'espaces de Jinja au texte du gabarit
+        // (`Gemma4TokenizerLoader.normalizedChatTemplate`) : le \n parasite apres <bos>
+        // et le \n\n entre tours que swift-jinja laissait ne sont plus rendus du tout.
         let rawNoSystem = try tokenizer.applyChatTemplate(
             messages: [["role": "user", "content": "Hi."]])
         let rawWithSystem = try tokenizer.applyChatTemplate(messages: [
             ["role": "system", "content": "Be terse."],
             ["role": "user", "content": "Hi."],
         ])
-        #expect(rawNoSystem.count >= 2 && rawNoSystem[1] == newline)
-        #expect(rawWithSystem.contains(doubleNewline))
+        #expect(rawNoSystem[0] == bos && rawNoSystem[1] == turnStart)
+        #expect(!rawWithSystem.contains(doubleNewline))
 
-        // Apres reparation, plus aucun des deux.
-        let fixedNoSystem = Gemma4Processor.strippingTemplateArtifacts(rawNoSystem)
-        let fixedWithSystem = Gemma4Processor.strippingTemplateArtifacts(rawWithSystem)
-        #expect(fixedNoSystem[0] == bos && fixedNoSystem[1] == turnStart)
-        #expect(!fixedWithSystem.contains(doubleNewline))
-        #expect(fixedNoSystem.count == rawNoSystem.count - 1)
-        #expect(fixedWithSystem.count == rawWithSystem.count)
-        // Et le contenu utile n'a pas bouge.
-        #expect(fixedWithSystem.filter { $0 != newline } == rawWithSystem.filter {
-            $0 != newline && $0 != doubleNewline
-        })
-        #expect(fixedWithSystem.contains(turnEnd))
+        // La reparation par jetons reste pour les autres ponts : ici, sans effet.
+        #expect(Gemma4Processor.strippingTemplateArtifacts(rawNoSystem) == rawNoSystem)
+        #expect(Gemma4Processor.strippingTemplateArtifacts(rawWithSystem) == rawWithSystem)
     }
 
     @Test("Avec systemPrompt : tour system distinct, different de la concatenation",

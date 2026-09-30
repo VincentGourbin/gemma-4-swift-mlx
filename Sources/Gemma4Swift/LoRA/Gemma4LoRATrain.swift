@@ -7,7 +7,9 @@ import MLXLMCommon
 import MLXLLM
 import MLXOptimizers
 import Tokenizers
+#if canImport(MLXProfiler)
 import MLXProfiler
+#endif
 
 /// Orchestrateur de fine-tuning LoRA pour les modeles Gemma 4.
 /// Wrapper autour de `LoRATrain` de mlx-swift-lm avec gestion
@@ -53,6 +55,30 @@ public enum Gemma4LoRATrain {
         public var gradClipMaxNorm: Float
         /// Activer le profiling du training
         public var enableProfiling: Bool
+        /// Graine : initialisation LoRA, dropout **et** melange des exemples (A-08).
+        public var seed: UInt64
+        /// Longueur maximale d'un exemple en jetons ; nil = aucune troncature (defaut).
+        /// Pas de 2048 par defaut comme mlx-lm : sur le dataset director de Fluxforge, 59 %
+        /// des exemples depassent 2048 jetons et la troncature coupe la fin de la reponse
+        /// (E7 29/30 -> 27/30, mesure du 2026-09-29). Les exemples longs sont signales.
+        public var maxSeqLength: Int?
+        /// Reprendre au dernier checkpoint de `outputDirectory` (poids, etat de l'optimiseur, pas).
+        public var resume: Bool
+        /// Lots de validation au plus (nil = tout le jeu ; A-21).
+        public var validationBatches: Int?
+        /// Fichier JSONL ou ecrire une ligne par rapport et validation (K-28).
+        public var metricsURL: URL?
+        /// Tete et perte sur les seules positions de reponse avec `maskPrompt` (K-30 a ;
+        /// director, 200 pas : +13 % de debit, -19 % de pic MLX, perte identique).
+        public var responseOnlyHead: Bool
+        /// Multimodal : tout le modele en fp32 (ancien chemin, poids x 2). `false` (defaut, K-31) :
+        /// base bf16, parametres LoRA fp32 — TB3 : pic 24,1 -> 14,2 Go, +16 % de debit, sans NaN.
+        public var multimodalFloat32: Bool
+        /// Gradient checkpointing par couche (K-32) : pic reduit, pas recalcule au backward.
+        public var gradientCheckpointing: Bool
+        /// Limite de cache MLX et vidage apres validation (K-30 b ; director : empreinte
+        /// 76 -> 16 Go, perte identique) ; nil = aucune politique.
+        public var memoryPolicy: Gemma4TrainingMemoryPolicy?
 
         public init(
             fineTuneType: FineTuneType = .lora,
@@ -69,7 +95,16 @@ public enum Gemma4LoRATrain {
             outputDirectory: URL = URL(fileURLWithPath: "./adapters"),
             maskPrompt: Bool = false,
             gradClipMaxNorm: Float = 0,
-            enableProfiling: Bool = false
+            enableProfiling: Bool = false,
+            seed: UInt64 = 0,
+            maxSeqLength: Int? = nil,
+            resume: Bool = false,
+            validationBatches: Int? = nil,
+            metricsURL: URL? = nil,
+            responseOnlyHead: Bool = true,
+            memoryPolicy: Gemma4TrainingMemoryPolicy? = Gemma4TrainingMemoryPolicy(cacheLimitMB: 2048),
+            multimodalFloat32: Bool = false,
+            gradientCheckpointing: Bool = false
         ) {
             self.fineTuneType = fineTuneType
             self.loraRank = loraRank
@@ -86,6 +121,82 @@ public enum Gemma4LoRATrain {
             self.maskPrompt = maskPrompt
             self.gradClipMaxNorm = gradClipMaxNorm
             self.enableProfiling = enableProfiling
+            self.seed = seed
+            self.maxSeqLength = maxSeqLength
+            self.resume = resume
+            self.validationBatches = validationBatches
+            self.metricsURL = metricsURL
+            self.responseOnlyHead = responseOnlyHead
+            self.memoryPolicy = memoryPolicy
+            self.multimodalFloat32 = multimodalFloat32
+            self.gradientCheckpointing = gradientCheckpointing
+        }
+    }
+
+    public enum TrainingSetupError: LocalizedError, Equatable {
+        case fullFineTuneOnQuantizedModel
+
+        public var errorDescription: String? {
+            switch self {
+            case .fullFineTuneOnQuantizedModel:
+                return "--fine-tune-type full sur un pack quantifie n'entraine presque rien (les QuantizedLinear "
+                    + "sont geles) : utiliser lora/dora, ou un modele bf16 pour full"
+            }
+        }
+    }
+
+    /// Tronque les exemples a `maxLength` jetons (A-06 : un exemple de 20 k jetons partait tel
+    /// quel). Rend aussi le nombre d'exemples tronques, a signaler.
+    public static func truncate(_ samples: [[Int]], maxLength: Int?) -> (samples: [[Int]], truncated: Int) {
+        guard let maxLength, maxLength > 1 else { return (samples, 0) }
+        var truncated = 0
+        let result = samples.map { tokens -> [Int] in
+            guard tokens.count > maxLength else { return tokens }
+            truncated += 1
+            return Array(tokens.prefix(maxLength))
+        }
+        return (result, truncated)
+    }
+
+    /// Exemple d'entrainement : frontiere prompt / reponse au dernier `<|turn>model\n`
+    /// si `maskPrompt`, sinon 0. `nil` si moins de 2 jetons.
+    public static func trainingSample(_ tokens: [Int], maskPrompt: Bool) -> TrainingBatchIterator.TokenizedSample? {
+        guard tokens.count > 1 else { return nil }
+        var offset = 0
+        if maskPrompt {
+            for i in 0 ..< tokens.count - 1 where tokens[i] == 105 && tokens[i + 1] == 4368 {
+                offset = i + 3
+            }
+        }
+        return TrainingBatchIterator.TokenizedSample(tokens: tokens, promptOffset: offset)
+    }
+
+    /// Perte moyenne par jeton sur des ids directs, **meme masquage et meme boucle que la
+    /// validation de l'entrainement** (A-03 : `evaluate` amont re-encodait du texte et ne
+    /// masquait pas le prompt, donc n'etait pas comparable a la val loss).
+    public static func evaluateMasked(
+        container: ModelContainer, samples: [[Int]], maskPrompt: Bool, batchSize: Int = 1
+    ) async throws -> Float {
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
+        return await container.perform { context in
+            let prepared = samples.compactMap { trainingSample($0, maskPrompt: maskPrompt) }
+            context.model.train(false)
+            return evaluateTraining(model: context.model, samples: prepared, batchSize: batchSize)
+        }
+    }
+
+    /// Modele texte (couches decodeur) d'un modele Gemma 4 texte ou multimodal.
+    static func textModel(of model: Module) -> Gemma4TextModel? {
+        if let llm = model as? Gemma4LLMModel { return llm.languageModel.model }
+        if let mm = model as? Gemma4MultimodalLLMModel { return mm.languageModel.model }
+        return nil
+    }
+
+    /// `full` n'a de sens que si les poids ne sont pas quantifies (A-07).
+    static func checkFullFineTune(_ model: Module) throws {
+        if model.leafModules().flattened().contains(where: { $0.1 is Quantized }) {
+            throw TrainingSetupError.fullFineTuneOnQuantizedModel
         }
     }
 
@@ -122,8 +233,16 @@ public enum Gemma4LoRATrain {
             numLayers: config.numLayers,
             useDora: config.fineTuneType == .dora
         )
+        // Config ecrite des le demarrage (K-25) : un run interrompu laisse un adaptateur
+        // chargeable (LoRAContainer.from(directory:) exige ce fichier).
+        if config.fineTuneType != .full {
+            try Gemma4TrainingCheckpoint.atomicWrite(
+                try JSONEncoder().encode(loraConfig),
+                to: config.outputDirectory.appending(component: "adapter_config.json"))
+        }
 
-        // Profiling
+        // Profiling (macOS : MLXProfiler n'existe pas sur iOS)
+        #if canImport(MLXProfiler)
         let profiler = MLXProfiler.shared
         if config.enableProfiling {
             profiler.enable()
@@ -138,29 +257,37 @@ public enum Gemma4LoRATrain {
                 "valid_samples": "\(validData.count)",
             ])
         }
+        #endif
 
         // Entrainement dans le contexte du container
-        nonisolated(unsafe) let capturedTrainData = trainData
-        nonisolated(unsafe) let capturedValidData = validData
+        let longest = (trainData + validData).map(\.count).max() ?? 0
+        let long = (trainData + validData).filter { $0.count > 2048 }.count
+        if config.maxSeqLength == nil && long > 0 {
+            print("Note : \(long) exemple(s) de plus de 2048 jetons (max \(longest)), non tronques "
+                + "(--max-seq-length pour borner la memoire)")
+        }
+        let (capturedTrainData, truncatedTrain) = truncate(trainData, maxLength: config.maxSeqLength)
+        let (capturedValidData, truncatedValid) = truncate(validData, maxLength: config.maxSeqLength)
+        if truncatedTrain + truncatedValid > 0 {
+            print("Troncature a \(config.maxSeqLength ?? 0) jetons : \(truncatedTrain) exemple(s) d'entrainement, "
+                + "\(truncatedValid) de validation")
+        }
 
         try await container.perform { (context: ModelContext) in
             let model = context.model
-            let tokenizer = context.tokenizer
 
-            // Fixer le seed avant l'initialisation LoRA (ref: Python seed=0)
-            MLXRandom.seed(0)
+            // Graine avant l'initialisation LoRA (ref: Python seed=0)
+            MLXRandom.seed(config.seed)
 
             if isFullFineTune {
+                try checkFullFineTune(model)
                 // Full SFT — tous les poids sont trainables (pas de freeze, pas de LoRA)
                 // Ref: arXiv:2512.15943 — small models concentrate capacity on the task
                 print("Mode: Full Fine-Tuning (tous les poids)")
             } else {
                 // LoRA/DoRA — freeze base + adapter layers
-                guard let languageModel = model as? LanguageModel else {
-                    throw Gemma4LoRAError.incompatibleModel
-                }
                 let _ = try LoRAContainer.from(
-                    model: languageModel,
+                    model: model,
                     configuration: loraConfig
                 )
             }
@@ -176,15 +303,23 @@ public enum Gemma4LoRATrain {
             print("Parametres trainables: \(trainableParams) / \(totalParams) (\(String(format: "%.2f", pct))%)")
 
             // Optimizer — AdamW avec weight decay pour full SFT (ref papier: 0.01)
-            let optimizer: any Optimizer
-            if isFullFineTune {
-                optimizer = AdamW(learningRate: config.learningRate, weightDecay: 0.01)
-            } else {
-                optimizer = Adam(learningRate: config.learningRate)
+            // Meme calcul qu'Adam / AdamW de MLXOptimizers, etat sauvegardable (K-25).
+            let optimizer = Gemma4ResumableAdam(
+                learningRate: config.learningRate, weightDecay: isFullFineTune ? 0.01 : 0)
+
+            // Reprise : poids et etat de l'optimiseur du dernier checkpoint, pas suivant.
+            var startIteration = 0
+            if config.resume, let state = Gemma4TrainingCheckpoint.readState(in: config.outputDirectory) {
+                try Gemma4TrainingCheckpoint.restore(
+                    into: model, optimizer: optimizer, directory: config.outputDirectory,
+                    weightsName: weightsURL.lastPathComponent)
+                startIteration = state.iteration
+                print("Reprise au pas \(state.iteration) (graine \(state.seed))")
             }
 
             // Callback avec profiling
             let wrappedProgress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition = { p in
+                #if canImport(MLXProfiler)
                 if config.enableProfiling {
                     switch p {
                     case .train(let iteration, let loss, _, let tokPerSec):
@@ -209,6 +344,7 @@ public enum Gemma4LoRATrain {
                         break
                     }
                 }
+                #endif
                 return progress(p)
             }
 
@@ -249,8 +385,10 @@ public enum Gemma4LoRATrain {
             print("Train: \(trainSamples.count) samples (avg \(config.maskPrompt ? "response" : "total"): \(avgResp) tokens)")
 
             // Training loop custom (ref: mlx-lm train())
+            Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = config.gradientCheckpointing
+            defer { Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = false }
             try trainLoRA(
-                model: model as! Module,
+                model: model,
                 trainSamples: trainSamples,
                 validSamples: validSamples,
                 optimizer: optimizer,
@@ -261,6 +399,14 @@ public enum Gemma4LoRATrain {
                 saveEvery: config.saveEvery,
                 weightsURL: weightsURL,
                 isFullFineTune: isFullFineTune,
+                seed: config.seed,
+                gradClipMaxNorm: config.gradClipMaxNorm,
+                startIteration: startIteration,
+                checkpointDirectory: config.outputDirectory,
+                validationBatches: config.validationBatches,
+                metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
+                responseOnlyHead: config.responseOnlyHead && config.maskPrompt,
+                memoryPolicy: config.memoryPolicy,
                 progress: wrappedProgress
             )
 
@@ -278,6 +424,7 @@ public enum Gemma4LoRATrain {
             try configData.write(to: configURL)
         }
 
+        #if canImport(MLXProfiler)
         // Exporter le profiling
         if config.enableProfiling, let session = profiler.activeSession {
             let summary = profiler.getTrainingSummary()
@@ -294,6 +441,7 @@ public enum Gemma4LoRATrain {
             try traceData.write(to: traceURL)
             print("Trace Chrome exportee: \(traceURL.path())")
         }
+        #endif
 
         print("Adapter sauvegarde dans \(config.outputDirectory.path())")
     }
@@ -331,8 +479,16 @@ public enum Gemma4LoRATrain {
             numLayers: config.numLayers,
             useDora: config.fineTuneType == .dora
         )
+        // Config ecrite des le demarrage (K-25) : un run interrompu laisse un adaptateur
+        // chargeable (LoRAContainer.from(directory:) exige ce fichier).
+        if config.fineTuneType != .full {
+            try Gemma4TrainingCheckpoint.atomicWrite(
+                try JSONEncoder().encode(loraConfig),
+                to: config.outputDirectory.appending(component: "adapter_config.json"))
+        }
 
-        // Profiling
+        // Profiling (macOS : MLXProfiler n'existe pas sur iOS)
+        #if canImport(MLXProfiler)
         let profiler = MLXProfiler.shared
         if config.enableProfiling {
             profiler.enable()
@@ -346,6 +502,7 @@ public enum Gemma4LoRATrain {
                 "valid_samples": "\(validData.count)",
             ])
         }
+        #endif
 
         nonisolated(unsafe) let capturedTrainData = trainData
         nonisolated(unsafe) let capturedValidData = validData
@@ -353,25 +510,31 @@ public enum Gemma4LoRATrain {
         try await container.perform { (context: ModelContext) in
             let model = context.model
 
-            // Convertir le modele en float32 pour eviter les NaN en bf16
-            // sur les sequences longues (>300 tokens avec images)
-            (model as! Module).apply { array in
-                array.dtype.isFloatingPoint ? array.asType(.float32) : array
+            // Ancien chemin : tout le modele en fp32 (poids x 2) contre les NaN du bf16 sur les
+            // sequences longues avec image. K-31 : `multimodalFloat32 = false` garde la base en
+            // bf16 et ne passe en fp32 que les parametres LoRA (plus bas) ; la perte l'est deja.
+            if config.multimodalFloat32 {
+                model.apply { array in
+                    array.dtype.isFloatingPoint ? array.asType(.float32) : array
+                }
+                print("Modele converti en float32 pour stabilite numerique")
             }
-            print("Modele converti en float32 pour stabilite numerique")
 
-            MLXRandom.seed(0)
+            MLXRandom.seed(config.seed)
 
             if isFullFineTune {
+                try checkFullFineTune(model)
                 print("Mode: Full Fine-Tuning multimodal (tous les poids)")
             } else {
-                guard let languageModel = model as? LanguageModel else {
-                    throw Gemma4LoRAError.incompatibleModel
-                }
                 let _ = try LoRAContainer.from(
-                    model: languageModel,
+                    model: model,
                     configuration: loraConfig
                 )
+            }
+            if !config.multimodalFloat32 && !isFullFineTune {
+                let loraParameters = model.trainableParameters().flattened().map { ($0.0, $0.1.asType(.float32)) }
+                model.update(parameters: ModuleParameters.unflattened(loraParameters))
+                print("Base en bf16, parametres LoRA en fp32")
             }
 
             let trainableParams = model.trainableParameters()
@@ -383,15 +546,23 @@ public enum Gemma4LoRATrain {
             let pct = Double(trainableParams) / Double(totalParams) * 100
             print("Parametres trainables: \(trainableParams) / \(totalParams) (\(String(format: "%.2f", pct))%)")
 
-            let optimizer: any Optimizer
-            if isFullFineTune {
-                optimizer = AdamW(learningRate: config.learningRate, weightDecay: 0.01)
-            } else {
-                optimizer = Adam(learningRate: config.learningRate)
+            // Meme calcul qu'Adam / AdamW de MLXOptimizers, etat sauvegardable (K-25).
+            let optimizer = Gemma4ResumableAdam(
+                learningRate: config.learningRate, weightDecay: isFullFineTune ? 0.01 : 0)
+
+            // Reprise : poids et etat de l'optimiseur du dernier checkpoint, pas suivant.
+            var startIteration = 0
+            if config.resume, let state = Gemma4TrainingCheckpoint.readState(in: config.outputDirectory) {
+                try Gemma4TrainingCheckpoint.restore(
+                    into: model, optimizer: optimizer, directory: config.outputDirectory,
+                    weightsName: weightsURL.lastPathComponent)
+                startIteration = state.iteration
+                print("Reprise au pas \(state.iteration) (graine \(state.seed))")
             }
 
             // Callback avec profiling
             let wrappedProgress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition = { p in
+                #if canImport(MLXProfiler)
                 if config.enableProfiling {
                     switch p {
                     case .train(let iteration, let loss, _, let tokPerSec):
@@ -416,6 +587,7 @@ public enum Gemma4LoRATrain {
                         break
                     }
                 }
+                #endif
                 return progress(p)
             }
 
@@ -423,8 +595,10 @@ public enum Gemma4LoRATrain {
             let imageCount = capturedTrainData.filter { $0.pixelValues != nil }.count
             print("Train multimodal: \(capturedTrainData.count) samples (\(audioCount) audio, \(imageCount) image)")
 
+            Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = config.gradientCheckpointing
+            defer { Gemma4LoRATrain.textModel(of: model)?.gradientCheckpointing = false }
             try trainMultimodalLoRA(
-                model: model as! Module,
+                model: model,
                 trainSamples: capturedTrainData,
                 validSamples: capturedValidData,
                 optimizer: optimizer,
@@ -434,6 +608,14 @@ public enum Gemma4LoRATrain {
                 saveEvery: config.saveEvery,
                 weightsURL: weightsURL,
                 isFullFineTune: isFullFineTune,
+                seed: config.seed,
+                gradClipMaxNorm: config.gradClipMaxNorm,
+                startIteration: startIteration,
+                checkpointDirectory: config.outputDirectory,
+                validationBatches: config.validationBatches,
+                metrics: config.metricsURL.map { url in { Gemma4TrainingMetricsWriter.append($0, to: url) } },
+                responseOnlyHead: config.responseOnlyHead && config.maskPrompt,
+                memoryPolicy: config.memoryPolicy,
                 progress: wrappedProgress
             )
         }
@@ -445,6 +627,7 @@ public enum Gemma4LoRATrain {
             try configData.write(to: configURL)
         }
 
+        #if canImport(MLXProfiler)
         // Exporter le profiling
         if config.enableProfiling, let session = profiler.activeSession {
             let summary = profiler.getTrainingSummary()
@@ -459,6 +642,7 @@ public enum Gemma4LoRATrain {
             let traceURL = config.outputDirectory.appending(component: "training_trace.json")
             try traceData.write(to: traceURL)
         }
+        #endif
 
         print("Adapter multimodal sauvegarde dans \(config.outputDirectory.path())")
     }
@@ -469,11 +653,11 @@ public enum Gemma4LoRATrain {
         testData: [String],
         batchSize: Int = 1
     ) async throws -> Float {
-        try await container.perform { context in
+        await container.perform { context in
             let model = context.model
             let tokenizer = context.tokenizer
             return LoRATrain.evaluate(
-                model: model as! Module,
+                model: model,
                 dataset: testData,
                 tokenizer: tokenizer,
                 batchSize: batchSize,
@@ -482,3 +666,35 @@ public enum Gemma4LoRATrain {
         }
     }
 }
+
+/// Ecrit les mesures d'entrainement en JSONL (une ligne par evenement), avec l'empreinte
+/// physique du processus (ce que voit le systeme, au-dela de la memoire MLX).
+public enum Gemma4TrainingMetricsWriter {
+    public static func append(_ metrics: Gemma4TrainingMetrics, to url: URL) {
+        guard var object = (try? JSONSerialization.jsonObject(with: JSONEncoder().encode(metrics))) as? [String: Any]
+        else { return }
+        object["phys_footprint_mb"] = physFootprintMB()
+        object["date"] = ISO8601DateFormatter().string(from: Date())
+        guard var line = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else { return }
+        line.append(0x0A)
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: line)
+        } else {
+            try? line.write(to: url)
+        }
+    }
+
+    static func physFootprintMB() -> Int {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Int(info.phys_footprint >> 20) : 0
+    }
+}
+

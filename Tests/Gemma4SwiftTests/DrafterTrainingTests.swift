@@ -120,4 +120,40 @@ struct DrafterTrainingTests {
         )
         // Si on est ici, pas de crash. Pas de save de poids (weightsURL nil).
     }
+
+    @Test("K-30 d : cible hors du gradient = memes perte et gradients du drafter")
+    func testTargetOutsideGradient() throws {
+        try Device.withDefaultDevice(.cpu) {
+            let targetCfg = try JSONDecoder().decode(Gemma4TextConfig.self, from: Data(targetConfigJSON.utf8))
+            let drafterCfg = try JSONDecoder().decode(Gemma4AssistantConfig.self, from: Data(drafterConfigJSON.utf8))
+            MLXRandom.seed(4)
+            let target = Gemma4LanguageModel(targetCfg)
+            let drafter = Gemma4AssistantDraftModel(drafterCfg)
+            drafter.bind(target: target)
+            let batch = MLXArray((0 ..< 8).map { Int32(($0 * 11) % 100) }).reshaped(1, 8)
+            let concrete = Array(targetCfg.resolvedLayerTypes.prefix(targetCfg.firstKvSharedLayerIdx))
+            let full = concrete.lastIndex(of: "full_attention") ?? 0
+            let sliding = concrete.lastIndex(of: "sliding_attention") ?? 0
+
+            let inside = valueAndGrad(model: drafter) { (d: Gemma4AssistantDraftModel, a: [MLXArray]) -> [MLXArray] in
+                let (l, n) = Gemma4DrafterTraining.drafterLoss(
+                    drafter: d, target: target, batchTokens: a[0], lastFullCacheIdx: full, lastSlidingCacheIdx: sliding)
+                return [l, n]
+            }
+            let outputs = Gemma4DrafterTraining.targetOutputs(
+                target: target, batchTokens: batch, lastFullCacheIdx: full, lastSlidingCacheIdx: sliding)
+            let outside = valueAndGrad(model: drafter) { (d: Gemma4AssistantDraftModel, a: [MLXArray]) -> [MLXArray] in
+                let (l, n) = Gemma4DrafterTraining.drafterLoss(drafter: d, batchTokens: a[0], target: outputs)
+                return [l, n]
+            }
+            let (l1, g1) = inside(drafter, [batch])
+            let (l2, g2) = outside(drafter, [batch])
+            #expect(abs(l1[0] - l2[0]).item(Float.self) < 1e-6)
+            let reference = Dictionary(g1.flattened(), uniquingKeysWith: { a, _ in a })
+            for (key, value) in g2.flattened() {
+                #expect(allClose(value, reference[key]!, atol: 1e-5).item(Bool.self), "\(key)")
+            }
+        }
+    }
 }
+

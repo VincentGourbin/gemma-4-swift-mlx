@@ -1,0 +1,30 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-12B-it-8bit
+Modele charge. GPU: 12068 Mo
+Famille detectee: b12b (48 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+Profil b12b/lora-8bit-lean (NON MESURE) : Econome : gradient checkpointing par couche, cache MLX 1 Go. QLoRA sur pack 8 bits.
+  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 50
+Couches: 16
+Sortie: /Volumes/Lexar/tmp/k33-adapters/b12b-lora-8bit-lean
+---
+
+Note : 608 exemple(s) de plus de 2048 jetons (max 3327), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 10930176 / 3360425776 (0.33%)
+Train: 899 samples (avg response: 4 tokens)
+Iteration 1: validation loss 0,000192, validation time 196,053842s
+Iteration 10: training loss 1,335485, iterations/sec 0,04026, Tokens/sec 0,161039
+Iteration 20: training loss 1,511645, iterations/sec 0,042839, Tokens/sec 0,171355
+Iteration 30: training loss 0,386814, iterations/sec 0,039293, Tokens/sec 0,15717
+Iteration 40: training loss 1,579973, iterations/sec 0,050014, Tokens/sec 0,200055
+Iteration 50: training loss 0,28527, iterations/sec 0,047928, Tokens/sec 0,19171
+Iteration 50: validation loss 0,067268, validation time 244,235715s
+Iteration 50: saved weights to /Volumes/Lexar/tmp/k33-adapters/b12b-lora-8bit-lean/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/tmp/k33-adapters/b12b-lora-8bit-lean
+
+Training termine.
+GPU pic: 28247 Mo

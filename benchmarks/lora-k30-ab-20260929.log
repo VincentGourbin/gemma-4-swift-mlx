@@ -1,0 +1,46 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-bf16
+Modele charge. GPU: 8828 Mo
+Famille detectee: e2b (35 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 200
+Couches: 16
+Sortie: /Volumes/Lexar/models/local/adapters/k30-ab
+---
+
+Note : 597 exemple(s) de plus de 2048 jetons (max 3320), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 6815744 / 4635385123 (0.15%)
+Train: 899 samples (avg response: 748 tokens)
+Iteration 1: validation loss 1,838157, validation time 226,990824s
+Iteration 10: training loss 1,571987, iterations/sec 0,262298, Tokens/sec 193,733221
+Iteration 20: training loss 1,321562, iterations/sec 0,156866, Tokens/sec 121,085219
+Iteration 30: training loss 1,321262, iterations/sec 0,121556, Tokens/sec 99,675984
+Iteration 40: training loss 1,24993, iterations/sec 0,18869, Tokens/sec 126,705546
+Iteration 50: training loss 1,224458, iterations/sec 0,201685, Tokens/sec 142,631455
+Iteration 50: saved weights to /Volumes/Lexar/models/local/adapters/k30-ab/adapters.safetensors
+Iteration 60: training loss 1,311381, iterations/sec 0,200585, Tokens/sec 153,286862
+Iteration 70: training loss 1,27323, iterations/sec 0,236154, Tokens/sec 171,258623
+Iteration 80: training loss 1,213954, iterations/sec 0,216673, Tokens/sec 177,455184
+Iteration 90: training loss 1,150082, iterations/sec 0,252382, Tokens/sec 167,354242
+Iteration 100: training loss 1,177374, iterations/sec 0,257265, Tokens/sec 171,724098
+Iteration 100: saved weights to /Volumes/Lexar/models/local/adapters/k30-ab/adapters.safetensors
+Iteration 110: training loss 1,220853, iterations/sec 0,255932, Tokens/sec 180,022853
+Iteration 120: training loss 1,186474, iterations/sec 0,218625, Tokens/sec 179,818996
+Iteration 130: training loss 1,170873, iterations/sec 0,221299, Tokens/sec 180,734927
+Iteration 140: training loss 1,166613, iterations/sec 0,214238, Tokens/sec 167,512517
+Iteration 150: training loss 1,166181, iterations/sec 0,238585, Tokens/sec 161,426616
+Iteration 150: saved weights to /Volumes/Lexar/models/local/adapters/k30-ab/adapters.safetensors
+Iteration 160: training loss 1,253253, iterations/sec 0,185827, Tokens/sec 153,752972
+Iteration 170: training loss 1,100656, iterations/sec 0,178548, Tokens/sec 146,730786
+Iteration 180: training loss 1,11789, iterations/sec 0,214933, Tokens/sec 160,082328
+Iteration 190: training loss 1,167139, iterations/sec 0,217491, Tokens/sec 158,789982
+Iteration 200: training loss 1,147014, iterations/sec 0,228798, Tokens/sec 162,904134
+Iteration 200: validation loss 1,136057, validation time 276,682184s
+Iteration 200: saved weights to /Volumes/Lexar/models/local/adapters/k30-ab/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/models/local/adapters/k30-ab/
+
+Training termine.
+GPU pic: 40695 Mo

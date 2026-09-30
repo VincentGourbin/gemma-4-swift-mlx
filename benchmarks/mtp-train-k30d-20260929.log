@@ -1,0 +1,172 @@
+=== A
+[mtp-train] target=/Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-4bit
+[mtp-train] drafter=google/gemma-4-E2B-it-assistant
+[mtp-train] data=/Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset/train.jsonl
+[mtp-train] output=/private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A
+[mtp-train] iterations=40 seq_len=256 lr=0.0001
+
+[1/4] Load target...
+[2/4] Load drafter...
+Chargement du drafter google/gemma-4-E2B-it-assistant...
+  drafter: 100% —               
+  drafter: 50 tenseurs charges (hidden=256, backbone=1536)
+[3/4] Tokenize dataset...
+  train: 899 lignes
+[4/4] Training...
+  tokenizing 899 lines...
+  train: 899 samples (chunks de 256), 0 lignes echouees
+[drafter-train] 7623 train chunks, 0 valid chunks (longueur 256)
+[drafter-train] iter 10/40  train_loss=3.9203  3.3 it/s
+[drafter-train] iter 20/40  train_loss=2.3951  4.6 it/s
+[drafter-train] iter 30/40  train_loss=2.3484  4.6 it/s
+[drafter-train] iter 40/40  train_loss=2.0266  4.6 it/s
+[drafter-train] final weights saved to /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A/drafter.safetensors
+
+[mtp-train] DONE — drafter sauve dans /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A/drafter.safetensors
+       19,41 real         8,63 user         0,78 sys
+          3169910784  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              200530  page reclaims
+                 491  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                2513  voluntary context switches
+               15065  involuntary context switches
+        144796496157  instructions retired
+         34562345385  cycles elapsed
+          6195154496  peak memory footprint
+=== B
+[mtp-train] target=/Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-4bit
+[mtp-train] drafter=google/gemma-4-E2B-it-assistant
+[mtp-train] data=/Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset/train.jsonl
+[mtp-train] output=/private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B
+[mtp-train] iterations=40 seq_len=256 lr=0.0001
+
+[1/4] Load target...
+[2/4] Load drafter...
+Chargement du drafter google/gemma-4-E2B-it-assistant...
+  drafter: 100% —               
+  drafter: 50 tenseurs charges (hidden=256, backbone=1536)
+[3/4] Tokenize dataset...
+  train: 899 lignes
+[4/4] Training...
+  tokenizing 899 lines...
+  train: 899 samples (chunks de 256), 0 lignes echouees
+[drafter-train] 7623 train chunks, 0 valid chunks (longueur 256)
+[drafter-train] iter 10/40  train_loss=3.9203  4.5 it/s
+[drafter-train] iter 20/40  train_loss=2.3951  4.6 it/s
+[drafter-train] iter 30/40  train_loss=2.3484  4.6 it/s
+[drafter-train] iter 40/40  train_loss=2.0266  4.6 it/s
+[drafter-train] final weights saved to /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B/drafter.safetensors
+
+[mtp-train] DONE — drafter sauve dans /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B/drafter.safetensors
+       16,83 real         8,56 user         0,76 sys
+          3177021440  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              199888  page reclaims
+                 400  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  42  voluntary context switches
+               12361  involuntary context switches
+        145332413970  instructions retired
+         34385528255  cycles elapsed
+          6319443376  peak memory footprint
+=== B2
+[mtp-train] target=/Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-4bit
+[mtp-train] drafter=google/gemma-4-E2B-it-assistant
+[mtp-train] data=/Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset/train.jsonl
+[mtp-train] output=/private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B2
+[mtp-train] iterations=40 seq_len=256 lr=0.0001
+
+[1/4] Load target...
+[2/4] Load drafter...
+Chargement du drafter google/gemma-4-E2B-it-assistant...
+  drafter: 100% —               
+  drafter: 50 tenseurs charges (hidden=256, backbone=1536)
+[3/4] Tokenize dataset...
+  train: 899 lignes
+[4/4] Training...
+  tokenizing 899 lines...
+  train: 899 samples (chunks de 256), 0 lignes echouees
+[drafter-train] 7623 train chunks, 0 valid chunks (longueur 256)
+[drafter-train] iter 10/40  train_loss=3.9203  4.5 it/s
+[drafter-train] iter 20/40  train_loss=2.3951  4.6 it/s
+[drafter-train] iter 30/40  train_loss=2.3484  4.6 it/s
+[drafter-train] iter 40/40  train_loss=2.0266  4.6 it/s
+[drafter-train] final weights saved to /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B2/drafter.safetensors
+
+[mtp-train] DONE — drafter sauve dans /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-B2/drafter.safetensors
+       16,73 real         8,41 user         0,74 sys
+          3169452032  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              200455  page reclaims
+                 400  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  39  voluntary context switches
+               12291  involuntary context switches
+        141784511419  instructions retired
+         33720479710  cycles elapsed
+          6311824816  peak memory footprint
+=== A2
+[mtp-train] target=/Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-4bit
+[mtp-train] drafter=google/gemma-4-E2B-it-assistant
+[mtp-train] data=/Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset/train.jsonl
+[mtp-train] output=/private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A2
+[mtp-train] iterations=40 seq_len=256 lr=0.0001
+
+[1/4] Load target...
+[2/4] Load drafter...
+Chargement du drafter google/gemma-4-E2B-it-assistant...
+  drafter: 100% —               
+  drafter: 50 tenseurs charges (hidden=256, backbone=1536)
+[3/4] Tokenize dataset...
+  train: 899 lignes
+[4/4] Training...
+  tokenizing 899 lines...
+  train: 899 samples (chunks de 256), 0 lignes echouees
+[drafter-train] 7623 train chunks, 0 valid chunks (longueur 256)
+[drafter-train] iter 10/40  train_loss=3.9203  4.5 it/s
+[drafter-train] iter 20/40  train_loss=2.3951  4.6 it/s
+[drafter-train] iter 30/40  train_loss=2.3484  4.6 it/s
+[drafter-train] iter 40/40  train_loss=2.0266  4.6 it/s
+[drafter-train] final weights saved to /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A2/drafter.safetensors
+
+[mtp-train] DONE — drafter sauve dans /private/tmp/claude-501/-Users-vincent-Developpements-gemma-4-swift-mlx/67092e63-08f3-4520-bd5f-7b538b084baf/scratchpad/mtp-A2/drafter.safetensors
+       16,58 real         8,38 user         0,75 sys
+          3171450880  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              200693  page reclaims
+                 400  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  37  voluntary context switches
+               12734  involuntary context switches
+        141723724118  instructions retired
+         33627637026  cycles elapsed
+          6332714392  peak memory footprint

@@ -177,6 +177,33 @@ public class Gemma4Attention: Module {
                 return (oProj(output), (state[0], state[1]), effectiveOffset)
             }
 
+            // Cache quantifie (GenerateParameters.kvBits : mlx-swift-lm remplace le
+            // KVCacheSimple de la couche source par un QuantizedKVCache). Son `state`
+            // vaut [kq, kscales, kbiases, vq, …] : le lire comme (K, V) ferait
+            // l'attention sur les poids packes. On passe par les tuples quantifies.
+            if let quantized = cache as? QuantizedKVCacheProtocol,
+               let (qKeys, qValues) = quantized.getQuantizedState() {
+                let output = quantizedScaledDotProductAttention(
+                    queries: queries,
+                    quantizedKeys: qKeys,
+                    quantizedValues: qValues,
+                    scale: scale,
+                    mask: mask,
+                    groupSize: quantized.groupSize,
+                    bits: quantized.bits,
+                    mode: quantized.mode
+                )
+                .transposed(0, 2, 1, 3)
+                .reshaped(B, L, -1)
+                // K/V rendus aux consommateurs d'intermediaires (MTP) : dequantifies
+                // paresseusement, donc rien n'est calcule si personne ne les lit.
+                let dequantize = { (t: (MLXArray, MLXArray, MLXArray?)) in
+                    dequantized(t.0, scales: t.1, biases: t.2, groupSize: quantized.groupSize,
+                                bits: quantized.bits, mode: quantized.mode, dtype: queries.dtype)
+                }
+                return (oProj(output), (dequantize(qKeys), dequantize(qValues)), effectiveOffset)
+            }
+
             // Standard shared: lire les K/V decompresses du cache
             let state = cache.state
             if state.count >= 2 {

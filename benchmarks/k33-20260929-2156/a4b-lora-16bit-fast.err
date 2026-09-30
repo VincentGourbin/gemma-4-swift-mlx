@@ -1,0 +1,3 @@
+[Gemma4Config] audio_config present but decode failed (DecodingError.valueNotFound: Expected value of type Dictionary<String, Any>. Path: audio_config. Debug description: Cannot get keyed decoding container -- found null value instead); fallback to text-only
+MLX/ErrorHandler.swift:345: Fatal error: [GatherMM] Cannot calculate VJP with respect to indices. at /Users/vincent/Developpements/gemma-4-swift-mlx/.build/xcode/SourcePackages/checkouts/mlx-swift/Source/Cmlx/mlx-c/mlx/c/transforms.cpp:132
+Scripts/bench-training-campaign.sh: line 41: 88767 Trace/BPT trap: 5       "$@"

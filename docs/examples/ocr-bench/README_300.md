@@ -1,5 +1,7 @@
 # OCR Bench 300 — DiffusionGemma vs Gemma 4 AR (extended)
 
+> Les sorties brutes ne sont plus dans le dépôt (nettoyage du 2026-09-27) : elles restent consultables au commit `c9543739` via les liens ci-dessous.
+
 Extension du mini-bench OCR à **300 images** (30 par catégorie × 10 catégories OCRBench). 10× plus large que le mini-bench (30) pour des résultats statistiquement plus robustes.
 
 ## Setup
@@ -93,6 +95,6 @@ L'écart entre DiffusionGemma et 26B-A4B AR **se resserre** sur l'échantillon l
 ## Fichiers
 
 - `meta_300.json` : 300 images stratifiées + ground truth
-- `results_300/{diff,e4b,a4b}/*.txt` : 900 sorties brutes
+- [`results_300/{diff,e4b,a4b}/*.txt`](https://github.com/VincentGourbin/gemma-4-swift-mlx/tree/c9543739/docs/examples/ocr-bench/results_300) : 900 sorties brutes
 - `score300.py` : script de scoring
 - `run_bench_300.sh` : reproduction

@@ -1,0 +1,42 @@
+Chargement du modele multimodal: /Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-bf16
+Modele multimodal charge. GPU: 9735 Mo
+Famille detectee: e2b (35 couches)
+Chargement des donnees multimodales depuis /Volumes/Lexar/datasets/LaTeX_OCR/tb3...
+Train: 500 samples, Valid: 50 samples
+Pre-traitement des media...
+  Preprocessing 1/500...
+  Preprocessing 100/500...
+  Preprocessing 200/500...
+  Preprocessing 300/500...
+  Preprocessing 400/500...
+  Preprocessing 500/500...
+  Preprocessing 1/50...
+
+--- Debut du training multimodal ---
+Mode: lora + response masking, Rank: 16, Scale: 20.0, LR: 5e-05
+Batch: 1 (multimodal), Iterations: 100
+Couches: 16
+Sortie: /Volumes/Lexar/models/local/adapters/k31-bf16
+---
+
+Base en bf16, parametres LoRA en fp32
+Parametres trainables: 13631488 / 5117929955 (0.27%)
+Train multimodal: 500 samples (0 audio, 500 image)
+Iteration 1: validation loss 1,476611, validation time 37,848413s
+Iteration 10: training loss 1,183936, iterations/sec 0,52314, Tokens/sec 42,740513
+Iteration 20: training loss 0,736344, iterations/sec 0,425081, Tokens/sec 32,476198
+Iteration 30: training loss 0,653006, iterations/sec 0,491639, Tokens/sec 33,185648
+Iteration 40: training loss 0,724984, iterations/sec 0,62189, Tokens/sec 30,845721
+Iteration 50: training loss 0,698309, iterations/sec 0,709597, Tokens/sec 58,896564
+Iteration 50: saved weights to /Volumes/Lexar/models/local/adapters/k31-bf16/adapters.safetensors
+Iteration 60: training loss 0,441939, iterations/sec 0,850932, Tokens/sec 48,162753
+Iteration 70: training loss 0,653606, iterations/sec 0,93452, Tokens/sec 47,09981
+Iteration 80: training loss 0,600441, iterations/sec 0,910935, Tokens/sec 70,77968
+Iteration 90: training loss 0,466419, iterations/sec 0,956596, Tokens/sec 66,866034
+Iteration 100: training loss 0,590141, iterations/sec 1,020829, Tokens/sec 64,005997
+Iteration 100: validation loss 0,583797, validation time 25,900485s
+Iteration 100: saved weights to /Volumes/Lexar/models/local/adapters/k31-bf16/adapters.safetensors
+Adapter multimodal sauvegarde dans /Volumes/Lexar/models/local/adapters/k31-bf16/
+
+Training multimodal termine.
+GPU pic: 15853 Mo

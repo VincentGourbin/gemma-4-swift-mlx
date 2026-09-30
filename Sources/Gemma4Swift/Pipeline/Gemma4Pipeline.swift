@@ -59,7 +59,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         case a4bDiffBf16 = "google/diffusiongemma-26B-A4B-it"
 
         /// Famille du modele
-        public enum Family: String, Sendable {
+        public enum Family: String, Sendable, CaseIterable {
             case e2b, e4b, b31b, a4b, b12b, a4bDiff
         }
 
@@ -209,10 +209,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             Int(ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024))
         }
 
-        /// Modeles recommandes pour la RAM disponible (IT uniquement)
+        /// Modeles recommandes pour la RAM disponible (IT uniquement). DiffusionGemma
+        /// en est exclu : `load` le refuse (pipeline a part, `DiffusionGemmaLoader`).
         public static func recommended(forRAMGB ram: Int) -> [Model] {
             allCases
-                .filter { $0.isInstructionTuned && $0.recommendedRAMGB <= ram }
+                .filter { $0.isInstructionTuned && !$0.isDiffusion && $0.recommendedRAMGB <= ram }
                 .sorted { $0.estimatedSizeGB < $1.estimatedSizeGB }
         }
     }
@@ -237,7 +238,46 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     }
 
     private var container: ModelContainer?
-    nonisolated(unsafe) private var currentSession: ChatSession?
+    private var currentSession: ChatSession?
+
+    /// Profil de reference applique (`nil` = comportement par defaut, inchange).
+    public private(set) var profile: Gemma4ReferenceProfile?
+
+    /// Applique un profil de reference au pipeline deja charge : politique memoire
+    /// de processus tout de suite, `kvBits` / tranche de prefill / vidage du cache a
+    /// chaque generation. `nil` revient au comportement par defaut (les limites
+    /// memoire deja posees restent en place).
+    public func apply(profile: Gemma4ReferenceProfile?) {
+        self.profile = profile
+        profile?.applyGlobalPolicy()
+        let release = profile?.releaseEncodersAfterPrefill ?? false
+        if let container {
+            Task { await container.perform { ($0.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = release } }
+        }
+    }
+
+    /// Charge les poids recommandes d'un profil, puis l'applique.
+    public func load(
+        profile: Gemma4ReferenceProfile,
+        downloadIfNeeded: Bool = false,
+        hfToken: String? = nil,
+        progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
+    ) async throws {
+        try await load(
+            profile.model, multimodal: profile.multimodal, audio: profile.audio,
+            downloadIfNeeded: downloadIfNeeded, hfToken: hfToken, progress: progress)
+        await container?.perform {
+            ($0.model as? Gemma4MultimodalLLMModel)?.releaseEncodersAfterPrefill = profile.releaseEncodersAfterPrefill
+        }
+        apply(profile: profile)
+    }
+
+    /// Parametres de generation, profil applique s'il y en a un.
+    private func generateParameters(maxTokens: Int, temperature: Float) -> GenerateParameters {
+        var params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        profile?.apply(to: &params)
+        return params
+    }
 
     // MARK: - Chargement
 
@@ -253,6 +293,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
     public func load(
         _ model: Model,
         multimodal: Bool = true,
+        audio: Bool = true,
         downloadIfNeeded: Bool = false,
         hfToken: String? = nil,
         progress: (@Sendable (Gemma4ModelDownloader.Progress) -> Void)? = nil
@@ -273,21 +314,21 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let localPath = Gemma4ModelCache.localPath(for: model) else {
             throw Gemma4PipelineError.modelNotDownloaded(model.rawValue)
         }
-        try await load(from: localPath, multimodal: multimodal)
+        try await load(from: localPath, multimodal: multimodal, audio: audio)
     }
 
     /// Charge un modele Gemma 4 depuis un chemin local arbitraire.
     /// - Parameters:
     ///   - path: URL du repertoire contenant config.json + safetensors + tokenizer.json
     ///   - multimodal: si true, charge le modele multimodal complet. Defaut: true.
-    public func load(from path: URL, multimodal: Bool = true) async throws {
+    public func load(from path: URL, multimodal: Bool = true, audio: Bool = true) async throws {
         state = .unloaded
         // Gemma4Registration.loadContainer et pas la fonction libre
         // loadModelContainer : celle-ci passe par ModelFactoryRegistry, qui essaie
         // MLXVLM avant MLXLLM et renverrait MLXVLM.Gemma4 des qu'un autre module du
         // processus lie MLXVLM. Cf. la doc de loadContainer(from:using:multimodal:).
         let loaded = try await Gemma4Registration.loadContainer(
-            from: path, using: Gemma4TokenizerLoader(), multimodal: multimodal)
+            from: path, using: Gemma4TokenizerLoader(), multimodal: multimodal, audio: audio)
         setContainer(loaded)
     }
 
@@ -316,7 +357,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         container = nil
         currentSession = nil
         state = .unloaded
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Generation texte
@@ -332,7 +373,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             throw Gemma4PipelineError.modelNotLoaded
         }
 
-        let params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        let params = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let session = ChatSession(
             container,
             instructions: systemPrompt ?? "Tu es un assistant utile.",
@@ -340,6 +381,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         )
         currentSession = session
 
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
         state = .processing
         defer { state = .ready }
 
@@ -398,7 +442,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             )
         }
 
-        let params = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: 0.95)
+        let params = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let session = ChatSession(
             container,
             instructions: systemPrompt ?? "Tu es un assistant utile.",
@@ -410,7 +454,14 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let stream = session.streamResponse(to: prompt)
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     for try await token in stream {
                         continuation.yield(token)
@@ -420,9 +471,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
                 await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
                     self?.state = .ready
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -457,15 +510,22 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
         let instructions = systemPrompt ?? "Tu es un assistant utile."
         let promptCapture = prompt
-        let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
+        let paramsCapture = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let ngramCapture = ngramSize
         let ngramIncludesPromptCapture = includePromptInWindow
         let ngramIncludesThinkingCapture = includeThinkingInWindow
-        nonisolated(unsafe) let templateVariablesCapture = templateVariables
+        let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     try await container.perform { context in
                         let input: LMInput
@@ -485,11 +545,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             input = try await context.processor.prepare(
                                 input: UserInput(chat: messages))
                         }
-                        let params = GenerateParameters(
-                            maxTokens: maxTokensCapture,
-                            temperature: temperatureCapture,
-                            topP: 0.95
-                        )
+                        let params = paramsCapture
                         let iterator = try TokenIterator(
                             input: input,
                             model: context.model,
@@ -505,29 +561,23 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                             prefillStepSize: params.prefillStepSize,
                             maxTokens: maxTokensCapture
                         )
-                        let (stream, _) = MLXLMCommon.generateTask(
+                        await Self.streamText(
+                            iterator: iterator,
                             promptTokenCount: input.text.tokens.size,
-                            modelConfiguration: context.configuration,
-                            tokenizer: context.tokenizer,
-                            iterator: iterator
+                            context: context,
+                            into: continuation
                         )
-                        for await generation in stream {
-                            switch generation {
-                            case .chunk(let text):
-                                continuation.yield(text)
-                            case .info, .toolCall:
-                                break
-                            @unknown default:
-                                break
-                            }
-                        }
                     }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
-                await MainActor.run { self?.state = .ready }
+                await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                    self?.state = .ready
+                }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -593,19 +643,30 @@ public final class Gemma4Pipeline: @unchecked Sendable {
             throw Gemma4PipelineError.invalidInput(
                 "noRepeatNGramSize doit etre >= 1 (recu \(ngramSize))")
         }
+        // L'appelant a pu construire pixelValues sans l'evaluer (processImage
+        // synchrone) : on le materialise sur son thread avant qu'il traverse
+        // vers container.perform. Sans cout si l'array est deja evalue.
+        eval(pixelValues)
         state = .processing
         nonisolated(unsafe) let pixelsCapture = pixelValues
-        let temperatureCapture = temperature
         let maxTokensCapture = maxTokens
+        let paramsCapture = generateParameters(maxTokens: maxTokens, temperature: temperature)
         let promptCapture = prompt
         let systemPromptCapture = systemPrompt
         let ngramCapture = noRepeatNGramSize
         let ngramIncludesPromptCapture = noRepeatNGramIncludesPrompt
         let ngramIncludesThinkingCapture = noRepeatNGramIncludesThinking
-        nonisolated(unsafe) let templateVariablesCapture = templateVariables
+        let templateVariablesCapture = templateVariables
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     try await container.perform { context in
                         // 1. Chat template (+ tour system si fourni) puis expansion
@@ -641,16 +702,12 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
                         // 3. Generation native via TokenIterator (asyncEval + sampler optimal)
                         let lmInput = LMInput(tokens: MLXArray(ids.map { Int32($0) }))
-                        let params = GenerateParameters(
-                            maxTokens: maxTokensCapture,
-                            temperature: temperatureCapture,
-                            topP: 0.95
-                        )
-                        let stream: AsyncStream<Generation>
+                        let params = paramsCapture
+                        let iterator: TokenIterator
                         if let ngramSize = ngramCapture {
                             // GenerateParameters ne transporte pas de processor custom :
                             // construire le TokenIterator explicitement.
-                            let iterator = try TokenIterator(
+                            iterator = try TokenIterator(
                                 input: lmInput,
                                 model: context.model,
                                 cache: nil,
@@ -663,33 +720,53 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 prefillStepSize: params.prefillStepSize,
                                 maxTokens: maxTokensCapture
                             )
-                            stream = MLXLMCommon.generateTask(
-                                promptTokenCount: lmInput.text.tokens.size,
-                                modelConfiguration: context.configuration,
-                                tokenizer: context.tokenizer,
-                                iterator: iterator
-                            ).0
                         } else {
-                            stream = try MLXLMCommon.generate(
-                                input: lmInput, parameters: params, context: context
-                            )
+                            iterator = try TokenIterator(
+                                input: lmInput, model: context.model, cache: nil, parameters: params)
                         }
-                        for await generation in stream {
-                            switch generation {
-                            case .chunk(let text):
-                                continuation.yield(text)
-                            case .info, .toolCall:
-                                break
-                            @unknown default:
-                                break
-                            }
-                        }
+                        await Self.streamText(
+                            iterator: iterator,
+                            promptTokenCount: lmInput.text.tokens.size,
+                            context: context,
+                            into: continuation
+                        )
                     }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
                 }
-                await MainActor.run { self?.state = .ready }
+                await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
+                    self?.state = .ready
+                }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Genere a partir de `iterator` et detokenise nous-memes : jetons bruts de
+    /// mlx-swift-lm (`generateTokenTask`), puis `Gemma4StreamingDetokenizer`.
+    /// Le chemin texte de l'amont passe par `NaiveStreamingDetokenizer`, qui perd les
+    /// scalaires fusionnant avec le grapheme precedent (drapeaux, sequences ZWJ,
+    /// accents combinants). Les chemins `ChatSession` (chat, chatStream par defaut,
+    /// continueChat) n'exposent pas les jetons et gardent ce defaut jusqu'a leur
+    /// remplacement (K-19) ou la correction amont.
+    private nonisolated static func streamText(
+        iterator: consuming TokenIterator,
+        promptTokenCount: Int,
+        context: ModelContext,
+        into continuation: AsyncThrowingStream<String, Error>.Continuation
+    ) async {
+        let (tokens, _) = MLXLMCommon.generateTokenTask(
+            promptTokenCount: promptTokenCount,
+            modelConfiguration: context.configuration,
+            tokenizer: context.tokenizer,
+            iterator: iterator
+        )
+        var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
+        for await event in tokens {
+            if case .token(let id) = event, let text = detokenizer.append(token: id) {
+                continuation.yield(text)
             }
         }
     }
@@ -701,6 +778,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let session = currentSession else {
             throw Gemma4PipelineError.modelNotLoaded
         }
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
         state = .processing
         defer { state = .ready }
         return try await session.respond(to: prompt)
@@ -717,7 +797,14 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let stream = session.streamResponse(to: prompt)
 
         return AsyncThrowingStream { continuation in
-            Task { [weak self] in
+            let task = Task { [weak self] in
+                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                do { try Gemma4ComputeGate.shared.beginInference() } catch {
+                    continuation.finish(throwing: error)
+                    await MainActor.run { self?.state = .ready }
+                    return
+                }
+                defer { Gemma4ComputeGate.shared.endInference() }
                 do {
                     for try await token in stream {
                         continuation.yield(token)
@@ -727,9 +814,11 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
                 await MainActor.run {
+                    if self?.profile?.clearCacheAfterAnswer == true { Memory.clearCache() }
                     self?.state = .ready
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -742,6 +831,8 @@ public enum Gemma4PipelineError: LocalizedError {
     case modelNotDownloaded(String)
     case invalidInput(String)
     case unsupportedModelFamily(String, reason: String)
+    /// Audio fourni a un modele charge sans tour audio (`load(audio: false)`).
+    case audioTowerUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -750,6 +841,8 @@ public enum Gemma4PipelineError: LocalizedError {
         case .invalidInput(let msg): return "Entree invalide: \(msg)"
         case .unsupportedModelFamily(let id, let reason):
             return "Famille modele non supportee par Gemma4Pipeline pour '\(id)' : \(reason)"
+        case .audioTowerUnavailable:
+            return "Audio fourni mais le modele a ete charge sans tour audio (audio: false)"
         }
     }
 }

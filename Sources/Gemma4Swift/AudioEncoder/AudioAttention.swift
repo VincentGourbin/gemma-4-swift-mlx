@@ -68,7 +68,7 @@ public class AudioAttention: Module {
         let padLeft = maxPastHorizon
         let padRight = maxFutureHorizon + chunkSize - 1
         let rest = Array(x.shape[2...])
-        var result = padded(x, widths: [.init(0), .init((padLeft, padRight))] + rest.map { _ in .init(0) })
+        let result = padded(x, widths: [.init(0), .init((padLeft, padRight))] + rest.map { _ in .init(0) })
 
         let TPadded = result.dim(1)
         let numBlocks = (TPadded - contextSize) / chunkSize + 1

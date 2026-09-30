@@ -1,0 +1,30 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Modele charge. GPU: 13544 Mo
+Famille detectee: a4b (30 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+Profil a4b/lora-4bit-lean (NON MESURE) : Econome : gradient checkpointing par couche, cache MLX 1 Go. QLoRA sur pack 4 bits. Experts MoE non adaptes (SwitchLinear n'est pas un Linear) ; MLP dense et attention le sont.
+  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 50
+Couches: 10
+Sortie: /Volumes/Lexar/tmp/k33-adapters/a4b-lora-4bit-lean
+---
+
+Note : 597 exemple(s) de plus de 2048 jetons (max 3320), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 3339264 / 3947960350 (0.08%)
+Train: 899 samples (avg response: 748 tokens)
+Iteration 1: validation loss 1,866868, validation time 72,922638s
+Iteration 10: training loss 1,76396, iterations/sec 0,154337, Tokens/sec 113,993227
+Iteration 20: training loss 1,329133, iterations/sec 0,107292, Tokens/sec 82,818642
+Iteration 30: training loss 1,272779, iterations/sec 0,048397, Tokens/sec 39,685277
+Iteration 40: training loss 1,178184, iterations/sec 0,102071, Tokens/sec 68,540654
+Iteration 50: training loss 1,135303, iterations/sec 0,117537, Tokens/sec 83,122328
+Iteration 50: validation loss 1,140441, validation time 83,309108s
+Iteration 50: saved weights to /Volumes/Lexar/tmp/k33-adapters/a4b-lora-4bit-lean/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/tmp/k33-adapters/a4b-lora-4bit-lean
+
+Training termine.
+GPU pic: 20908 Mo

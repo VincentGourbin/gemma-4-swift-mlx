@@ -102,7 +102,10 @@ Bandwidth naïf prédit 4×. Les ~5× supplémentaires viennent des kernels quan
 MLX, de la saturation wired memory à 56 Go sur 96 Go, et du LM head 4× plus gros.
 Pour DiffusionGemma il n'existe pas de version 4-bit pré-quantizée, mais
 `DiffusionOnTheFlyQuantization.applyMixedPrecision(...)` (Q-DiT / ViDiT-Q) permet de
-quantizer à la volée pour économiser ~70% de RAM. Détail dans
+quantizer à la volée. Estimation (non mesurée) : ~27 Go en 8 bits, ~15 Go en 4 bits contre ~50 Go
+en bf16, experts MoE compris. Jusqu'au correctif D-01 (2026-09-28) les experts restaient en bf16 :
+les chiffres antérieurs sont invalides, voir `docs/audit/2026-09-27/audit-diffusion.md` et les
+profils `gemma4-cli references --family a4bdiff`. Détail dans
 [docs/examples/vision-image-description/README.md](examples/vision-image-description/README.md)
 section "bf16 vs 4-bit".
 

@@ -40,7 +40,7 @@ public actor Gemma4MTPPipeline {
         sequentialVerify: Bool = false
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     try await self.runLoop(
                         prompt: prompt,
@@ -56,6 +56,7 @@ public actor Gemma4MTPPipeline {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -68,7 +69,7 @@ public actor Gemma4MTPPipeline {
         sequentialVerify: Bool = false
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     try await self.runLoop(
                         prompt: "",
@@ -84,6 +85,7 @@ public actor Gemma4MTPPipeline {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -111,6 +113,9 @@ public actor Gemma4MTPPipeline {
         continuation: AsyncThrowingStream<String, Error>.Continuation
     ) async throws {
         precondition(blockSize >= 2, "blockSize doit etre >= 2 pour faire de la speculation")
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        try Gemma4ComputeGate.shared.beginInference()
+        defer { Gemma4ComputeGate.shared.endInference() }
 
         nonisolated(unsafe) let drafterRef = drafter
         let bs = blockSize
@@ -152,12 +157,17 @@ public actor Gemma4MTPPipeline {
                 let messages: [[String: String]] = [["role": "user", "content": userPrompt]]
                 promptIds = try context.tokenizer.applyChatTemplate(messages: messages)
             } else {
-                promptIds = try context.tokenizer.encode(text: userPrompt)
+                promptIds = context.tokenizer.encode(text: userPrompt)
             }
             let inputArr = MLXArray(promptIds.map { Int32($0) }).reshaped(1, -1)
 
             // 2) Cache + prefill (multimodal: pendingX deja set sur le model par caller)
-            let cache = langModel.makeCache()
+            // Caches glissants dimensionnes pour ne jamais tourner pendant le run : un
+            // RotatingKVCache a 512 qui a tourne n'est plus trimmable, trimPromptCache ne
+            // retirait alors rien, et les brouillons rejetes restaient dans le KV (sortie
+            // fausse des que prompt + generation depassait la fenetre).
+            let cache = langModel.makeCache(
+                slidingCapacity: inputArr.dim(1) + maxTok + bs + 1)
             let prefillOut = modelForward(inputArr, cache)
             eval(prefillOut.logits, prefillOut.preNormHiddenStates)
 
@@ -167,11 +177,15 @@ public actor Gemma4MTPPipeline {
             var bonus = argMax(prefillOut.logits[0, promptLen - 1, 0...], axis: -1).item(Int32.self)
             var lastHidden = prefillOut.preNormHiddenStates[0..., (promptLen - 1) ..< promptLen, 0...]
 
+            // Detokenisation incrementale : un caractere UTF-8 peut s'etaler sur
+            // plusieurs tokens (byte-fallback) ; les decoder un par un le cassait.
+            var detokenizer = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
+
             // Yield le premier token (sauf si c'est deja un EOS)
             if isEOS(bonus, tokenizer: context.tokenizer) {
                 return s
             }
-            try yieldToken(bonus, tokenizer: context.tokenizer, continuation: continuation)
+            yieldToken(bonus, detokenizer: &detokenizer, continuation: continuation)
             s.emittedTokens = 1
             if s.emittedTokens >= maxTok {
                 return s
@@ -190,12 +204,15 @@ public actor Gemma4MTPPipeline {
 
             // 6) Boucle MTP
             while s.emittedTokens < maxTok {
+                // Le consommateur a lache le stream : onTermination a annule la Task.
+                try Task.checkCancellation()
                 // Lecture des K/V partages depuis le cache (etat valide jusqu'a cache.offset)
                 let kvOffset = cache[lastFullCacheIdx].offset
                 let sharedKV = extractSharedKV(
                     cache: cache,
                     fullIdx: lastFullCacheIdx,
-                    slidingIdx: lastSlidingCacheIdx
+                    slidingIdx: lastSlidingCacheIdx,
+                    slidingWindow: textCfg.slidingWindow
                 )
 
                 drafterRef.setSharedKV(sharedKV, kvOffset: kvOffset)
@@ -273,7 +290,7 @@ public actor Gemma4MTPPipeline {
                         sawEOS = true
                         break
                     }
-                    try yieldToken(tok, tokenizer: context.tokenizer, continuation: continuation)
+                    yieldToken(tok, detokenizer: &detokenizer, continuation: continuation)
                     s.emittedTokens += 1
                     if s.emittedTokens >= maxTok { break }
                 }
@@ -285,7 +302,12 @@ public actor Gemma4MTPPipeline {
                 // garde les (accepted + 1) premiers (bonus + drafts acceptes), trim le reste.
                 let toTrim = bs - 1 - walkRes.accepted
                 if toTrim > 0 {
-                    trimPromptCache(cache, numTokens: toTrim)
+                    let trimmed = trimPromptCache(cache, numTokens: toTrim)
+                    // Un retrait partiel laisserait des jetons faux dans le KV : erreur
+                    // plutot que sortie silencieusement corrompue.
+                    guard trimmed == toTrim else {
+                        throw MTPError.cacheRollbackFailed(expected: toTrim, trimmed: trimmed)
+                    }
                 }
 
                 // Update bonus + lastHidden pour le prochain round
@@ -299,7 +321,7 @@ public actor Gemma4MTPPipeline {
             return s
         }
 
-        await self.setStats(stats)
+        self.setStats(stats)
     }
 
     private func setStats(_ s: Stats) {
@@ -310,25 +332,36 @@ public actor Gemma4MTPPipeline {
     private nonisolated func extractSharedKV(
         cache: [any KVCache],
         fullIdx: Int,
-        slidingIdx: Int
+        slidingIdx: Int,
+        slidingWindow: Int
     ) -> SharedKVStates {
         let fullState = cache[fullIdx].state
         let slidingState = cache[slidingIdx].state
         precondition(fullState.count >= 2 && slidingState.count >= 2,
                      "Cache state inattendu (full=\(fullState.count), sliding=\(slidingState.count))")
+        // Le cache glissant du run MTP ne tourne pas et garde tout l'historique : le
+        // drafter ne voit que la fenetre, comme avec un cache glissant ordinaire.
+        var slidingKeys = slidingState[0]
+        var slidingValues = slidingState[1]
+        let length = slidingKeys.dim(-2)
+        if length > slidingWindow {
+            slidingKeys = slidingKeys[.ellipsis, (length - slidingWindow)..., 0...]
+            slidingValues = slidingValues[.ellipsis, (length - slidingWindow)..., 0...]
+        }
         return [
             "full_attention": (keys: fullState[0], values: fullState[1]),
-            "sliding_attention": (keys: slidingState[0], values: slidingState[1]),
+            "sliding_attention": (keys: slidingKeys, values: slidingValues),
         ]
     }
 
     private nonisolated func yieldToken(
         _ tokenId: Int32,
-        tokenizer: any Tokenizer,
+        detokenizer: inout Gemma4StreamingDetokenizer,
         continuation: AsyncThrowingStream<String, Error>.Continuation
-    ) throws {
-        let piece = tokenizer.decode(tokenIds: [Int(tokenId)])
-        continuation.yield(piece)
+    ) {
+        if let piece = detokenizer.append(token: Int(tokenId)) {
+            continuation.yield(piece)
+        }
     }
 
     private nonisolated func isEOS(_ tokenId: Int32, tokenizer: any Tokenizer) -> Bool {
@@ -346,6 +379,7 @@ public actor Gemma4MTPPipeline {
     public enum MTPError: LocalizedError {
         case unsupportedModel(String)
         case cacheLayoutInvalid
+        case cacheRollbackFailed(expected: Int, trimmed: Int)
 
         public var errorDescription: String? {
             switch self {
@@ -353,6 +387,8 @@ public actor Gemma4MTPPipeline {
                 return "MTP requires Gemma4LLMModel, got \(t)"
             case .cacheLayoutInvalid:
                 return "Cannot find both full_attention and sliding_attention concrete layers — model layout incompatible"
+            case .cacheRollbackFailed(let expected, let trimmed):
+                return "MTP cache rollback removed \(trimmed) of \(expected) rejected draft positions — output would be corrupted"
             }
         }
     }

@@ -1,6 +1,8 @@
 // Configuration centralisee des optimisations memoire pour DiffusionGemma.
 //
 // Inspire de LTX `MemoryOptimizationConfig` qui regroupe les presets par RAM.
+// Les cibles RAM des presets sont indicatives, non mesurees (et anterieures au
+// correctif D-01) ; les profils de reference sont `DiffusionReferenceProfile`.
 // Les optimisations sont :
 //   - mixedPrecision        : Q-DiT/ViDiT-Q (premiers/derniers layers high-prec)
 //   - unloadVisionAfterUse  : vision_tower retire apres le 1er forward

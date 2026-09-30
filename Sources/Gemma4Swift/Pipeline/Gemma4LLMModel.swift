@@ -41,6 +41,11 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         return languageModel(inputs: inputs, cache: cacheArray)
     }
 
+    /// Logits des positions `from...` seulement (entrainement masque, K-30 a).
+    public func logits(_ inputs: MLXArray, from: Int) -> MLXArray {
+        languageModel(inputs: inputs, cache: nil, logitsFrom: from)
+    }
+
     /// Hidden states de toutes les couches, convention HuggingFace
     /// `output_hidden_states=True` : `num_hidden_layers + 1` tenseurs
     /// `[B, T, hidden_size]` (49 x `[B, T, 3840]` sur le 12B).
@@ -60,9 +65,14 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         return languageModel.forwardCollectingHiddenStates(inputs: inputs, cache: cacheArray)
     }
 
+    /// Caches standard. `parameters.kvBits` n'est volontairement pas lu ici : la
+    /// quantification native du KV est faite par mlx-swift-lm pendant la generation
+    /// (`maybeQuantizeKVCache`, a partir de `quantizedKVStart`), comme le documente
+    /// le README. Le router vers TurboQuant donnait deux implementations differentes
+    /// selon le modele pour un meme parametre. TurboQuant (experimental) reste
+    /// accessible explicitement par `languageModel.makeCache(kvBits:)`.
     public func newCache(parameters: GenerateParameters?) -> [any KVCache] {
-        let kvBits: Float? = parameters?.kvBits != nil ? Float(parameters!.kvBits!) : nil
-        return languageModel.makeCache(kvBits: kvBits)
+        languageModel.makeCache()
     }
 
     public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
@@ -72,7 +82,8 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
-    /// Prepare les tokens d'entree pour la generation
+    /// Prefill par tranches de `windowSize` (defaut 512) ; seul le dernier jeton est
+    /// rendu au `TokenIterator`, donc le head ne tourne que sur une position.
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
         let promptTokens = input.text.tokens
         let promptCount = promptTokens.shape[0]
@@ -82,6 +93,10 @@ public class Gemma4LLMModel: Module, LLMModel, LoRAModel {
             return .tokens(.init(tokens: emptyToken))
         }
 
-        return .tokens(input.text)
+        let cacheArray: [KVCache?] = cache.map { $0 as KVCache? }
+        Gemma4ChunkedPrefill.run(count: promptCount, step: windowSize ?? 512, cache: cache) { range in
+            _ = languageModel(inputs: promptTokens[range][.newAxis], cache: cacheArray)
+        }
+        return .tokens(input.text[(promptCount - 1)...])
     }
 }

@@ -13,9 +13,9 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     public let config: Gemma4Config
 
     @ModuleInfo(key: "language_model") var languageModel: Gemma4LanguageModel
-    @ModuleInfo(key: "vision_tower") var visionTower: VisionModel
+    @ModuleInfo(key: "vision_tower") public var visionTower: VisionModel
     @ModuleInfo(key: "embed_vision") var embedVision: MultimodalEmbedder
-    @ModuleInfo(key: "audio_tower") var audioTower: AudioEncoder?
+    @ModuleInfo(key: "audio_tower") public var audioTower: AudioEncoder?
     @ModuleInfo(key: "embed_audio") var embedAudio: MultimodalEmbedder?
 
     public let modelType: String
@@ -30,6 +30,14 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     // Embeddings pre-calculees (pour le training — evite de tracer les towers dans valueAndGrad)
     public var pendingImageEmbeddings: MLXArray?
     public var pendingAudioEmbeddings: MLXArray?
+
+    // Residence par etape (K-43) : tours liberees apres le prefill, rechargees a la demande.
+    /// Liberer les tours vision/audio une fois un prefill avec media termine.
+    public var releaseEncodersAfterPrefill = false
+    /// Dossier du checkpoint (pose par `Gemma4Registration.loadContainer`), pour recharger.
+    public var weightsDirectory: URL?
+    /// Vrai quand les tours ont ete liberees et pas encore rechargees.
+    public private(set) var encodersReleased = false
 
     // Video: frames separees des images, avec truncation a softTokensPerFrame
     public var pendingVideoFrames: MLXArray?
@@ -84,6 +92,15 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         return languageModel(inputs: inputs, cache: cacheArray)
     }
 
+    /// Logits des positions `from...` seulement (entrainement masque, K-30 a).
+    public func logits(_ inputs: MLXArray, from: Int) -> MLXArray {
+        let (inputsEmbeds, perLayerInputs) = prepareMultimodalEmbeds(inputs)
+        if let inputsEmbeds {
+            return languageModel(inputsEmbeds: inputsEmbeds, cache: nil, perLayerInputs: perLayerInputs, logitsFrom: from)
+        }
+        return languageModel(inputs: inputs, cache: nil, logitsFrom: from)
+    }
+
     /// Variante de `callAsFunction` qui retourne logits + hidden states (pre-norm) +
     /// intermediates K/V — utilise par le path MTP speculative decoding.
     public func forwardWithIntermediates(
@@ -113,7 +130,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
 
         // Mode multimodal: construire les embeddings fusionnes
         var inputsEmbeds = languageModel.model.embedTokens(inputs)
-        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: .float32)
+        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: inputsEmbeds.dtype)
 
         // Per-layer inputs (masquer tokens image/audio)
         var perLayerInputs: MLXArray? = nil
@@ -129,7 +146,7 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         // Vision: utiliser les embeddings pre-calculees si disponibles (training)
         // ou encoder via le vision tower (inference)
         if let precomputed = pendingImageEmbeddings {
-            var imageFeatures = precomputed.asType(inputsEmbeds.dtype)
+            let imageFeatures = precomputed.asType(inputsEmbeds.dtype)
             let imageMask = inputs .== Int32(config.imageTokenId)
             let imageMaskExpanded = broadcast(expandedDimensions(imageMask, axis: -1), to: inputsEmbeds.shape)
             inputsEmbeds = maskedScatter(input: inputsEmbeds, mask: imageMaskExpanded, source: imageFeatures)
@@ -250,12 +267,125 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
+    /// Prefill par tranches (voir `Gemma4ChunkedPrefill`). Avec un media en attente,
+    /// les embeddings fusionnes (tours + masked_scatter) sont calcules une fois sur
+    /// tout le prompt, puis le modele de langage avance par tranches d'embeddings ;
+    /// le dernier jeton (texte : fin du gabarit) est rendu au `TokenIterator`.
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+        // Sans tour audio (chargement `audio: false`), l'audio en attente serait ignore
+        // en silence par `prepareMultimodalEmbeds` : refuser plutot que repondre sans.
+        if pendingAudioFeatures != nil && audioTower == nil {
+            pendingAudioFeatures = nil
+            pendingAudioMask = nil
+            throw Gemma4PipelineError.audioTowerUnavailable
+        }
         let promptTokens = input.text.tokens
-        guard promptTokens.shape[0] > 0 else {
+        let promptCount = promptTokens.shape[0]
+        guard promptCount > 0 else {
             let emptyToken = MLXArray(Int32(0))[0 ..< 0]
             return .tokens(.init(tokens: emptyToken))
         }
-        return .tokens(input.text)
+
+        let cacheArray: [KVCache?] = cache.map { $0 as KVCache? }
+        let step = windowSize ?? 512
+        if hasPendingMedia { try restoreEncodersIfNeeded() }
+        let (inputsEmbeds, perLayerInputs) = prepareMultimodalEmbeds(promptTokens[.newAxis])
+        if let inputsEmbeds {
+            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+                _ = languageModel(
+                    inputsEmbeds: inputsEmbeds[0..., range],
+                    cache: cacheArray,
+                    perLayerInputs: perLayerInputs?[0..., range]
+                )
+            }
+            if releaseEncodersAfterPrefill {
+                // Les soft tokens sont dans les caches : evaluer, puis liberer les tours.
+                eval(cache)
+                releaseEncoders()
+            }
+        } else {
+            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+                _ = languageModel(inputs: promptTokens[range][.newAxis], cache: cacheArray)
+            }
+        }
+        return .tokens(input.text[(promptCount - 1)...])
+    }
+
+    // MARK: - Residence par etape (K-43)
+
+    private var hasPendingMedia: Bool {
+        pendingPixelValues != nil || pendingVideoFrames != nil || pendingAudioFeatures != nil
+    }
+
+    private var encoderModules: [Module] {
+        [visionTower, embedVision, audioTower, embedAudio].compactMap { $0 }
+    }
+
+    private static let encoderPrefixes = ["vision_tower.", "embed_vision.", "audio_tower.", "embed_audio."]
+
+    /// Libere les tours (poids remplaces par des tableaux vides). Sans effet si une tour est
+    /// quantifiee (quantification a la volee : on ne saurait pas la recharger a l'identique)
+    /// ou si le dossier du modele est inconnu.
+    public func releaseEncoders() {
+        guard !encodersReleased, let directory = weightsDirectory else { return }
+        guard encodersReloadable(from: directory) else { return }
+        for module in encoderModules {
+            let empty = module.parameters().flattened().map { ($0.0, MLXArray.zeros([0])) }
+            module.update(parameters: ModuleParameters.unflattened(empty))
+        }
+        encodersReleased = true
+        Memory.clearCache()
+    }
+
+    /// Les tours se rechargent a l'identique si chaque module quantifie en memoire l'est
+    /// aussi sur disque (pack pre-quantifie : `embed_vision.embedding_projection` du pack
+    /// E2B 4 bits) ; pas une tour quantifiee a la volee depuis un checkpoint bf16.
+    /// Lecture des seules cles (chargement paresseux).
+    private var reloadableCache: Bool?
+    private func encodersReloadable(from directory: URL) -> Bool {
+        if let reloadableCache { return reloadableCache }
+        let quantizedPaths = [("vision_tower", visionTower as Module?), ("embed_vision", embedVision as Module?),
+                              ("audio_tower", audioTower as Module?), ("embed_audio", embedAudio as Module?)]
+            .flatMap { name, module -> [String] in
+                guard let module else { return [] }
+                return module.leafModules().flattened().filter { $0.1 is Quantized }.map { "\(name).\($0.0)" }
+            }
+        var reloadable = true
+        if !quantizedPaths.isEmpty {
+            let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "safetensors" }) ?? []
+            var keys = Set<String>()
+            for file in files { keys.formUnion((try? loadArrays(url: file).keys).map(Array.init) ?? []) }
+            reloadable = quantizedPaths.allSatisfy { keys.contains("\($0).scales") }
+        }
+        reloadableCache = reloadable
+        return reloadable
+    }
+
+    /// Recharge les tours liberees depuis `weightsDirectory` (lecture paresseuse : seuls
+    /// leurs tenseurs sont lus).
+    public func restoreEncodersIfNeeded() throws {
+        guard encodersReleased else { return }
+        guard let directory = weightsDirectory else {
+            throw Gemma4PipelineError.invalidInput("tours liberees et dossier du modele inconnu : impossible de les recharger")
+        }
+        var raw: [String: MLXArray] = [:]
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "safetensors" }
+        for file in files {
+            for (key, value) in try loadArrays(url: file)
+            where key.contains("vision_tower") || key.contains("embed_vision")
+                || key.contains("audio_tower") || key.contains("embed_audio") {
+                raw[key] = value
+            }
+        }
+        let weights = sanitize(weights: raw).filter { key, _ in
+            Self.encoderPrefixes.contains { key.hasPrefix($0) }
+        }
+        // Pas de .shapeMismatch : les poids liberes sont des tableaux vides, toute forme differe.
+        try update(parameters: ModuleParameters.unflattened(weights), verify: [.noUnusedKeys])
+        for module in encoderModules { eval(module) }
+        encodersReleased = false
     }
 }
+

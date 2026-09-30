@@ -53,14 +53,39 @@ public class DiffusionGemmaEncoderModel: Module {
     /// le cache). Les forwards suivants peuvent etre incrementaux sur du texte
     /// pur sans vision.
     public func unloadVision() {
-        self._visionTower.wrappedValue = nil
-        self._embedVision.wrappedValue = nil
+        // Affecter nil a la propriete @ModuleInfo est fatal dans MLX (« please use
+        // Model.update(modules:) rather than mutating the Module property directly ») :
+        // c'est ce qui faisait planter le canvas suivant (D-10). On garde les modules et
+        // on remplace leurs parametres par des tableaux vides, ce qui libere les tampons.
+        for module in [visionTower as Module?, embedVision as Module?].compactMap({ $0 }) {
+            let empty = module.parameters().flattened().map { ($0.0, MLXArray.zeros([0])) }
+            module.update(parameters: ModuleParameters.unflattened(empty))
+        }
+        visionUnloaded = true
         MLX.Memory.clearCache()
     }
 
+    /// Recharge la vision apres `unloadVision()`, depuis les poids sanitises
+    /// `encoder.vision_tower.*` / `encoder.embed_vision.*`
+    /// (`DiffusionGemmaLoader.loadVisionWeights`). Sans elle, une image fournie apres
+    /// un dechargement serait ignoree : le forward saute la vision (`useVision`).
+    public func reloadVision(from weights: [String: MLXArray]) throws {
+        let prefix = "encoder."
+        let local = weights.compactMap { key, value -> (String, MLXArray)? in
+            key.hasPrefix(prefix) ? (String(key.dropFirst(prefix.count)), value) : nil
+        }
+        try update(parameters: ModuleParameters.unflattened(local), verify: [.noUnusedKeys])
+        if let visionTower { eval(visionTower) }
+        if let embedVision { eval(embedVision) }
+        visionUnloaded = false
+    }
+
+    /// Vrai apres `unloadVision()` : la tour vision ne doit plus etre appelee.
+    public private(set) var visionUnloaded = false
+
     /// True si le vision_tower est encore charge.
     public var hasVisionLoaded: Bool {
-        visionTower != nil
+        visionTower != nil && !visionUnloaded
     }
 
     /// Forward de l'encoder.
@@ -80,7 +105,7 @@ public class DiffusionGemmaEncoderModel: Module {
         // En mode incremental (priorCache != nil) : on suppose que la vision a
         // ete encodee au premier appel, donc on traite les inputIds comme du
         // texte pur (les nouveaux tokens sont du canvas argmax, pas d'image).
-        let useVision = pixelValues != nil && priorCache == nil
+        let useVision = pixelValues != nil && priorCache == nil && !visionUnloaded
 
         // 1) Mask des positions image_token AVANT de remplacer par pad
         let imageMask = inputIds .== MLXArray(Int32(imageTokenId))
@@ -109,69 +134,18 @@ public class DiffusionGemmaEncoderModel: Module {
             let maskExpanded = expandedDimensions(imageMask, axis: -1)
             let maskBroadcast = broadcast(maskExpanded, to: inputsEmbeds.shape)
 
-            inputsEmbeds = maskedScatter(
-                inputsEmbeds: inputsEmbeds,
-                mask: maskBroadcast,
-                source: mmFeatures
-            )
+            // maskedScatter generique (chemin AR) : positions remplies dans l'ordre,
+            // plusieurs images et B > 1 compris. L'ancienne version locale exigeait B == 1
+            // et ne placait que la premiere image (D-09) ; la coherence nombre de jetons
+            // image / nombre d'images est verifiee en tete de generate.
+            inputsEmbeds = Gemma4Swift.maskedScatter(
+                input: inputsEmbeds, mask: maskBroadcast, source: mmFeatures.asType(inputsEmbeds.dtype))
         }
 
         // 5) Forward du language_model avec priorCache si fourni
-        return languageModel(inputsEmbeds: inputsEmbeds, priorCache: priorCache)
-    }
-
-    /// Splice les valeurs `source` aux positions `mask=True` dans `inputsEmbeds`.
-    /// Equivalent de `inputsEmbeds.masked_scatter(mask, source)` PyTorch.
-    private func maskedScatter(
-        inputsEmbeds: MLXArray,
-        mask: MLXArray,
-        source: MLXArray
-    ) -> MLXArray {
-        // source shape : [B, K, H] avec K = nb soft-tokens par image
-        // mask shape : [B, T, H]
-        // On veut placer source.flatten([B, K, H] -> [B*K, H]) aux positions mask=True.
-        //
-        // Approche simple : reshape source pour matcher [B, T, H] avec zeros ailleurs.
-        // Mais c'est complique en MLX. On utilise un trick :
-        //   1. Source aplati a [N_mask_true, H] (N_mask_true == B*K)
-        //   2. positions_dans_T = cumsum(mask_bool) - 1 (indice cumul des positions True)
-        //   3. Indexation : source[positions_dans_T] gather sur axe 0
-        //   4. where(mask, gathered, inputsEmbeds)
-        //
-        // Pour Phase 5 vision initial : version simplifiee qui suppose
-        // que mask est consecutif (tous les image_tokens sont contigus
-        // dans la sequence), ce qui est le cas pour un seul block d'image.
-        // Cas multi-images / mixe sera traite plus tard.
-
-        let B = inputsEmbeds.dim(0)
-        let H = inputsEmbeds.dim(2)
-        // source aplati : [B, K*H] puis on broadcast aux positions mask
-        // Trick : on ecrit source.reshape(B, -1, H) sur les positions mask.
-        // Mais la maniere la plus robuste : utiliser une boucle batch + indexation.
-
-        // Pour Phase 5 minimale, on traite batch=1 et on suppose tous les soft-tokens
-        // sont a la suite. Cela couvre le cas "un prompt avec une image".
-        precondition(B == 1, "maskedScatter multi-batch a implementer (Phase 6)")
-
-        // Trouve les indices ou mask est True dans la sequence T (axis=1)
-        // mask shape : [1, T, H] -> on regarde mask[0, :, 0] pour les positions
-        let maskCol = mask[0, 0..., 0]  // [T] bool
-        let positions = argSort(MLXArray(-1) * maskCol.asType(.int32), axis: 0)
-        // positions[:K] = indices True, dans l'ordre. Puis on tronque a K.
-        let K = source.dim(1)
-        let targetIndices = positions[0 ..< K]  // [K]
-
-        // Update inputsEmbeds[0, targetIndices, :] = source[0, :, :]
-        // En MLX : putAlong
-        let inputs0 = inputsEmbeds[0]  // [T, H]
-        let source0 = source[0]        // [K, H]
-
-        // Pour chaque k dans 0..K, ecrire inputs0[targetIndices[k], :] = source0[k, :]
-        // Approche : utiliser putAlong sur axe 0 avec broadcast des indices.
-        let idxExpanded = expandedDimensions(targetIndices, axis: -1)  // [K, 1]
-        let idxBroadcast = broadcast(idxExpanded, to: [K, H])  // [K, H]
-        let updated = putAlong(inputs0, idxBroadcast, values: source0, axis: 0)
-
-        return expandedDimensions(updated, axis: 0)
+        // Blocs image bidirectionnels en mode "vision" (D-06).
+        return languageModel(
+            inputsEmbeds: inputsEmbeds, priorCache: priorCache,
+            visionTokenMask: useVision ? imageMask : nil)
     }
 }

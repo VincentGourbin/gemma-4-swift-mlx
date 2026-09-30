@@ -20,24 +20,29 @@ public struct DiffusionGemmaContainer: @unchecked Sendable {
     public let generationConfig: DiffusionGenerationConfig
     public let tokenizer: Tokenizer
     public let memoryConfig: DiffusionMemoryConfig
+    /// Dossier du checkpoint : permet de recharger la vision apres un dechargement.
+    public let modelDirectory: URL?
 
     public init(
         model: DiffusionGemmaForBlockDiffusion,
         config: DiffusionGemmaConfig,
         generationConfig: DiffusionGenerationConfig,
         tokenizer: Tokenizer,
-        memoryConfig: DiffusionMemoryConfig
+        memoryConfig: DiffusionMemoryConfig,
+        modelDirectory: URL? = nil
     ) {
         self.model = model
         self.config = config
         self.generationConfig = generationConfig
         self.tokenizer = tokenizer
         self.memoryConfig = memoryConfig
+        self.modelDirectory = modelDirectory
     }
 
     /// Cree un pipeline pret a generer depuis ce container.
     public func makePipeline() -> DiffusionGemmaPipeline {
-        DiffusionGemmaPipeline(model: model, genConfig: generationConfig)
+        DiffusionGemmaPipeline(
+            model: model, genConfig: generationConfig, memoryConfig: memoryConfig, modelDirectory: modelDirectory)
     }
 }
 
@@ -87,8 +92,8 @@ public enum DiffusionGemmaRegistration {
             throw LoadError.configLoadFailed(error)
         }
 
-        // 2) Mixed precision si demandee
-        if let mp = memoryConfig.mixedPrecision {
+        // 2) Mixed precision si demandee (un pack est deja quantifie)
+        if let mp = memoryConfig.mixedPrecision, !DiffusionPrequantizedPack.isPack(directory) {
             _ = DiffusionOnTheFlyQuantization.applyMixedPrecision(to: model, config: mp)
         }
 
@@ -117,8 +122,44 @@ public enum DiffusionGemmaRegistration {
             config: config,
             generationConfig: genConfig,
             tokenizer: tokenizer,
-            memoryConfig: memoryConfig
+            memoryConfig: memoryConfig,
+            modelDirectory: directory
         )
+    }
+
+    /// Charge le bf16 officiel et applique un profil de reference : quantification a la
+    /// volee (experts compris, routeur 8 bits, vision bf16), vision, politique memoire.
+    /// Additif : `load(from:memoryConfig:includeVision:)` reste.
+    public static func load(
+        from directory: URL,
+        profile: DiffusionReferenceProfile
+    ) async throws -> DiffusionGemmaContainer {
+        // Pack pre-quantifie : sa quantification doit etre celle du profil.
+        if DiffusionPrequantizedPack.isPack(directory) {
+            let manifest = try DiffusionPrequantizedPack.readManifest(directory)
+            guard manifest.quantization == profile.quantization.signature else {
+                throw DiffusionPrequantizedPack.PackError.quantizationMismatch(
+                    pack: manifest.quantization, profile: profile.quantization.signature)
+            }
+            let container = try await load(
+                from: directory, memoryConfig: profile.memoryConfig, includeVision: profile.includeVision)
+            profile.applyGlobalPolicy()
+            return container
+        }
+        let container = try await load(
+            from: directory, memoryConfig: profile.memoryConfig, includeVision: profile.includeVision)
+        switch profile.quantization {
+        case .none:
+            break
+        case .uniform(let bits, let groupSize):
+            DiffusionOnTheFlyQuantization.apply(
+                to: container.model, bits: bits, groupSize: groupSize,
+                excludedPathPrefixes: DiffusionOnTheFlyQuantization.multimodalEncoderPrefixes)
+        case .mixed(let config):
+            DiffusionOnTheFlyQuantization.applyMixedPrecision(to: container.model, config: config)
+        }
+        profile.applyGlobalPolicy()
+        return container
     }
 
     /// RAM systeme en GB pour auto-selection du preset.

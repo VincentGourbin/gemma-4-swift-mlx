@@ -39,6 +39,11 @@ public enum DiffusionGemmaLoader {
         from directory: URL,
         includeVision: Bool = false
     ) throws -> (model: DiffusionGemmaForBlockDiffusion, config: DiffusionGemmaConfig) {
+        // Pack pre-quantifie (K-D12) : charge quantifie, sans lire de bf16.
+        if DiffusionPrequantizedPack.isPack(directory) {
+            let pack = try DiffusionPrequantizedPack.load(from: directory, includeVision: includeVision)
+            return (pack.model, pack.config)
+        }
         let config = try loadConfig(from: directory)
         let model = DiffusionGemmaForBlockDiffusion(config)
         try loadWeights(into: model, from: directory, includeVision: includeVision)
@@ -97,5 +102,25 @@ public enum DiffusionGemmaLoader {
         // Apply
         let parameters = ModuleParameters.unflattened(sanitized)
         try model.update(parameters: parameters, verify: [.all])
+    }
+
+    /// Poids de la tour vision seuls (`encoder.vision_tower.*`, `encoder.embed_vision.*`),
+    /// pour recharger une vision dechargee (`DiffusionGemmaEncoderModel.reloadVision`).
+    /// Chargement paresseux de MLX : seuls les tableaux vision sont lus a l'evaluation.
+    public static func loadVisionWeights(from directory: URL) throws -> [String: MLXArray] {
+        var weights = [String: MLXArray]()
+        var fileCount = 0
+        if let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil) {
+            for case let url as URL in enumerator where url.pathExtension == "safetensors" {
+                let (w, _) = try loadArraysAndMetadata(url: url)
+                for (key, value) in w where key.contains("vision_tower") || key.contains("embed_vision") {
+                    weights[key] = value
+                }
+                fileCount += 1
+            }
+        }
+        guard fileCount > 0 else { throw DiffusionGemmaLoaderError.noSafetensorsFound(directory) }
+        return DiffusionWeightSanitizer.sanitize(weights, includeVision: true)
+            .filter { $0.key.hasPrefix("encoder.vision_tower.") || $0.key.hasPrefix("encoder.embed_vision.") }
     }
 }

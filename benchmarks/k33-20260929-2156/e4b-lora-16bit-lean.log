@@ -1,0 +1,30 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-e4b-it-bf16
+Modele charge. GPU: 14234 Mo
+Famille detectee: e4b (42 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+Profil e4b/lora-16bit-lean (NON MESURE) : Econome : gradient checkpointing par couche, cache MLX 1 Go.
+  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 50
+Couches: 12
+Sortie: /Volumes/Lexar/tmp/k33-adapters/e4b-lora-16bit-lean
+---
+
+Note : 597 exemple(s) de plus de 2048 jetons (max 3320), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 5177344 / 7468190762 (0.07%)
+Train: 899 samples (avg response: 748 tokens)
+Iteration 1: validation loss 1,411438, validation time 76,418342s
+Iteration 10: training loss 1,356366, iterations/sec 0,184425, Tokens/sec 136,215975
+Iteration 20: training loss 1,22365, iterations/sec 0,154424, Tokens/sec 119,199642
+Iteration 30: training loss 1,207637, iterations/sec 0,150105, Tokens/sec 123,086216
+Iteration 40: training loss 1,152782, iterations/sec 0,171775, Tokens/sec 115,346604
+Iteration 50: training loss 1,149268, iterations/sec 0,125899, Tokens/sec 89,035977
+Iteration 50: validation loss 1,157254, validation time 97,067069s
+Iteration 50: saved weights to /Volumes/Lexar/tmp/k33-adapters/e4b-lora-16bit-lean/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/tmp/k33-adapters/e4b-lora-16bit-lean
+
+Training termine.
+GPU pic: 24640 Mo

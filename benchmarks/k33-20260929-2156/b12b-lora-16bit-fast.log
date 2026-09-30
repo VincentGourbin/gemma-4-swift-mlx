@@ -1,0 +1,30 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-12B-it-bf16
+Modele charge. GPU: 22711 Mo
+Famille detectee: b12b (48 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+Profil b12b/lora-16bit-fast (NON MESURE) : Rapide : cache MLX 2 Go ; checkpointing garde (activations trop grosses sans).
+  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 50
+Couches: 16
+Sortie: /Volumes/Lexar/tmp/k33-adapters/b12b-lora-16bit-fast
+---
+
+Note : 608 exemple(s) de plus de 2048 jetons (max 3327), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 10930176 / 11918280496 (0.09%)
+Train: 899 samples (avg response: 4 tokens)
+Iteration 1: validation loss 0,034743, validation time 155,361481s
+Iteration 10: training loss 0,002279, iterations/sec 0,038706, Tokens/sec 0,154825
+Iteration 20: training loss 1,297258, iterations/sec 0,046207, Tokens/sec 0,184829
+Iteration 30: training loss 0,319667, iterations/sec 0,049609, Tokens/sec 0,198436
+Iteration 40: training loss 0,319218, iterations/sec 0,049203, Tokens/sec 0,196813
+Iteration 50: training loss 0,08011, iterations/sec 0,058102, Tokens/sec 0,232409
+Iteration 50: validation loss 0,408023, validation time 205,757529s
+Iteration 50: saved weights to /Volumes/Lexar/tmp/k33-adapters/b12b-lora-16bit-fast/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/tmp/k33-adapters/b12b-lora-16bit-fast
+
+Training termine.
+GPU pic: 38559 Mo

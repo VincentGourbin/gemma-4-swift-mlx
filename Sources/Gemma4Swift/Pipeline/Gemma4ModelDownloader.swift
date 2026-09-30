@@ -42,11 +42,16 @@ public enum Gemma4ModelDownloader {
             modelDir = modelDir.appendingPathComponent(String(part))
         }
 
-        if !force && Gemma4ModelCache.isDownloaded(modelId: modelId) {
+        // Deja present : renvoyer l'emplacement reel, qui peut etre un snapshot du
+        // cache HF plutot que modelsDirectory/org/model.
+        if !force, let existing = Gemma4ModelCache.localPath(modelId: modelId) {
             progress?(.cached(fileCount: 1))
-            return modelDir
+            return existing
         }
 
+        guard !Gemma4ModelCache.isOnUnmountedVolume(modelDir) else {
+            throw Gemma4DownloadError.volumeNotMounted(modelDir.path)
+        }
         try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
         let specs = try await fetchHFFileSpecs(modelId: modelId, token: token)
@@ -89,6 +94,8 @@ public enum Gemma4DownloadError: LocalizedError {
     case httpError(String, Int)
     case networkError(String, Error)
     case cancelled(String)
+    /// La racine des modeles est sur un disque externe non monte.
+    case volumeNotMounted(String)
 
     public var errorDescription: String? {
         switch self {
@@ -98,6 +105,7 @@ public enum Gemma4DownloadError: LocalizedError {
         case .httpError(let file, let c):  return "HTTP \(c) for \(file)"
         case .networkError(let id, let e): return "Network error for \(id): \(e.localizedDescription)"
         case .cancelled:                   return "Download cancelled"
+        case .volumeNotMounted(let path):  return "External volume not mounted for \(path) (GEMMA4_MODELS_DIR?)"
         }
     }
 }

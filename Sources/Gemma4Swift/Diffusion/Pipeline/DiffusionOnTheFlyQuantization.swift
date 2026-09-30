@@ -4,9 +4,12 @@
 // directement un Module (DiffusionGemmaForBlockDiffusion) au lieu
 // d'un LanguageModel.
 //
-// Cible 4-bit : modele passe de 48 Go bf16 a ~14 Go, et chaque
-// forward decoder devient 3-4x plus rapide (kernels MLX optimises
-// pour 4-bit groupwise sur Apple Silicon).
+// Taille estimee (calcul, non mesuree) : ~50 Go bf16, ~27 Go en 8 bits,
+// ~15 Go en 4 bits, experts MoE compris (voir DiffusionReferenceProfile).
+// Avant le correctif D-01 (2026-09-28) les experts SwitchLinear n'etaient
+// PAS quantifies : les mesures anterieures (docs/examples/
+// diffusion-optim-phases.md) ne portaient que sur ~12 % des poids. Aucun
+// gain de vitesse n'est etabli ; a mesurer avec `gemma4-cli bench-diffusion`.
 
 import Foundation
 import MLX
@@ -57,9 +60,11 @@ public enum DiffusionOnTheFlyQuantization {
         let mlxMode = mode.mlxMode
 
         var skipped: [String] = []
+        func quantizeTree(_ root: Module, pathPrefix: String) {
         MLXNN.quantize(
-            model: model,
-            filter: { path, m -> (groupSize: Int, bits: Int, mode: QuantizationMode)? in
+            model: root,
+            filter: { relativePath, m -> (groupSize: Int, bits: Int, mode: QuantizationMode)? in
+                let path = pathPrefix + relativePath
                 for prefix in excludedPathPrefixes {
                     if path.hasPrefix(prefix) || path.contains(".\(prefix).") {
                         return nil
@@ -83,16 +88,36 @@ public enum DiffusionOnTheFlyQuantization {
                         return nil
                     }
                 }
-                if m is Linear || m is Embedding {
-                    return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
+                // Experts MoE compris (SwitchLinear n'herite pas de Linear, D-01) ;
+                // routeur en 8 bits sous 8 bits comme les packs mlx-community (D-03).
+                guard m is Quantizable, !(m is Quantized) else { return nil }
+                if path.hasSuffix("router.proj") && bits < 8 {
+                    return (groupSize: effectiveGroupSize, bits: 8, mode: .affine)
                 }
-                return nil
+                return (groupSize: effectiveGroupSize, bits: bits, mode: mlxMode)
             },
             apply: { layer, gs, b, qmode in
                 quantizedCount += 1
                 return quantizeSingle(layer: layer, groupSize: gs, bits: b, mode: qmode)
             }
         )
+        }
+
+        // Encodeur et decodeur partagent leurs poids (D-02) : quantifier l'encodeur,
+        // le materialiser, puis donner au decodeur les MEMES instances de modules ;
+        // ensuite seulement le reste (self_conditioning, tours…), les modules deja
+        // quantifies etant ignores. Voir `shareEncoderModules`.
+        if let diffusion = model as? DiffusionGemmaForBlockDiffusion {
+            let shared = sharedDecoderLeafPaths(diffusion)
+            let encoder = diffusion.encoder.languageModel
+            quantizeSharedLayerwise(diffusion, shared: shared) { i, layer in
+                quantizeTree(layer, pathPrefix: "encoder.language_model.layers.\(i).")
+            }
+            quantizeTree(encoder, pathPrefix: "encoder.language_model.")
+            eval(encoder)
+            shareEncoderModules(diffusion, paths: shared)
+        }
+        quantizeTree(model, pathPrefix: "")
         if !skipped.isEmpty {
             let msg = "[DiffusionQuant] \(skipped.count) modules skip (last_dim non divisible par \(effectiveGroupSize)) :\n"
                 + skipped.prefix(5).map { "  - \($0)" }.joined(separator: "\n")
@@ -121,7 +146,7 @@ public enum DiffusionOnTheFlyQuantization {
     //   - self_conditioning en 8-bit (modulation soft signals)
     //   - vision_tower en bf16 (skip, sensible et petit)
 
-    public struct MixedPrecisionConfig: Sendable {
+    public struct MixedPrecisionConfig: Sendable, Equatable {
         public var highPrecisionLayers: Set<Int>
         public var highPrecisionBits: Int
         public var lowPrecisionBits: Int
@@ -214,10 +239,12 @@ public enum DiffusionOnTheFlyQuantization {
                             return nil
                         }
                     }
-                    if m is Linear || m is Embedding {
-                        return (groupSize: config.groupSize, bits: bits, mode: .affine)
+                    // Experts MoE compris (D-01) ; routeur en 8 bits (D-03).
+                    guard m is Quantizable, !(m is Quantized) else { return nil }
+                    if path.hasSuffix("router.proj") && bits < 8 {
+                        return (groupSize: config.groupSize, bits: 8, mode: .affine)
                     }
-                    return nil
+                    return (groupSize: config.groupSize, bits: bits, mode: .affine)
                 },
                 apply: { layer, gs, b, qmode in
                     if b == config.highPrecisionBits {
@@ -230,24 +257,32 @@ public enum DiffusionOnTheFlyQuantization {
             )
         }
 
-        // 1) Encoder text layers
-        let encoderTextLayers = model.encoder.languageModel.layers
-        for (i, layer) in encoderTextLayers.enumerated() {
+        // Chemins du decodeur qui partagent leurs poids avec l'encodeur (avant quantif).
+        let shared = sharedDecoderLeafPaths(model)
+
+        // 1) Encoder text layers, chacune reprise aussitot par le decodeur
+        quantizeSharedLayerwise(model, shared: shared) { i, layer in
             let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
             quantizeModule(layer, bits: bits, label: "encoder.language_model.layers.\(i)")
         }
 
-        // 2) Decoder layers (memes index, partagent les poids tied avec encoder)
+        if config.quantizeSensitiveAtHighPrecision {
+            quantizeModule(model.encoder.languageModel.embedTokens, bits: config.highPrecisionBits, label: "encoder.embed_tokens")
+        }
+
+        // 2) Le decodeur reprend les modules quantifies de l'encodeur (memes instances,
+        //    meme precision par couche) : une seule copie en memoire (D-02).
+        eval(model.encoder.languageModel)
+        shareEncoderModules(model, paths: shared)
+
+        // 3) Ce qui reste propre au decodeur (modules deja quantifies ignores).
         let decoderLayers = model.decoder.layers
         for (i, layer) in decoderLayers.enumerated() {
             let bits = config.highPrecisionLayers.contains(i) ? config.highPrecisionBits : config.lowPrecisionBits
             quantizeModule(layer, bits: bits, label: "decoder.layers.\(i)")
         }
-
-        // 3) Sensible : embed_tokens + self_conditioning en highPrecision si demande
         if config.quantizeSensitiveAtHighPrecision {
             quantizeModule(model.decoder.embedTokens, bits: config.highPrecisionBits, label: "decoder.embed_tokens")
-            quantizeModule(model.encoder.languageModel.embedTokens, bits: config.highPrecisionBits, label: "encoder.embed_tokens")
             quantizeModule(model.decoder.selfConditioning, bits: config.highPrecisionBits, label: "decoder.self_conditioning")
         }
 
@@ -258,6 +293,72 @@ public enum DiffusionOnTheFlyQuantization {
         MLX.Memory.clearCache()
 
         return stats
+    }
+
+    /// Chemins des modules feuilles du decodeur partages avec l'encodeur. Contrat du
+    /// sanitizer (`DiffusionWeightSanitizer`) : le meme tableau est insere sous
+    /// `decoder.X` et `encoder.language_model.X` pour tout sauf `self_conditioning` et
+    /// `layer_scalar` (qui n'est pas un module feuille). Garde-fou : memes cles, formes
+    /// et dtypes. A appeler sur le modele bf16 charge, avant toute quantification.
+    static func sharedDecoderLeafPaths(_ model: DiffusionGemmaForBlockDiffusion) -> Set<String> {
+        let encoderLeaves = Dictionary(
+            model.encoder.languageModel.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+        var shared = Set<String>()
+        for (path, module) in model.decoder.leafModules().flattened() where !path.hasPrefix("self_conditioning") {
+            guard let source = encoderLeaves[path], type(of: source) == type(of: module) else { continue }
+            let mine = module.parameters().flattened()
+            let theirs = Dictionary(source.parameters().flattened(), uniquingKeysWith: { a, _ in a })
+            let compatible = !mine.isEmpty && mine.count == theirs.count && mine.allSatisfy { key, array in
+                theirs[key].map { $0.shape == array.shape && $0.dtype == array.dtype } ?? false
+            }
+            if compatible { shared.insert(path) }
+        }
+        return shared
+    }
+
+    /// Quantifie les couches texte de l'encodeur une a une et donne chacune au decodeur
+    /// des qu'elle est evaluee : le bf16 de la couche n'a alors plus de reference et
+    /// part. Quantifier tout l'encodeur avant de partager gardait le bf16 complet et
+    /// tout le quantifie en meme temps (pic de chargement mesure le 2026-09-28 : 77 Go
+    /// en 8 bits, 65 Go en 4 bits, pour 49 Go de bf16).
+    static func quantizeSharedLayerwise(
+        _ model: DiffusionGemmaForBlockDiffusion,
+        shared: Set<String>,
+        quantizeLayer: (Int, Module) -> Void
+    ) {
+        let decoderLayers = model.decoder.layers
+        for (i, layer) in model.encoder.languageModel.layers.enumerated() where i < decoderLayers.count {
+            quantizeLayer(i, layer)
+            eval(layer)
+            // Mise a jour de la couche elle-meme : `unflattened` sur "layers.i.*" seul ne
+            // reconstruit pas le tableau `layers` (unexpectedStructure).
+            let prefix = "layers.\(i)."
+            let leaves = Dictionary(layer.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+            let replacements = shared.filter { $0.hasPrefix(prefix) }.sorted().compactMap { path -> (String, Module)? in
+                let relative = String(path.dropFirst(prefix.count))
+                return leaves[relative].map { (relative, $0) }
+            }
+            if !replacements.isEmpty {
+                decoderLayers[i].update(modules: ModuleChildren.unflattened(replacements))
+            }
+            MLX.Memory.clearCache()
+        }
+    }
+
+    /// Donne au decodeur les instances de modules (quantifies) de l'encodeur pour les
+    /// chemins partages. Partager les **modules**, et non les tableaux : relier les
+    /// tableaux quantifies gardait les 49 Go de bf16 d'origine en memoire (mesure sur le
+    /// vrai checkpoint le 2026-09-28 : 74,8 Go actifs en 8 bits ; avec les modules
+    /// partages : 26,7 Go). A appeler apres avoir quantifie ET evalue l'encodeur.
+    @discardableResult
+    static func shareEncoderModules(_ model: DiffusionGemmaForBlockDiffusion, paths: Set<String>) -> Int {
+        let encoderLeaves = Dictionary(
+            model.encoder.languageModel.leafModules().flattened(), uniquingKeysWith: { a, _ in a })
+        let replacements = paths.sorted().compactMap { path in encoderLeaves[path].map { (path, $0) } }
+        if !replacements.isEmpty {
+            model.decoder.update(modules: ModuleChildren.unflattened(replacements))
+        }
+        return replacements.count
     }
 }
 

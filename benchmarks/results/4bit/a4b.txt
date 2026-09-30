@@ -3,7 +3,7 @@ Date: 2026-04-07T16:39:21Z
 
 === Text Generation ===
 Enregistrement du type gemma4_text...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
 Modele charge en 2.5s
 GPU: 13799 Mo actifs, 13799 Mo pic
 
@@ -22,7 +22,7 @@ GPU pic: 13899 Mo
 
 === Vision (single image) ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
 Modele charge.
 Traitement de l'image: input_sample.jpg
   Image preprocessee: [1, 3, 624, 960]
@@ -57,7 +57,7 @@ GPU pic: 16311 Mo
 
 === Video ===
 Enregistrement Gemma 4 (multimodal)...
-Chargement du modele: /Users/vincent/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
+Chargement du modele: ~/Library/Caches/models/mlx-community/gemma-4-26b-a4b-it-4bit
 Modele charge.
 Traitement de la video: /tmp/bench_video.mp4
   Video preprocessee: 9 frames, 70 tokens/frame, 24.0 fps source

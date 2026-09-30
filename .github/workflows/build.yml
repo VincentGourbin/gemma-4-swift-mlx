@@ -1,0 +1,58 @@
+# Compilation seulement. Les runners macOS de GitHub ne garantissent pas un GPU
+# Metal utilisable par MLX (mlx-swift et mlx-swift-lm testent sur des runners
+# auto-heberges) : les tests se lancent sur une machine Apple Silicon avec
+# Scripts/run-tests.sh (jamais `xcodebuild test` nu, voir CLAUDE.md).
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    # mlx-swift 0.31.6 declare swift-tools-version 6.3 : Xcode 16.4 (Swift 6.1) de
+    # macos-15 ne resout pas les dependances. macos-26 : Xcode 26.6 par defaut.
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode
+        run: xcodebuild -version
+      - name: Metal toolchain
+        # Xcode 26+ telecharge la chaine Metal a part ; Xcode 16 l'embarquait et ne
+        # connaissait pas -downloadComponent.
+        run: |
+          if xcodebuild -help 2>&1 | grep -q -- '-downloadComponent'; then
+            xcodebuild -downloadComponent MetalToolchain
+          else
+            echo "Chaine Metal incluse dans $(xcodebuild -version | head -1)"
+          fi
+      - name: Build library, CLI and test bundle
+        run: |
+          xcodebuild build-for-testing \
+            -scheme Gemma4Swift-Package \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/xcode \
+            -skipMacroValidation \
+            -skipPackagePluginValidation
+      - name: Server isolation (consumers never resolve hummingbird / swift-nio)
+        run: Scripts/check-server-isolation.sh
+      - name: Build and test server package (fake backend, no GPU)
+        working-directory: Server
+        run: |
+          xcodebuild test \
+            -scheme Gemma4Server-Package \
+            -destination 'platform=macOS' \
+            -derivedDataPath ../.build/xcode-server \
+            -skipMacroValidation \
+            -skipPackagePluginValidation \
+            -only-testing:Gemma4ServerTests
+      - name: Build library for iOS (K-46)
+        run: |
+          xcodebuild build \
+            -scheme Gemma4Swift \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath .build/xcode-ios \
+            -skipMacroValidation \
+            -skipPackagePluginValidation

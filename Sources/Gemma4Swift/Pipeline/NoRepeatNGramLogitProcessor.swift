@@ -32,10 +32,12 @@ import MLX
 /// decodage greedy de longues captions derive sans ce blocage (repetitions,
 /// tokens aberrants).
 ///
-/// Note perf : l'historique est maintenu cote CPU, donc `didSample` force
-/// l'evaluation du token echantillonne a chaque etape (sync GPU→CPU). Le cout
-/// est negligeable aux longueurs visees (quelques centaines de tokens), mais
-/// cela desactive de fait le pipelining `asyncEval` du `TokenIterator`.
+/// Perf (K-15) : avec `includeThinkingInWindow == true` (defaut), l'historique
+/// reste sur le GPU et le masque des continuations interdites est calcule par
+/// comparaison vectorisee des fenetres : aucune lecture CPU, le pipelining
+/// `asyncEval` du `TokenIterator` est preserve. Avec `false`, l'automate de
+/// canal a besoin de chaque token cote CPU : `didSample` force alors
+/// l'evaluation du token a chaque etape (sync GPU→CPU), comme avant.
 public struct NoRepeatNGramLogitProcessor: LogitProcessor {
 
     /// Taille du n-gramme bloque (`n`). `1` interdit tout token deja vu.
@@ -69,6 +71,19 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
 
     private var channelState: ChannelState = .outside
 
+    /// Historique sur GPU (`[T]` int32), chemin sans synchronisation.
+    private var deviceHistory: MLXArray?
+    /// Longueur de `deviceHistory`, suivie cote CPU sans lire le GPU.
+    private var deviceCount = 0
+
+    /// Diagnostic : force l'historique CPU (ancien chemin, synchronisation par jeton)
+    /// meme quand tous les tokens comptent — pour l'A/B de K-15.
+    public let forceHostHistory: Bool
+
+    /// Le chemin GPU n'a pas d'automate de canal : reserve au cas ou tous les
+    /// tokens comptent.
+    private var onDevice: Bool { includeThinkingInWindow && !forceHostHistory }
+
     /// - Parameters:
     ///   - ngramSize: taille du n-gramme, >= 1.
     ///   - includePromptInWindow: inclure le prompt dans la fenetre
@@ -78,20 +93,27 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     public init(
         ngramSize: Int,
         includePromptInWindow: Bool = true,
-        includeThinkingInWindow: Bool = true
+        includeThinkingInWindow: Bool = true,
+        forceHostHistory: Bool = false
     ) {
         precondition(ngramSize >= 1, "ngramSize doit etre >= 1 (recu \(ngramSize))")
         self.ngramSize = ngramSize
         self.includePromptInWindow = includePromptInWindow
         self.includeThinkingInWindow = includeThinkingInWindow
+        self.forceHostHistory = forceHostHistory
     }
 
     public mutating func prompt(_ prompt: MLXArray) {
         guard includePromptInWindow else { return }
-        append(tokens(of: prompt))
+        if onDevice {
+            appendOnDevice(prompt)
+        } else {
+            append(tokens(of: prompt))
+        }
     }
 
     public func process(logits: MLXArray) -> MLXArray {
+        if onDevice { return processOnDevice(logits: logits) }
         // Dans le canal de pensee exclu, l'historique est gele : le prefixe
         // resterait fige sur les `n - 1` tokens d'avant l'ouverture du canal et
         // rebannirait leurs continuations a *chaque* pas du raisonnement, sur
@@ -114,7 +136,40 @@ public struct NoRepeatNGramLogitProcessor: LogitProcessor {
     }
 
     public mutating func didSample(token: MLXArray) {
-        append(tokens(of: token))
+        if onDevice {
+            appendOnDevice(token)
+        } else {
+            append(tokens(of: token))
+        }
+    }
+
+    // MARK: - Chemin GPU
+
+    private mutating func appendOnDevice(_ tokens: MLXArray) {
+        let flat = tokens.asType(.int32).reshaped(-1)
+        deviceHistory = deviceHistory.map { concatenated([$0, flat]) } ?? flat
+        deviceCount += flat.size
+    }
+
+    /// Meme regle que le chemin CPU : un token est interdit s'il a deja suivi
+    /// les `n - 1` derniers tokens. Pour chacun des `W = T - n + 1` n-grammes de
+    /// l'historique, on compare ses `n - 1` premiers tokens au prefixe courant ;
+    /// les derniers tokens des n-grammes concordants sont interdits.
+    private func processOnDevice(logits: MLXArray) -> MLXArray {
+        let n = ngramSize
+        let windows = deviceCount - n + 1
+        guard let history = deviceHistory, windows > 0 else { return logits }
+
+        var match = MLXArray.ones([windows], type: Bool.self)
+        for j in 0 ..< (n - 1) {
+            let current = history[deviceCount - (n - 1) + j]
+            match = match .&& (history[j ..< (j + windows)] .== current)
+        }
+        let next = history[(n - 1) ..< (n - 1 + windows)]
+        let vocab = logits.dim(-1)
+        let hits = MLXArray.zeros([vocab], type: Int32.self).at[next].add(match.asType(.int32))
+        let negInf = MLXArray(-Float.infinity).asType(logits.dtype)
+        return MLX.where(hits .> 0, negInf, logits)
     }
 
     // MARK: - Interne

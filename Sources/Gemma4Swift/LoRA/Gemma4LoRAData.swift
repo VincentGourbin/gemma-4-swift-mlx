@@ -41,14 +41,18 @@ public struct MultimodalTrainingSample: Sendable {
     public let imagePath: String?
     public let hasAudio: Bool
     public let hasImage: Bool
+    /// Messages bruts (role, content) : a rendre en ids directs avec
+    /// `Gemma4Processor.multimodalTrainingIds` (A-03 : pas d'aller-retour texte).
+    public let messages: [[String: String]]?
 
     public init(text: String, audioPath: String? = nil, imagePath: String? = nil,
-                hasAudio: Bool = false, hasImage: Bool = false) {
+                hasAudio: Bool = false, hasImage: Bool = false, messages: [[String: String]]? = nil) {
         self.text = text
         self.audioPath = audioPath
         self.imagePath = imagePath
         self.hasAudio = hasAudio
         self.hasImage = hasImage
+        self.messages = messages
     }
 }
 
@@ -187,7 +191,8 @@ public func loadGemma4MultimodalJSONL(
         let imagePath = sample.image.map { dataDirectory.appending(component: $0).path() }
 
         return MultimodalTrainingSample(text: text, audioPath: audioPath, imagePath: imagePath,
-                                        hasAudio: sample.audio != nil, hasImage: sample.image != nil)
+                                        hasAudio: sample.audio != nil, hasImage: sample.image != nil,
+                                        messages: sample.messages.map { ["role": $0.role, "content": $0.content] })
     }
 }
 

@@ -134,7 +134,7 @@ struct ProfileDiffusion: AsyncParsableCommand {
             from: directory, includeVision: needVision
         )
         session.endPhase("1. Model Loading", category: .modelLoad)
-        session.metadata["weightsBytes"] = "\(MLX.GPU.activeMemory / (1024 * 1024)) MB GPU"
+        session.metadata["weightsBytes"] = "\(MLX.Memory.activeMemory / (1024 * 1024)) MB GPU"
 
         // 3a-ter) Eval frequency override (pattern Flux2/LTX)
         if evalEveryNLayers > 0 {
@@ -170,7 +170,7 @@ struct ProfileDiffusion: AsyncParsableCommand {
             session.metadata["mixedPrecision"] = "\(preset) (\(stats.quantizedHigh) high + \(stats.quantizedLow) low)"
             print("Mixed precision (\(preset)) : \(stats.quantizedHigh) modules \(mpConfig.highPrecisionBits)-bit + \(stats.quantizedLow) modules \(mpConfig.lowPrecisionBits)-bit")
             print("High-prec layers : \(mpConfig.highPrecisionLayers.sorted())")
-            print("GPU apres mixed-precision : \(MLX.GPU.activeMemory / (1024 * 1024)) MB")
+            print("GPU apres mixed-precision : \(MLX.Memory.activeMemory / (1024 * 1024)) MB")
         } else if let bits = quantizeBits {
             guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
                 print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
@@ -186,7 +186,7 @@ struct ProfileDiffusion: AsyncParsableCommand {
             let scope = quantizeTextOnly ? "text-only" : "all"
             session.metadata["onTheFlyQuant"] = "\(bits)-bit g=\(quantizeGroupSize) \(mode.rawValue) (\(count) modules, \(scope))"
             print("Quantization : \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue), \(scope))")
-            print("GPU apres quantization : \(MLX.GPU.activeMemory / (1024 * 1024)) MB")
+            print("GPU apres quantization : \(MLX.Memory.activeMemory / (1024 * 1024)) MB")
         }
 
         // 4) Tokenizer
@@ -420,7 +420,7 @@ struct ProfileDiffusion: AsyncParsableCommand {
             print("Charger dans chrome://tracing ou ui.perfetto.dev")
         }
 
-        print("GPU pic : \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic : \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 
     private func loadGenerationConfig(directory: URL) throws -> DiffusionGenerationConfig {

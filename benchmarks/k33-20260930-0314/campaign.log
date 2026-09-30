@@ -1,0 +1,69 @@
+== telechargements
+== runs (6 profils, 50 pas)
+-- b12b/lora-16bit-fast (mlx-community/gemma-4-12B-it-bf16) 03:14
+OK  aucun autre process MLX
+INFO process le plus gourmand : 37,7 XprotectService
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 73,8 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 38790 Mo
+-- b12b/lora-8bit-lean (mlx-community/gemma-4-12B-it-8bit) 03:40
+OK  aucun autre process MLX
+INFO process le plus gourmand : 10,4 loginwindow
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 74,8 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 28619 Mo
+-- a4b/lora-16bit-fast (mlx-community/gemma-4-26b-a4b-it-bf16) 04:10
+OK  aucun autre process MLX
+INFO process le plus gourmand : 11,8 opendirectoryd
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 73,7 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 58980 Mo
+-- a4b/lora-4bit-lean (mlx-community/gemma-4-26b-a4b-it-4bit) 04:24
+OK  aucun autre process MLX
+INFO process le plus gourmand : 16,0 SiliconScope
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 78,9 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 20908 Mo
+-- b31b/lora-8bit-fast (mlx-community/gemma-4-31b-it-8bit) 04:37
+OK  aucun autre process MLX
+INFO process le plus gourmand : 4,0 fskitd
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 78,7 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 56090 Mo
+-- b31b/lora-4bit-lean (mlx-community/gemma-4-31b-it-4bit) 05:47
+OK  aucun autre process MLX
+INFO process le plus gourmand : 2,7 SiliconScope
+OK  binaire Release : .build/xcode/Build/Products/Release/gemma4-cli
+OK  sur secteur
+INFO  powermode            2
+INFO thermique : Note: No thermal warning level has been recorded
+INFO mémoire libre+inactive ≈ 78,3 Go
+INFO refroidissement 60s…
+OK  refroidissement fait
+   ok : GPU pic: 40190 Mo
+== fini 06:56 — resultats dans benchmarks/k33-20260930-0314

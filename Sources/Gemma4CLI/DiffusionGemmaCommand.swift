@@ -62,7 +62,7 @@ struct DiffusionCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Chemin vers une image à passer au modèle (active le vision_tower). Requires --include-vision pour charger les poids vision.")
     var image: String?
 
-    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Applique apres le load, AVANT la generation. 48 Go -> ~14 Go en 4-bit, 3-4x speedup forwards.")
+    @Option(name: .customLong("quantize-bits"), help: "Quantification a la volee (4, 6, 8). Applique apres le load, AVANT la generation. Experts MoE compris ; poids estimes ~15 Go en 4 bits (non mesure, voir bench-diffusion).")
     var quantizeBits: Int?
 
     @Option(name: .customLong("quantize-group-size"), help: "Group size de quantization (defaut 64 pour affine, 32 pour mxfp).")
@@ -144,7 +144,7 @@ struct DiffusionCommand: AsyncParsableCommand {
         let loadTime = Date().timeIntervalSince(loadStart)
         print("Modele charge en \(String(format: "%.1f", loadTime))s")
         print("Config: hidden=\(config.textConfig.base.hiddenSize), layers=\(config.textConfig.base.numHiddenLayers), canvas=\(config.textConfig.canvasLength), vocab=\(config.textConfig.base.vocabSize)")
-        print("GPU: \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.GPU.peakMemory / (1024 * 1024)) Mo pic")
+        print("GPU: \(MLX.Memory.activeMemory / (1024 * 1024)) Mo actifs, \(MLX.Memory.peakMemory / (1024 * 1024)) Mo pic")
 
         // 1a-bis) Override du cache MLX si demande
         if let cacheGB = cacheLimitGB {
@@ -170,7 +170,7 @@ struct DiffusionCommand: AsyncParsableCommand {
             let quantTime = Date().timeIntervalSince(quantStart)
             print("Mixed precision (\(preset)) : \(stats.quantizedHigh) modules en \(mpConfig.highPrecisionBits)-bit, \(stats.quantizedLow) modules en \(mpConfig.lowPrecisionBits)-bit (skipped \(stats.skipped.count)) en \(String(format: "%.1f", quantTime))s")
             print("Layers high-precision (\(mpConfig.highPrecisionBits)-bit) : \(mpConfig.highPrecisionLayers.sorted())")
-            print("GPU apres mixed-precision : \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs")
+            print("GPU apres mixed-precision : \(MLX.Memory.activeMemory / (1024 * 1024)) Mo actifs")
         } else if let bits = quantizeBits {
             guard let mode = DiffusionOnTheFlyQuantization.Mode(rawValue: quantizeMode) else {
                 print("Erreur: --quantize-mode doit etre affine|mxfp4|mxfp8")
@@ -185,7 +185,7 @@ struct DiffusionCommand: AsyncParsableCommand {
             let quantTime = Date().timeIntervalSince(quantStart)
             let scope = quantizeTextOnly ? "text-only" : "all"
             print("Quantification a la volee (\(scope)): \(count) modules (\(bits)-bit, group=\(quantizeGroupSize), \(mode.rawValue)) en \(String(format: "%.1f", quantTime))s")
-            print("GPU apres quantization : \(MLX.GPU.activeMemory / (1024 * 1024)) Mo actifs")
+            print("GPU apres quantization : \(MLX.Memory.activeMemory / (1024 * 1024)) Mo actifs")
         }
 
         if smoke {
@@ -341,7 +341,7 @@ struct DiffusionCommand: AsyncParsableCommand {
             let tokPerSec = Double(allTokens.count) / max(0.01, genTime)
             print("Vitesse : \(String(format: "%.1f", tokPerSec)) tok/s (\(String(format: "%.2f", genTime / Double(result.totalDecoderSteps)))s/step)")
         }
-        print("GPU pic : \(MLX.GPU.peakMemory / (1024 * 1024)) Mo")
+        print("GPU pic : \(MLX.Memory.peakMemory / (1024 * 1024)) Mo")
     }
 
     private func loadGenerationConfig(directory: URL) throws -> DiffusionGenerationConfig {

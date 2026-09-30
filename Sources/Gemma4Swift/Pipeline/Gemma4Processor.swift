@@ -143,6 +143,21 @@ public struct Gemma4Processor {
     ///
     /// Les ids attendus sont ceux du rendu HF du meme `chat_template.jinja`,
     /// mesures token par token (voir `MultimodalSystemPromptTests`).
+    /// Retire l'invite de generation ouverte que le gabarit ajoute en fin de rendu : le
+    /// dernier `<|turn>model` s'il n'est suivi d'aucun `<turn|>`, et tout ce qui le suit.
+    ///
+    /// Selon la famille, cette invite fait 3 jetons (`<|turn>model\n`, E2B/E4B) ou plus :
+    /// 12B, 26B-A4B et 31B ajoutent `<|channel>thought\n<channel|>` quand la reflexion est
+    /// coupee. Ne retirer que les 3 jetons laissait l'invite en place, et le masque de
+    /// reponse (dernier `<|turn>model`) ne gardait que 4 jetons de « reponse » (K-33).
+    public static func droppingGenerationPrompt(_ ids: [Int]) -> [Int] {
+        guard let start = ids.indices.last(where: {
+            ids[$0] == Int(turnStartTokenId) && $0 + 1 < ids.count && ids[$0 + 1] == 4368
+        }), !ids[start...].contains(Int(turnEndTokenId))
+        else { return ids }
+        return Array(ids[..<start])
+    }
+
     public static func strippingTemplateArtifacts(_ ids: [Int]) -> [Int] {
         var out = ids
 
@@ -239,6 +254,50 @@ public struct Gemma4Processor {
             expanded.append(Int(boiTokenId))
             expanded.append(contentsOf: repeatElement(Int(imageTokenId), count: numImageTokens))
             expanded.append(Int(eoiTokenId))
+        }
+        return expanded
+    }
+
+    /// Ids d'un exemple d'entrainement multimodal au **format exact de l'inference**
+    /// (A-03 / A-04) : marqueurs `<|image|>` puis `<|audio|>` en tete du premier tour
+    /// user, joints au texte par `\n` comme `describe` et `multimodalChatIds` ; gabarit
+    /// rendu en ids directs (pas d'aller-retour texte), sans suffixe de generation ni
+    /// artefacts ; marqueurs developpes (`boi + image x N + eoi`, `boa + audio x M + eoa`).
+    /// Un media sans tour user est une erreur (il etait garde sans positions).
+    public static func multimodalTrainingIds(
+        messages: [[String: String]],
+        hasImage: Bool,
+        audioTokens: Int?,
+        tokenizer: any Tokenizer,
+        numImageTokens: Int = 280
+    ) throws -> [Int] {
+        var messages = messages
+        if hasImage || audioTokens != nil {
+            guard let user = messages.firstIndex(where: { $0["role"] == "user" }) else {
+                throw Gemma4PipelineError.invalidInput("exemple avec media mais sans tour user")
+            }
+            var parts: [String] = []
+            if hasImage { parts.append(imageToken) }
+            if audioTokens != nil { parts.append(audioToken) }
+            parts.append(messages[user]["content"] ?? "")
+            messages[user]["content"] = parts.joined(separator: "\n")
+        }
+        var ids = try tokenizer.applyChatTemplate(messages: messages, tools: nil, additionalContext: nil)
+        ids = strippingTemplateArtifacts(droppingGenerationPrompt(ids))
+
+        var expanded: [Int] = []
+        for id in ids {
+            if id == Int(imageTokenId) {
+                expanded.append(Int(boiTokenId))
+                expanded.append(contentsOf: repeatElement(Int(imageTokenId), count: numImageTokens))
+                expanded.append(Int(eoiTokenId))
+            } else if id == Int(audioTokenId), let n = audioTokens {
+                expanded.append(Int(boaTokenId))
+                expanded.append(contentsOf: repeatElement(Int(audioTokenId), count: n))
+                expanded.append(Int(eoaTokenId))
+            } else {
+                expanded.append(id)
+            }
         }
         return expanded
     }

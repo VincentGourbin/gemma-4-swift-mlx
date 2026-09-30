@@ -44,7 +44,7 @@ public class Gemma4MultimodalModel: Module {
     ) -> (inputsEmbeds: MLXArray, perLayerInputs: MLXArray?) {
         // Token embeddings texte
         var inputsEmbeds = languageModel.model.embedTokens(inputIds)
-        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: .float32)
+        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: inputsEmbeds.dtype)
 
         // Per-layer inputs (masquer les tokens image/audio)
         var perLayerInputs: MLXArray? = nil

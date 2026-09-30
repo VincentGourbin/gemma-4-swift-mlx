@@ -36,6 +36,23 @@ public struct DiffusionGenerationResult: @unchecked Sendable {
     public let totalDecoderSteps: Int
     /// Nombre de canvases utilises.
     public let canvases: Int
+    /// Pourquoi la generation s'est arretee.
+    public let stopReason: DiffusionStopReason
+}
+
+/// Raison de fin d'une generation DiffusionGemma.
+public enum DiffusionStopReason: Sendable, Equatable {
+    /// EOS atteint ou `maxBlocks` canvases generes.
+    case completed
+    /// La Task appelante a ete annulee : le resultat ne contient que les canvases
+    /// deja commits (le canvas en cours est abandonne).
+    case cancelled
+    /// Refus de `Gemma4ComputeGate` : un entrainement tourne dans le processus
+    /// (deadlock mlx-swift gradient x forward). Aucun pas execute.
+    case trainingInProgress
+    /// Entree incoherente (ex. nombre de jetons image different de
+    /// `visionSoftTokensPerImage` x nombre d'images). Aucun pas execute.
+    case invalidInput(String)
 }
 
 /// Pipeline de generation DiffusionGemma block-AR.
@@ -45,13 +62,25 @@ public actor DiffusionGemmaPipeline {
     public let sampler: EntropyBoundSampler
     public let temperatureSchedule: LinearTemperatureSchedule
     public let stopping: StableConfidentStopping
+    /// Politique memoire appliquee pendant la generation (D-10).
+    public let memoryConfig: DiffusionMemoryConfig
+    /// Dossier du checkpoint, pour recharger la vision dechargee par un appel precedent.
+    public let modelDirectory: URL?
 
+    /// - Parameter memoryConfig: par defaut, comportement anterieur (cache MLX vide
+    ///   entre canvases, vision gardee). `DiffusionGemmaContainer.makePipeline()`
+    ///   transmet la politique choisie au chargement.
     public init(
         model: DiffusionGemmaForBlockDiffusion,
-        genConfig: DiffusionGenerationConfig
+        genConfig: DiffusionGenerationConfig,
+        memoryConfig: DiffusionMemoryConfig = DiffusionMemoryConfig(
+            mixedPrecision: nil, unloadVisionAfterFirstCanvas: false, clearCacheBetweenCanvases: true),
+        modelDirectory: URL? = nil
     ) {
         self.model = model
         self.genConfig = genConfig
+        self.memoryConfig = memoryConfig
+        self.modelDirectory = modelDirectory
         let vocab = model.config.textConfig.base.vocabSize
         let canvas = model.config.textConfig.canvasLength
         self.sampler = EntropyBoundSampler(
@@ -92,6 +121,26 @@ public actor DiffusionGemmaPipeline {
         onCanvas: ((Int, MLXArray) -> Void)? = nil,
         onStep: ((_ canvasIdx: Int, _ step: Int, _ argmaxCanvas: MLXArray) -> Void)? = nil
     ) -> DiffusionGenerationResult {
+        let promptLen = promptIds.dim(1)
+        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift, D-07).
+        do { try Gemma4ComputeGate.shared.beginInference() } catch {
+            let empty = promptIds[0..., promptLen...]
+            eval(empty)
+            return DiffusionGenerationResult(
+                generatedIds: empty, fullIds: promptIds, totalDecoderSteps: 0, canvases: 0,
+                stopReason: .trainingInProgress)
+        }
+        defer { Gemma4ComputeGate.shared.endInference() }
+
+        if let problem = validate(promptIds: promptIds, pixelValues: pixelValues)
+            ?? restoreVisionIfNeeded(pixelValues: pixelValues) {
+            let empty = promptIds[0..., promptLen...]
+            eval(empty)
+            return DiffusionGenerationResult(
+                generatedIds: empty, fullIds: promptIds, totalDecoderSteps: 0, canvases: 0,
+                stopReason: .invalidInput(problem))
+        }
+
         var key = MLXRandom.key(seed)
         let batchSize = promptIds.dim(0)
         let eosSet = Set(genConfig.eosTokenIds.map { Int32($0) })
@@ -105,6 +154,7 @@ public actor DiffusionGemmaPipeline {
         // - Canvas N+1 : on encode juste les 256 nouveaux tokens (argmax du canvas N)
         //   et on append au cache. Pas de re-encode du prompt initial.
         var encoderCache: EncoderKVCache? = nil
+        var cancelled = false
 
         for canvasIdx in 0 ..< maxBlocks {
             // 1) Encoder forward incremental
@@ -130,12 +180,14 @@ public actor DiffusionGemmaPipeline {
             // (l'encoder text n'a pas de role direct dans le denoising, c'est le
             // KV cache qui est utilise par le decoder cross-attention).
 
-            // Note : on a tente de unloadVision() apres le canvas 0 mais
-            // l'assignment direct sur @ModuleInfo viole l'API MLX et crashe
-            // au canvas suivant ("rather than mutating the Module property
-            // directly"). Solution propre = passer par Module.update(modules:)
-            // avec ModuleChildren. Pour l'instant on laisse vision en RAM
-            // (~600 MB sur 50 GB, negligeable). TODO Phase 10.
+            // Les soft-tokens image sont dans le cache : la tour vision ne sert plus
+            // (politique memoire, D-10). L'ancien commentaire affirmait que le
+            // dechargement plantait au canvas suivant : non reproduit
+            // (DiffusionMemoryConfigWiringTests).
+            if pixelsForCall != nil, memoryConfig.unloadVisionAfterFirstCanvas {
+                eval(encoderCache!.entries.compactMap { $0?.keys } + encoderCache!.entries.compactMap { $0?.values })
+                model.encoder.unloadVision()
+            }
 
             // 2) Init canvas + stopping
             let (k1, k2) = splitKey(key: &key)
@@ -148,6 +200,13 @@ public actor DiffusionGemmaPipeline {
             // 3) Inner denoising loop : steps decroissants
             var stepsExecuted = 0
             for step in (1 ... genConfig.maxDenoisingSteps).reversed() {
+                // Annulation verifiee a chaque pas, avant le forward (D-07) : un
+                // consommateur qui abandonne libere le modele en moins d'un pas.
+                if Task.isCancelled {
+                    cancelled = true
+                    break
+                }
+
                 // a) decoder forward
                 let logits = model.denoiseStep(
                     canvasIds: canvas,
@@ -167,17 +226,24 @@ public actor DiffusionGemmaPipeline {
 
                 // Streaming step-by-step : observer la convergence du denoising.
                 // Equivalent du `streamer.put_draft(argmax_canvas)` Python.
-                onStep?(canvasIdx, step, argmaxCanvas)
+                // Evalue avant de le confier a l'appelant (D-08) ; seulement si
+                // quelqu'un observe, la sync du pas l'aurait calcule de toute facon.
+                if let onStep {
+                    eval(argmaxCanvas)
+                    onStep(canvasIdx, step, argmaxCanvas)
+                }
 
                 // d) accept / stopping / renoise
+                // Entropie calculee une fois, partagee par accept et l'arret (D-12).
+                let entropy = sampler.entropy(of: scaled)
                 canvas = sampler.accept(
                     currentCanvas: canvas,
                     denoiserCanvas: denoiserCanvas,
-                    logits: scaled
+                    entropy: entropy
                 )
 
                 stepsExecuted += 1
-                let shouldStop = stopping.shouldStop(argmaxCanvas: argmaxCanvas, logits: scaled)
+                let shouldStop = stopping.shouldStop(argmaxCanvas: argmaxCanvas, entropy: entropy)
                 if shouldStop.all().item(Bool.self) {
                     break
                 }
@@ -204,6 +270,8 @@ public actor DiffusionGemmaPipeline {
             }
 
             totalSteps += stepsExecuted
+            // Canvas en cours abandonne : on ne commit que ce qui est termine.
+            if cancelled { break }
             canvasesUsed += 1
 
             // 4) Commit canvas
@@ -218,22 +286,59 @@ public actor DiffusionGemmaPipeline {
             // 6) Liberation du pic transient du denoising loop (~440 MB observe).
             //    Pattern Flux 2 clearCacheEveryNSteps mais ici entre canvases
             //    (entre steps : neutre testé Phase 5).
-            MLX.Memory.clearCache()
+            if memoryConfig.clearCacheBetweenCanvases {
+                MLX.Memory.clearCache()
+            }
         }
 
-        let promptLen = promptIds.dim(1)
         let totalLen = fullIds.dim(1)
         let generatedIds = fullIds[0..., promptLen ..< totalLen]
+        // Le resultat sort de l'actor : materialise ici (D-08).
+        eval(generatedIds, fullIds)
 
         return DiffusionGenerationResult(
             generatedIds: generatedIds,
             fullIds: fullIds,
             totalDecoderSteps: totalSteps,
-            canvases: canvasesUsed
+            canvases: canvasesUsed,
+            stopReason: cancelled ? .cancelled : .completed
         )
     }
 
     // MARK: - Helpers
+
+    /// Coherence prompt / images (D-09) : sans elle, maskedScatter remplit en boucle
+    /// ou laisse des positions image vides, sans erreur.
+    /// `unloadVisionAfterFirstCanvas` decharge la vision pour de bon : sans ce
+    /// rechargement, l'image de l'appel suivant etait ignoree sans erreur (le forward
+    /// saute la vision) et le modele repondait a l'aveugle.
+    private func restoreVisionIfNeeded(pixelValues: MLXArray?) -> String? {
+        guard pixelValues != nil, model.encoder.visionUnloaded else { return nil }
+        guard let modelDirectory else {
+            return "vision dechargee par un appel precedent (unloadVisionAfterFirstCanvas) "
+                + "et dossier du modele inconnu : impossible de la recharger"
+        }
+        do {
+            try model.encoder.reloadVision(from: DiffusionGemmaLoader.loadVisionWeights(from: modelDirectory))
+            return nil
+        } catch {
+            return "rechargement de la vision impossible : \(error)"
+        }
+    }
+
+    private func validate(promptIds: MLXArray, pixelValues: MLXArray?) -> String? {
+        let imageTokens = (promptIds .== Int32(model.config.imageTokenId)).asType(.int32).sum().item(Int.self)
+        guard let pixelValues else {
+            return imageTokens == 0
+                ? nil : "\(imageTokens) jeton(s) image dans le prompt mais aucune image fournie"
+        }
+        let expected = pixelValues.dim(0) * model.config.visionSoftTokensPerImage
+        guard imageTokens == expected else {
+            return "\(imageTokens) jeton(s) image dans le prompt pour \(pixelValues.dim(0)) image(s) : "
+                + "\(expected) attendus (\(model.config.visionSoftTokensPerImage) par image)"
+        }
+        return nil
+    }
 
     /// Split d'une cle PRNG en (k_use, k_next). Met a jour la cle courante.
     private func splitKey(key: inout MLXArray) -> (MLXArray, MLXArray) {

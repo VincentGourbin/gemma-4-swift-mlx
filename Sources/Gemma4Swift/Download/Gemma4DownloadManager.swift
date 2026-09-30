@@ -122,6 +122,9 @@ public final class Gemma4DownloadManager {
             for part in modelId.split(separator: "/") {
                 modelDir = modelDir.appendingPathComponent(String(part))
             }
+            guard !Gemma4ModelCache.isOnUnmountedVolume(modelDir) else {
+                throw Gemma4DownloadError.volumeNotMounted(modelDir.path)
+            }
             try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
 
             let specs = try await fetchHFFileSpecs(modelId: modelId, token: token)

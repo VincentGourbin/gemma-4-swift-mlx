@@ -93,4 +93,34 @@ struct Gemma4RegistrationTests {
             configuration: config, modelType: "gemma4")
         #expect(multimodal is Gemma4MultimodalLLMModel)
     }
+
+    @Test("les fabriques de loadContainer ignorent l'etat du registre global (S-05)")
+    func testPrivateCreatorsIgnoreGlobalRegistry() async throws {
+        let config = Data(Self.tinyConfigJSON.utf8)
+
+        // Le registre global dit « texte seul »…
+        await Gemma4Registration.register(multimodal: false)
+
+        // …mais la fabrique privee d'un chargement multimodal n'en tient pas compte.
+        let privateMultimodal = Gemma4Registration.typeRegistry(multimodal: true)
+        let model = try await privateMultimodal.createModel(configuration: config, modelType: "gemma4")
+        #expect(model is Gemma4MultimodalLLMModel)
+
+        let privateText = Gemma4Registration.typeRegistry(multimodal: false)
+        let textModel = try await privateText.createModel(configuration: config, modelType: "gemma4")
+        #expect(textModel is Gemma4LLMModel)
+    }
+
+    @Test("deux loadContainer concurrents recoivent chacun le bon type (S-05)",
+          .enabled(if: ProcessInfo.processInfo.environment["GEMMA4_INTEGRATION_MODEL_PATH"] != nil))
+    func testConcurrentLoadsKeepTheirType() async throws {
+        let url = URL(fileURLWithPath: ProcessInfo.processInfo.environment["GEMMA4_INTEGRATION_MODEL_PATH"]!)
+        async let multimodal = Gemma4Registration.loadContainer(from: url, multimodal: true)
+        async let text = Gemma4Registration.loadContainer(from: url, multimodal: false)
+        let (m, t) = try await (multimodal, text)
+        let mIsMultimodal = await m.perform { $0.model is Gemma4MultimodalLLMModel }
+        let tIsText = await t.perform { $0.model is Gemma4LLMModel }
+        #expect(mIsMultimodal)
+        #expect(tIsText)
+    }
 }

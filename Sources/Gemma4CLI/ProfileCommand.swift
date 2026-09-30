@@ -147,10 +147,13 @@ struct ProfileRun: AsyncParsableCommand {
 
             // 3. KV Cache allocation
             session.beginPhase("3. KV Cache Allocation", category: .kvCache)
-            let params = self.kvBits != nil
-                ? GenerateParameters(kvBits: self.kvBits)
-                : nil
-            let cache = context.model.newCache(parameters: params)
+            // TurboQuant explicite : newCache(parameters:) ne route plus kvBits vers lui.
+            let cache: [any KVCache]
+            if let kvBits = self.kvBits, let gemma = context.model as? Gemma4LLMModel {
+                cache = gemma.languageModel.makeCache(kvBits: Float(kvBits))
+            } else {
+                cache = context.model.newCache(parameters: nil)
+            }
             session.endPhase("3. KV Cache Allocation", category: .kvCache)
 
             // 4. Prefill
@@ -315,7 +318,7 @@ struct ProfileSweep: AsyncParsableCommand {
             if let m = context.model as? Gemma4MultimodalLLMModel { return m.config.textConfig.maxPositionEmbeddings }
             return 131072
         }
-        let modelBaseMemMB = Double(MLX.GPU.activeMemory) / (1024 * 1024)
+        let modelBaseMemMB = Double(MLX.Memory.activeMemory) / (1024 * 1024)
 
         // Header
         let separator = String(repeating: "\u{2500}", count: 82)
@@ -475,7 +478,7 @@ struct ProfileSweep: AsyncParsableCommand {
                 print("  \(ctxStr)    \(cfgStr)  \(tpsStr)   \(ttftStr)  \(mlxStr)  \(procStr)  \(genStr)  \(totalStr)")
 
                 // Liberer le cache GPU entre les runs
-                MLX.GPU.clearCache()
+                MLX.Memory.clearCache()
             }
         }
 

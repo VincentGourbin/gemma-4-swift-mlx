@@ -206,7 +206,7 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
         guard hasImage || hasVideo || hasAudio else { return nil }
 
         var inputsEmbeds = languageModel.model.embedTokens(inputs)
-        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: .float32)
+        inputsEmbeds = inputsEmbeds * MLXArray(languageModel.model.embedScale, dtype: inputsEmbeds.dtype)
 
         // --- Vision ---
         if let patches = pendingPixelPatches,

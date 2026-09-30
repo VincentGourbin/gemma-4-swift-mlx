@@ -68,6 +68,8 @@ public enum Gemma4AudioProcessor {
 
         let features = MLXArray(melData).reshaped(1, T, numMelFilters)
         let mask = MLXArray.zeros([1, T], type: Bool.self)
+        // Materialiser ici : l'appelant consomme ces arrays sur un autre thread.
+        eval(features, mask)
 
         return AudioFeatures(
             features: features,
@@ -125,7 +127,7 @@ public enum Gemma4AudioProcessor {
         }
 
         var isDone = false
-        try converter.convert(to: targetBuffer, error: nil) { _, outStatus in
+        converter.convert(to: targetBuffer, error: nil) { _, outStatus in
             if isDone {
                 outStatus.pointee = .noDataNow
                 return nil
@@ -208,11 +210,19 @@ public enum Gemma4AudioProcessor {
         var realPart = [Float](repeating: 0, count: halfN)
         var imagPart = [Float](repeating: 0, count: halfN)
 
+        // Les pointeurs de DSPSplitComplex doivent rester valides pendant vDSP_ctoz et
+        // vDSP_fft_zrip : `&realPart` dans l'init n'est valide que le temps de l'init
+        // (comportement indefini, #TemporaryPointers). On les tient par des closures.
         signal.withUnsafeBufferPointer { ptr in
             ptr.baseAddress!.withMemoryRebound(to: DSPComplex.self, capacity: halfN) { complexPtr in
-                var splitComplex = DSPSplitComplex(realp: &realPart, imagp: &imagPart)
-                vDSP_ctoz(complexPtr, 2, &splitComplex, 1, vDSP_Length(halfN))
-                vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFTDirection(FFT_FORWARD))
+                realPart.withUnsafeMutableBufferPointer { realBuffer in
+                    imagPart.withUnsafeMutableBufferPointer { imagBuffer in
+                        var splitComplex = DSPSplitComplex(
+                            realp: realBuffer.baseAddress!, imagp: imagBuffer.baseAddress!)
+                        vDSP_ctoz(complexPtr, 2, &splitComplex, 1, vDSP_Length(halfN))
+                        vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFTDirection(FFT_FORWARD))
+                    }
+                }
             }
         }
 

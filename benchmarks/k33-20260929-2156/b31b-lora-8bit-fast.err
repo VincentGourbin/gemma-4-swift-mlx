@@ -1,0 +1,1 @@
+[Gemma4Config] audio_config present but decode failed (DecodingError.valueNotFound: Expected value of type Dictionary<String, Any>. Path: audio_config. Debug description: Cannot get keyed decoding container -- found null value instead); fallback to text-only

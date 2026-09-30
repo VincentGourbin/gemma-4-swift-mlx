@@ -1,0 +1,22 @@
+Enregistrement Gemma 4 (multimodal)...
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-e2b-it-bf16
+Modele charge.
+On-the-fly quant (all): 527 modules (4-bit, group=64, affine)
+Traitement de l'image: docs/examples/vision-image-description/UI.png
+  Image preprocessee: [1, 3, 624, 1008]
+  Total: 1 image(s), batch: [1, 3, 624, 1008]
+  Premiers tokens: [2, 105, 2364, 107, 255999, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880, 258880]
+  Derniers tokens: [258880, 258882, 107, 82858, 672, 2471, 528, 886, 13315, 236761, 106, 107, 105, 4368, 107]
+  image_token: 280, video_token: 0, audio_token: 0
+  Total input tokens: 299
+
+--- Generation multimodale ---
+  Mode: vision (1 image(s), 280 tokens/image)
+  Prompt: Describe this image in one sentence.
+---
+This image displays the interface of a software application called "Forge," featuring various tools and modules for creation, such as forging ideas, generating images and videos, and managing libraries.<turn|>
+
+--- Stats ---
+Tokens: 36
+Temps: 0.72s, Vitesse: 50.3 t/s
+GPU pic: 10072 Mo

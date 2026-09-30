@@ -9,13 +9,38 @@ public enum Gemma4ModelCache {
     /// Chemin personnalise pour le stockage des modeles (overridable)
     nonisolated(unsafe) public static var customModelsDirectory: URL?
 
-    /// Repertoire de stockage des modeles
+    /// Repertoire de stockage des modeles, par ordre de priorite :
+    /// 1. `customModelsDirectory` (reglage par code, ex. une app) ;
+    /// 2. `$GEMMA4_MODELS_DIR` (ex. `/Volumes/MonSSD/models`, comme `QWEN38_MODELS_DIR`) ;
+    /// 3. `~/Library/Caches/models`.
     public static var modelsDirectory: URL {
         if let custom = customModelsDirectory {
             return custom
         }
+        return environmentModelsDirectory ?? defaultModelsDirectory
+    }
+
+    /// `~/Library/Caches/models`.
+    public static var defaultModelsDirectory: URL {
         let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
         return cacheDir.appendingPathComponent("models", isDirectory: true)
+    }
+
+    /// `$GEMMA4_MODELS_DIR`, `~` developpe ; `nil` si absente ou vide.
+    public static var environmentModelsDirectory: URL? {
+        guard let value = ProcessInfo.processInfo.environment["GEMMA4_MODELS_DIR"], !value.isEmpty else {
+            return nil
+        }
+        return URL(fileURLWithPath: (value as NSString).expandingTildeInPath, isDirectory: true)
+    }
+
+    /// Vrai si `url` est sous `/Volumes/<nom>` et que ce volume n'est pas monte.
+    /// Ecrire la-dessous creerait un faux dossier `/Volumes/<nom>` sur le disque interne
+    /// et y deverserait les poids.
+    public static func isOnUnmountedVolume(_ url: URL) -> Bool {
+        let components = url.standardizedFileURL.pathComponents
+        guard components.count >= 3, components[1] == "Volumes" else { return false }
+        return !FileManager.default.fileExists(atPath: "/Volumes/" + components[2])
     }
 
     /// RAM systeme en Go
@@ -39,7 +64,13 @@ public enum Gemma4ModelCache {
 
     /// Chemin local du modele s'il existe, nil sinon
     public static func localPath(for model: Gemma4Pipeline.Model) -> URL? {
-        possiblePaths(for: model.rawValue).first { hasModelFiles(at: $0) }
+        localPath(modelId: model.rawValue)
+    }
+
+    /// Chemin local d'un modele (par ID HuggingFace) s'il est complet, nil sinon.
+    /// Peut etre le cache personnalise ou un snapshot du cache HF.
+    public static func localPath(modelId: String) -> URL? {
+        possiblePaths(for: modelId).first { hasModelFiles(at: $0) }
     }
 
     /// Taille sur disque d'un modele telecharge (en octets), nil si non telecharge
@@ -90,12 +121,40 @@ public enum Gemma4ModelCache {
 
     // MARK: - Private
 
-    private static func hasModelFiles(at path: URL) -> Bool {
+    /// Un modele est complet quand `config.json` est la et que ses poids le sont tous.
+    ///
+    /// Un modele multi-shards publie `model.safetensors.index.json` : chaque shard de
+    /// son `weight_map` doit etre present. Sans cet index, un seul `.safetensors`
+    /// suffisait, et un telechargement coupe au 2e shard passait pour complet
+    /// (les fichiers arrivent dans l'ordre du manifeste, `config.json` en tete) :
+    /// plus de reprise, puis un chargement qui echoue sur des poids manquants.
+    ///
+    /// Un shard qui est un lien symbolique compte comme present meme si sa cible est
+    /// absente (disque externe non monte) : le telechargement est complet, c'est le
+    /// montage qui manque, et le chargement le dira. Le traiter comme manquant ferait
+    /// re-telecharger des dizaines de Go vers le disque interne.
+    static func hasModelFiles(at path: URL) -> Bool {
         let fm = FileManager.default
-        let configExists = fm.fileExists(atPath: path.appendingPathComponent("config.json").path)
-        guard configExists else { return false }
+        guard fm.fileExists(atPath: path.appendingPathComponent("config.json").path) else {
+            return false
+        }
+        let indexURL = path.appendingPathComponent("model.safetensors.index.json")
+        if let data = try? Data(contentsOf: indexURL) {
+            guard let index = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let weightMap = index["weight_map"] as? [String: String],
+                  !weightMap.isEmpty
+            else { return false }
+            return Set(weightMap.values).allSatisfy { isPresent(path.appendingPathComponent($0).path) }
+        }
         let contents = (try? fm.contentsOfDirectory(atPath: path.path)) ?? []
         return contents.contains { $0.hasSuffix(".safetensors") }
+    }
+
+    /// Fichier present, ou lien symbolique (meme pendant).
+    private static func isPresent(_ path: String) -> Bool {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: path) { return true }
+        return (try? fm.destinationOfSymbolicLink(atPath: path)) != nil
     }
 
     private static func possiblePaths(for modelId: String) -> [URL] {
@@ -107,6 +166,14 @@ public enum Gemma4ModelCache {
         for part in parts { customPath = customPath.appendingPathComponent(String(part)) }
         paths.append(customPath)
 
+        // Racine deplacee (GEMMA4_MODELS_DIR ou customModelsDirectory) : les modeles
+        // deja presents dans l'emplacement par defaut restent trouves (lecture seule).
+        if modelsDirectory.standardizedFileURL != defaultModelsDirectory.standardizedFileURL {
+            var defaultPath = defaultModelsDirectory
+            for part in parts { defaultPath = defaultPath.appendingPathComponent(String(part)) }
+            paths.append(defaultPath)
+        }
+
         // Cache HuggingFace par defaut: ~/.cache/huggingface/hub/models--{org}--{model}/snapshots/*
         // homeDirectoryForCurrentUser n'est pas dispo sur iOS — utiliser NSHomeDirectory()
         let homeDir = URL(fileURLWithPath: NSHomeDirectory())
@@ -116,12 +183,17 @@ public enum Gemma4ModelCache {
             .appendingPathComponent(modelFolder)
             .appendingPathComponent("snapshots")
 
-        // Prendre le dernier snapshot (le plus recent)
+        // Prendre le snapshot le plus recent. contentsOfDirectory ne garantit aucun
+        // ordre : on trie par date de modification plutot que de prendre le dernier.
         if let snapshots = try? FileManager.default.contentsOfDirectory(
             at: hfSnapshotsDir,
-            includingPropertiesForKeys: nil
+            includingPropertiesForKeys: [.contentModificationDateKey]
         ) {
-            if let latest = snapshots.last {
+            let modified = { (url: URL) -> Date in
+                (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? .distantPast
+            }
+            if let latest = snapshots.max(by: { modified($0) < modified($1) }) {
                 paths.append(latest)
             }
         }

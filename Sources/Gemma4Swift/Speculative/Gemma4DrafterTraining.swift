@@ -34,46 +34,83 @@ public enum Gemma4DrafterTraining {
         lastFullCacheIdx: Int,
         lastSlidingCacheIdx: Int
     ) -> (loss: MLXArray, ntoks: MLXArray) {
-        let L = batchTokens.dim(1)
-        precondition(L >= 3, "batch sequence length doit etre >= 3 (need positions p, p+1, p+2)")
+        let target = targetOutputs(
+            target: target, batchTokens: batchTokens,
+            lastFullCacheIdx: lastFullCacheIdx, lastSlidingCacheIdx: lastSlidingCacheIdx)
+        return drafterLoss(drafter: drafter, batchTokens: batchTokens, target: target)
+    }
 
+    /// Ce que le drafter consomme de la cible gelee pour un lot. Calculer ces sorties hors de
+    /// `valueAndGrad` a ete mesure (K-30 d, 2026-09-29) : aucun gain (MLX ne propage deja rien
+    /// a travers la cible sous stopGradient) ; la boucle garde donc le chemin simple.
+    public struct TargetOutputs {
+        public let preNormHiddens: MLXArray   // [B, L, backbone]
+        public let targetArgmax: MLXArray     // [B, L]
+        public let bonusEmbeds: MLXArray      // [B, L-1, backbone]
+        public let fullKV: (keys: MLXArray, values: MLXArray)
+        public let slidingKV: (keys: MLXArray, values: MLXArray)
+
+        var arrays: [MLXArray] {
+            [preNormHiddens, targetArgmax, bonusEmbeds, fullKV.keys, fullKV.values, slidingKV.keys, slidingKV.values]
+        }
+
+        init(_ a: [MLXArray]) {
+            preNormHiddens = a[0]; targetArgmax = a[1]; bonusEmbeds = a[2]
+            fullKV = (a[3], a[4]); slidingKV = (a[5], a[6])
+        }
+
+        init(preNormHiddens: MLXArray, targetArgmax: MLXArray, bonusEmbeds: MLXArray,
+             fullKV: (keys: MLXArray, values: MLXArray), slidingKV: (keys: MLXArray, values: MLXArray)) {
+            self.preNormHiddens = preNormHiddens; self.targetArgmax = targetArgmax; self.bonusEmbeds = bonusEmbeds
+            self.fullKV = fullKV; self.slidingKV = slidingKV
+        }
+    }
+
+    /// Forward de la cible (gelee) : hidden pre-norm, argmax des logits (cibles de
+    /// distillation), K/V partages, embeddings des jetons bonus. Tout en stopGradient.
+    public static func targetOutputs(
+        target: Gemma4LanguageModel,
+        batchTokens: MLXArray,
+        lastFullCacheIdx: Int,
+        lastSlidingCacheIdx: Int
+    ) -> TargetOutputs {
         // 1. Target forward (no grad) — pre-norm hidden + sharedKV + LOGITS
         let targetOut = target.forwardWithIntermediates(inputs: batchTokens)
-        // stopGradient sur tout ce qui vient du target — frozen, pas de backprop
-        let hiddens = stopGradient(targetOut.preNormHiddenStates)  // [B, L, backbone]
-
-        // Self-distillation targets: utiliser argmax(target_logits) plutot que ground truth.
-        // C'est ce qui maximise l'acceptance rate au moment de l'inference MTP — le drafter
-        // doit MATCH le target, pas la verite terrain.
-        let targetArgmax = stopGradient(argMax(targetOut.logits, axis: -1))  // [B, L]
-
+        let hiddens = stopGradient(targetOut.preNormHiddenStates)
+        // Self-distillation : argmax(target_logits) plutot que la verite terrain — le
+        // drafter doit coller a la cible, c'est ce qui maximise l'acceptation MTP.
+        let targetArgmax = stopGradient(argMax(targetOut.logits, axis: -1))
         guard let fullKV = targetOut.intermediates[lastFullCacheIdx],
               let slidingKV = targetOut.intermediates[lastSlidingCacheIdx] else {
-            fatalError("Cannot extract shared K/V from target intermediates")
+            fatalError("Cannot extract shared K/V from target intermediates")  // indices valides par trainDrafter
         }
-        let sharedKV: SharedKVStates = [
-            "full_attention": (
-                keys: stopGradient(fullKV.keys),
-                values: stopGradient(fullKV.values)
-            ),
-            "sliding_attention": (
-                keys: stopGradient(slidingKV.keys),
-                values: stopGradient(slidingKV.values)
-            ),
-        ]
-
-        // 2. Construire les (bonus_token, prev_hidden) pour positions 1..L-1
-        // bonus[p] = batchTokens[p] (token a la position p, qu'on traite comme bonus)
-        // prev_hidden[p] = hiddens[p-1] (etat avant de voir token p)
-        let bonusTokens = batchTokens[0..., 1...]                          // [B, L-1]
-        let prevHiddens = hiddens[0..., .stride(to: -1)]                   // [B, L-1, backbone]
-
+        // bonus[p] = batchTokens[p], embeddings a l'echelle du modele
+        let bonusTokens = batchTokens[0..., 1...]
         let scale = pow(Float(target.config.hiddenSize), 0.5)
         var bonusEmbeds = target.model.embedTokens(bonusTokens)
-        bonusEmbeds = bonusEmbeds * MLXArray(scale, dtype: bonusEmbeds.dtype)
-        bonusEmbeds = stopGradient(bonusEmbeds)
+        bonusEmbeds = stopGradient(bonusEmbeds * MLXArray(scale, dtype: bonusEmbeds.dtype))
+        return TargetOutputs(
+            preNormHiddens: hiddens, targetArgmax: targetArgmax, bonusEmbeds: bonusEmbeds,
+            fullKV: (stopGradient(fullKV.keys), stopGradient(fullKV.values)),
+            slidingKV: (stopGradient(slidingKV.keys), stopGradient(slidingKV.values)))
+    }
 
-        let drafterInput = concatenated([bonusEmbeds, prevHiddens], axis: -1)
+    /// Perte du drafter a partir des sorties de la cible deja calculees.
+    public static func drafterLoss(
+        drafter: Gemma4AssistantDraftModel,
+        batchTokens: MLXArray,
+        target: TargetOutputs
+    ) -> (loss: MLXArray, ntoks: MLXArray) {
+        let L = batchTokens.dim(1)
+        precondition(L >= 3, "batch sequence length doit etre >= 3 (need positions p, p+1, p+2)")
+        let sharedKV: SharedKVStates = [
+            "full_attention": (keys: target.fullKV.keys, values: target.fullKV.values),
+            "sliding_attention": (keys: target.slidingKV.keys, values: target.slidingKV.values),
+        ]
+        let targetArgmax = target.targetArgmax
+        // prev_hidden[p] = hiddens[p-1] (etat avant de voir le jeton p)
+        let prevHiddens = target.preNormHiddens[0..., .stride(to: -1)]
+        let drafterInput = concatenated([target.bonusEmbeds, prevHiddens], axis: -1)
         // drafterInput: [B, L-1, 2*backbone]
 
         // 3. Drafter forward (avec grad) en parallele, mask causal
@@ -120,6 +157,8 @@ public enum Gemma4DrafterTraining {
         public var validBatches: Int = 8   // nb de batches a evaluer sur la valid
         public var saveEvery: Int = 100
         public var weightsURL: URL? = nil
+        /// Graine du tirage des troncons (A-08 : `randomElement()` non seede).
+        public var seed: UInt64 = 0
 
         public init() {}
     }
@@ -136,6 +175,10 @@ public enum Gemma4DrafterTraining {
     ///     dans le target (utilises pour extraire la sharedKV)
     ///   - optimizer: typiquement Adam(lr=1e-4)
     ///   - config: hyperparametres
+    /// - Warning: exclusif dans le process (`Gemma4ComputeGate`) : echoue avec
+    ///   `inferenceInProgress` si une inference du paquet tourne, et toute inference
+    ///   lancee pendant l'entrainement echoue avec `trainingInProgress`. Un gradient
+    ///   concurrent d'un forward fige le process (deadlock mlx-swift, voir CLAUDE.md).
     public static func trainDrafter(
         drafter: Gemma4AssistantDraftModel,
         target: Gemma4LanguageModel,
@@ -147,6 +190,20 @@ public enum Gemma4DrafterTraining {
         config: TrainConfig,
         progress: (Int, Float) -> Void = { _, _ in }
     ) throws {
+        // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
+        // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+        // A-12 : entrees validees ici (erreurs levees) plutot que par precondition/fatalError
+        // dans drafterLoss, qui tourne dans valueAndGrad.
+        guard config.seqLen >= 3 else {
+            throw DrafterTrainingError.invalidInput("seqLen doit etre >= 3 (positions p, p+1, p+2), recu \(config.seqLen)")
+        }
+        let concreteLayers = target.model.layers.count
+        guard (0 ..< concreteLayers).contains(lastFullCacheIdx), (0 ..< concreteLayers).contains(lastSlidingCacheIdx) else {
+            throw DrafterTrainingError.invalidInput(
+                "indices de cache hors du modele cible (\(lastFullCacheIdx), \(lastSlidingCacheIdx) sur \(concreteLayers) couches)")
+        }
+        try Gemma4ComputeGate.shared.beginTraining()
+        defer { Gemma4ComputeGate.shared.endTraining() }
         target.train(false)   // target en eval mode (frozen)
         target.freeze()
         drafter.train()       // drafter en train mode
@@ -167,22 +224,21 @@ public enum Gemma4DrafterTraining {
         let chunks = chunkify(tokenizedSamples)
         let validChunks = chunkify(validSamples)
         guard !chunks.isEmpty else {
-            throw NSError(domain: "DrafterTraining", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "No chunks of length \(seqLen) found in samples"
-            ])
+            throw DrafterTrainingError.invalidInput("aucun troncon de \(seqLen) jetons dans les exemples")
         }
-        print("[drafter-train] \(chunks.count) train chunks, \(validChunks.count) valid chunks (longueur \(seqLen))")
+        let tooShort = tokenizedSamples.filter { $0.count < seqLen }.count
+        print("[drafter-train] \(chunks.count) train chunks, \(validChunks.count) valid chunks (longueur \(seqLen))"
+            + (tooShort > 0 ? " ; \(tooShort) exemple(s) plus court(s) que \(seqLen) ignore(s)" : ""))
+        var rng = SeededGenerator(seed: config.seed)
 
         // valueAndGrad sur le DRAFTER seulement
         // batch = [batchTokens] (single MLXArray in array)
         let lossValueGrad = valueAndGrad(model: drafter) { (drafter: Gemma4AssistantDraftModel, arrays: [MLXArray]) -> [MLXArray] in
-            let (loss, ntoks) = drafterLoss(
-                drafter: drafter,
-                target: target,
-                batchTokens: arrays[0],
-                lastFullCacheIdx: lastFullCacheIdx,
-                lastSlidingCacheIdx: lastSlidingCacheIdx
-            )
+            let (loss, ntoks) = arrays.count > 1
+                ? drafterLoss(drafter: drafter, batchTokens: arrays[0], target: TargetOutputs(Array(arrays[1...])))
+                : drafterLoss(
+                    drafter: drafter, target: target, batchTokens: arrays[0],
+                    lastFullCacheIdx: lastFullCacheIdx, lastSlidingCacheIdx: lastSlidingCacheIdx)
             return [loss, ntoks]
         }
 
@@ -196,7 +252,7 @@ public enum Gemma4DrafterTraining {
             var flatTokens: [Int32] = []
             flatTokens.reserveCapacity(batchSize * seqLen)
             for _ in 0 ..< batchSize {
-                let chunk = chunks.randomElement()!
+                let chunk = chunks[Int.random(in: 0 ..< chunks.count, using: &rng)]
                 flatTokens.append(contentsOf: chunk.map { Int32($0) })
             }
             let batchTokens = MLXArray(flatTokens).reshaped(batchSize, seqLen)
@@ -286,3 +342,39 @@ public enum Gemma4DrafterTraining {
         }
     }
 }
+
+public enum DrafterTrainingError: LocalizedError, Equatable {
+    case invalidInput(String)
+    case ambiguousWeights(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidInput(let message): return message
+        case .ambiguousWeights(let message): return message
+        }
+    }
+}
+
+/// Fichiers de poids d'un drafter (A-11) : un fichier est pris tel quel ; un dossier est lu
+/// dans l'ordre trie, et refuse s'il contient a la fois `drafter.safetensors` et
+/// `drafter.best.safetensors` (memes cles, l'ordre du systeme de fichiers decidait).
+public enum Gemma4DrafterWeights {
+    public static func files(at url: URL) throws -> [URL] {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+            throw DrafterTrainingError.invalidInput("poids du drafter introuvables : \(url.path)")
+        }
+        guard isDirectory.boolValue else { return [url] }
+        let files = try FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "safetensors" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let names = Set(files.map(\.lastPathComponent))
+        if names.contains("drafter.safetensors") && names.contains("drafter.best.safetensors") {
+            throw DrafterTrainingError.ambiguousWeights(
+                "\(url.lastPathComponent) contient drafter.safetensors et drafter.best.safetensors : "
+                    + "passer le fichier voulu a --drafter-path")
+        }
+        return files
+    }
+}
+

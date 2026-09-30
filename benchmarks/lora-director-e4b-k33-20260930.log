@@ -1,0 +1,131 @@
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-e4b-it-bf16
+Modele charge. GPU: 14234 Mo
+Famille detectee: e4b (42 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+Profil e4b/lora-16bit-fast (NON MESURE) : Rapide : sans checkpointing, cache MLX 2 Go.
+  rang, echelle, couches, lr, batch, checkpointing, cache MLX et lots de validation fixes par le profil.
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 0.0001
+Batch: 1, Iterations: 898
+Couches: 12
+Sortie: /Volumes/Lexar/models/local/adapters/director-e4b-k33
+---
+
+Note : 597 exemple(s) de plus de 2048 jetons (max 3320), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 5177344 / 7468190762 (0.07%)
+Train: 899 samples (avg response: 748 tokens)
+Iteration 1: validation loss 1,411438, validation time 68,627536s
+Iteration 10: training loss 1,356366, iterations/sec 0,26156, Tokens/sec 193,188401
+Iteration 20: training loss 1,22365, iterations/sec 0,198402, Tokens/sec 153,146877
+Iteration 30: training loss 1,207637, iterations/sec 0,171556, Tokens/sec 140,675619
+Iteration 40: training loss 1,152782, iterations/sec 0,110885, Tokens/sec 74,459537
+Iteration 50: training loss 1,149268, iterations/sec 0,052914, Tokens/sec 37,421088
+Iteration 50: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 60: training loss 1,196783, iterations/sec 0,114657, Tokens/sec 87,620756
+Iteration 70: training loss 1,19241, iterations/sec 0,147509, Tokens/sec 106,973454
+Iteration 80: training loss 1,120725, iterations/sec 0,132511, Tokens/sec 108,526876
+Iteration 90: training loss 1,057238, iterations/sec 0,15781, Tokens/sec 104,643967
+Iteration 100: training loss 1,097322, iterations/sec 0,168787, Tokens/sec 112,665553
+Iteration 100: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 110: training loss 1,124936, iterations/sec 0,164595, Tokens/sec 115,776413
+Iteration 120: training loss 1,10532, iterations/sec 0,12189, Tokens/sec 100,25461
+Iteration 130: training loss 1,097462, iterations/sec 0,132787, Tokens/sec 108,446938
+Iteration 140: training loss 1,091687, iterations/sec 0,149236, Tokens/sec 116,68746
+Iteration 150: training loss 1,099418, iterations/sec 0,185028, Tokens/sec 125,18982
+Iteration 150: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 160: training loss 1,157282, iterations/sec 0,158188, Tokens/sec 130,884706
+Iteration 170: training loss 1,056188, iterations/sec 0,156561, Tokens/sec 128,661756
+Iteration 180: training loss 1,063128, iterations/sec 0,175911, Tokens/sec 131,018566
+Iteration 190: training loss 1,074137, iterations/sec 0,161706, Tokens/sec 118,061807
+Iteration 200: training loss 1,064267, iterations/sec 0,16145, Tokens/sec 114,952164
+Iteration 200: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 210: training loss 1,085042, iterations/sec 0,149543, Tokens/sec 119,73904
+Iteration 220: training loss 1,04564, iterations/sec 0,146854, Tokens/sec 130,288912
+Iteration 230: training loss 1,037902, iterations/sec 0,175977, Tokens/sec 118,133595
+Iteration 240: training loss 1,095035, iterations/sec 0,156787, Tokens/sec 120,443708
+Iteration 250: training loss 1,002084, iterations/sec 0,163123, Tokens/sec 118,900044
+Iteration 250: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 260: training loss 1,036512, iterations/sec 0,160462, Tokens/sec 109,435319
+Iteration 270: training loss 1,092654, iterations/sec 0,15891, Tokens/sec 114,28842
+Iteration 280: training loss 0,984817, iterations/sec 0,170909, Tokens/sec 119,294426
+Iteration 290: training loss 1,055765, iterations/sec 0,148011, Tokens/sec 117,772356
+Iteration 300: training loss 1,043195, iterations/sec 0,162434, Tokens/sec 119,535143
+Iteration 300: validation loss 1,023313, validation time 84,03206s
+Iteration 300: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 310: training loss 0,978871, iterations/sec 0,161185, Tokens/sec 108,558319
+Iteration 320: training loss 1,006095, iterations/sec 0,148584, Tokens/sec 108,2728
+Iteration 330: training loss 1,038313, iterations/sec 0,155301, Tokens/sec 108,897181
+Iteration 340: training loss 0,96154, iterations/sec 0,176351, Tokens/sec 110,131335
+Iteration 350: training loss 1,065548, iterations/sec 0,154922, Tokens/sec 120,77687
+Iteration 350: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 360: training loss 0,991988, iterations/sec 0,168847, Tokens/sec 126,736337
+Iteration 370: training loss 0,908995, iterations/sec 0,170509, Tokens/sec 126,176661
+Iteration 380: training loss 0,991181, iterations/sec 0,197488, Tokens/sec 125,997653
+Iteration 390: training loss 1,0523, iterations/sec 0,167122, Tokens/sec 125,608584
+Iteration 400: training loss 1,075706, iterations/sec 0,15695, Tokens/sec 128,604761
+Iteration 400: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 410: training loss 1,034843, iterations/sec 0,159269, Tokens/sec 129,262394
+Iteration 420: training loss 1,053519, iterations/sec 0,170449, Tokens/sec 121,25774
+Iteration 430: training loss 0,973001, iterations/sec 0,161562, Tokens/sec 128,134691
+Iteration 440: training loss 0,959416, iterations/sec 0,17095, Tokens/sec 122,742193
+Iteration 450: training loss 0,986326, iterations/sec 0,160871, Tokens/sec 130,209024
+Iteration 450: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 460: training loss 0,996309, iterations/sec 0,169163, Tokens/sec 127,210513
+Iteration 470: training loss 0,957494, iterations/sec 0,171227, Tokens/sec 129,532905
+Iteration 480: training loss 0,991734, iterations/sec 0,169623, Tokens/sec 127,488892
+Iteration 490: training loss 1,022928, iterations/sec 0,157842, Tokens/sec 132,398247
+Iteration 500: training loss 0,96825, iterations/sec 0,167862, Tokens/sec 126,383252
+Iteration 500: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 510: training loss 0,986248, iterations/sec 0,167876, Tokens/sec 129,650579
+Iteration 520: training loss 0,990469, iterations/sec 0,157497, Tokens/sec 121,3989
+Iteration 530: training loss 0,937183, iterations/sec 0,187047, Tokens/sec 122,122906
+Iteration 540: training loss 1,003199, iterations/sec 0,158681, Tokens/sec 126,531989
+Iteration 550: training loss 1,017603, iterations/sec 0,162351, Tokens/sec 123,62993
+Iteration 550: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 560: training loss 0,921206, iterations/sec 0,187091, Tokens/sec 129,991115
+Iteration 570: training loss 1,085339, iterations/sec 0,174624, Tokens/sec 132,871745
+Iteration 580: training loss 0,99028, iterations/sec 0,163152, Tokens/sec 129,281333
+Iteration 590: training loss 1,032036, iterations/sec 0,165656, Tokens/sec 125,716471
+Iteration 600: training loss 0,981421, iterations/sec 0,151848, Tokens/sec 127,840711
+Iteration 600: validation loss 0,987927, validation time 78,722593s
+Iteration 600: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 610: training loss 1,007271, iterations/sec 0,157198, Tokens/sec 117,898453
+Iteration 620: training loss 1,002722, iterations/sec 0,147872, Tokens/sec 113,594929
+Iteration 630: training loss 0,966539, iterations/sec 0,155054, Tokens/sec 106,27418
+Iteration 640: training loss 1,007368, iterations/sec 0,155022, Tokens/sec 123,025505
+Iteration 650: training loss 0,929683, iterations/sec 0,182937, Tokens/sec 125,256937
+Iteration 650: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 660: training loss 0,984481, iterations/sec 0,173782, Tokens/sec 129,259153
+Iteration 670: training loss 0,945806, iterations/sec 0,200555, Tokens/sec 138,162032
+Iteration 680: training loss 0,991377, iterations/sec 0,191942, Tokens/sec 129,618494
+Iteration 690: training loss 0,974843, iterations/sec 0,172761, Tokens/sec 135,945434
+Iteration 700: training loss 0,928984, iterations/sec 0,180675, Tokens/sec 123,997397
+Iteration 700: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 710: training loss 0,981689, iterations/sec 0,165639, Tokens/sec 129,910309
+Iteration 720: training loss 0,946067, iterations/sec 0,14829, Tokens/sec 126,639469
+Iteration 730: training loss 0,993363, iterations/sec 0,152301, Tokens/sec 129,36467
+Iteration 740: training loss 0,934346, iterations/sec 0,18287, Tokens/sec 132,453051
+Iteration 750: training loss 0,970643, iterations/sec 0,196428, Tokens/sec 128,346252
+Iteration 750: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 760: training loss 0,959838, iterations/sec 0,167268, Tokens/sec 125,467803
+Iteration 770: training loss 0,946818, iterations/sec 0,172016, Tokens/sec 125,72627
+Iteration 780: training loss 1,000401, iterations/sec 0,178681, Tokens/sec 120,680963
+Iteration 790: training loss 0,983169, iterations/sec 0,173768, Tokens/sec 126,224895
+Iteration 800: training loss 0,99729, iterations/sec 0,159631, Tokens/sec 116,594735
+Iteration 800: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 810: training loss 1,004919, iterations/sec 0,176681, Tokens/sec 130,160933
+Iteration 820: training loss 0,998162, iterations/sec 0,170928, Tokens/sec 130,999055
+Iteration 830: training loss 0,963664, iterations/sec 0,183467, Tokens/sec 135,894084
+Iteration 840: training loss 0,983886, iterations/sec 0,17175, Tokens/sec 129,963279
+Iteration 850: training loss 0,977314, iterations/sec 0,154937, Tokens/sec 129,573697
+Iteration 850: saved weights to /Volumes/Lexar/models/local/adapters/director-e4b-k33/adapters.safetensors
+Iteration 860: training loss 1,01182, iterations/sec 0,156598, Tokens/sec 127,893426
+Iteration 870: training loss 0,940808, iterations/sec 0,190404, Tokens/sec 133,797209
+Iteration 880: training loss 0,876402, iterations/sec 0,177509, Tokens/sec 131,92503
+Iteration 890: training loss 1,04571, iterations/sec 0,175865, Tokens/sec 126,833651
+Adapter sauvegarde dans /Volumes/Lexar/models/local/adapters/director-e4b-k33
+
+Training termine.
+GPU pic: 40600 Mo

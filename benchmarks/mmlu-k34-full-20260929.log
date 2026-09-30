@@ -1,0 +1,178 @@
+Loaded 1140 test questions, 57 subjects (5-shot dev)
+Letter token IDs : A=562 B=603 C=565 D=622
+[10/1140] subj=abstract_algebra gold=D bf16=D | 0.7s elapsed, ETA 83s
+[20/1140] subj=abstract_algebra gold=A bf16=D | 1.3s elapsed, ETA 75s
+[30/1140] subj=anatomy gold=B bf16=D | 2.0s elapsed, ETA 73s
+[40/1140] subj=anatomy gold=C bf16=C | 2.5s elapsed, ETA 70s
+[50/1140] subj=astronomy gold=C bf16=C | 3.4s elapsed, ETA 74s
+[60/1140] subj=astronomy gold=C bf16=A | 4.1s elapsed, ETA 73s
+[70/1140] subj=business_ethics gold=C bf16=C | 4.8s elapsed, ETA 73s
+[80/1140] subj=business_ethics gold=B bf16=B | 5.5s elapsed, ETA 73s
+[90/1140] subj=clinical_knowledge gold=C bf16=D | 6.1s elapsed, ETA 72s
+[100/1140] subj=clinical_knowledge gold=B bf16=B | 6.8s elapsed, ETA 71s
+[110/1140] subj=college_biology gold=A bf16=D | 7.7s elapsed, ETA 72s
+[120/1140] subj=college_biology gold=A bf16=D | 8.3s elapsed, ETA 71s
+[130/1140] subj=college_chemistry gold=D bf16=D | 9.1s elapsed, ETA 70s
+[140/1140] subj=college_chemistry gold=A bf16=A | 9.9s elapsed, ETA 71s
+[150/1140] subj=college_computer_science gold=B bf16=D | 11.0s elapsed, ETA 73s
+[160/1140] subj=college_computer_science gold=C bf16=C | 11.9s elapsed, ETA 73s
+[170/1140] subj=college_mathematics gold=A bf16=D | 12.8s elapsed, ETA 73s
+[180/1140] subj=college_mathematics gold=C bf16=B | 13.6s elapsed, ETA 72s
+[190/1140] subj=college_medicine gold=C bf16=C | 14.4s elapsed, ETA 72s
+[200/1140] subj=college_medicine gold=B bf16=D | 15.1s elapsed, ETA 71s
+[210/1140] subj=college_physics gold=D bf16=B | 15.9s elapsed, ETA 71s
+[220/1140] subj=college_physics gold=C bf16=A | 16.7s elapsed, ETA 70s
+[230/1140] subj=computer_security gold=B bf16=A | 17.4s elapsed, ETA 69s
+[240/1140] subj=computer_security gold=A bf16=A | 18.1s elapsed, ETA 68s
+[250/1140] subj=conceptual_physics gold=A bf16=B | 18.7s elapsed, ETA 66s
+[260/1140] subj=conceptual_physics gold=A bf16=B | 19.2s elapsed, ETA 65s
+[270/1140] subj=econometrics gold=C bf16=D | 20.4s elapsed, ETA 66s
+[280/1140] subj=econometrics gold=A bf16=D | 21.4s elapsed, ETA 66s
+[290/1140] subj=electrical_engineering gold=A bf16=B | 22.0s elapsed, ETA 64s
+[300/1140] subj=electrical_engineering gold=C bf16=C | 22.6s elapsed, ETA 63s
+[310/1140] subj=elementary_mathematics gold=D bf16=D | 23.5s elapsed, ETA 63s
+[320/1140] subj=elementary_mathematics gold=C bf16=C | 24.3s elapsed, ETA 62s
+[330/1140] subj=formal_logic gold=A bf16=D | 25.2s elapsed, ETA 62s
+[340/1140] subj=formal_logic gold=D bf16=D | 26.2s elapsed, ETA 62s
+[350/1140] subj=global_facts gold=C bf16=A | 26.9s elapsed, ETA 61s
+[360/1140] subj=global_facts gold=C bf16=A | 27.6s elapsed, ETA 60s
+[370/1140] subj=high_school_biology gold=D bf16=D | 28.5s elapsed, ETA 59s
+[380/1140] subj=high_school_biology gold=A bf16=A | 29.4s elapsed, ETA 59s
+[390/1140] subj=high_school_chemistry gold=D bf16=D | 30.2s elapsed, ETA 58s
+[400/1140] subj=high_school_chemistry gold=C bf16=D | 30.9s elapsed, ETA 57s
+[410/1140] subj=high_school_computer_science gold=C bf16=C | 32.2s elapsed, ETA 57s
+[420/1140] subj=high_school_computer_science gold=D bf16=D | 33.3s elapsed, ETA 57s
+[430/1140] subj=high_school_european_history gold=C bf16=C | 36.5s elapsed, ETA 60s
+[440/1140] subj=high_school_european_history gold=C bf16=A | 38.9s elapsed, ETA 62s
+[450/1140] subj=high_school_geography gold=D bf16=D | 39.5s elapsed, ETA 61s
+[460/1140] subj=high_school_geography gold=B bf16=B | 40.1s elapsed, ETA 59s
+[470/1140] subj=high_school_government_and_politics gold=D bf16=C | 41.0s elapsed, ETA 58s
+[480/1140] subj=high_school_government_and_politics gold=C bf16=C | 41.6s elapsed, ETA 57s
+[490/1140] subj=high_school_macroeconomics gold=B bf16=D | 42.5s elapsed, ETA 56s
+[500/1140] subj=high_school_macroeconomics gold=D bf16=D | 43.1s elapsed, ETA 55s
+[510/1140] subj=high_school_mathematics gold=A bf16=D | 44.0s elapsed, ETA 54s
+[520/1140] subj=high_school_mathematics gold=A bf16=D | 44.7s elapsed, ETA 53s
+[530/1140] subj=high_school_microeconomics gold=B bf16=B | 45.6s elapsed, ETA 53s
+[540/1140] subj=high_school_microeconomics gold=D bf16=D | 46.3s elapsed, ETA 51s
+[550/1140] subj=high_school_physics gold=D bf16=B | 47.3s elapsed, ETA 51s
+[560/1140] subj=high_school_physics gold=C bf16=B | 48.4s elapsed, ETA 50s
+[570/1140] subj=high_school_psychology gold=C bf16=C | 49.1s elapsed, ETA 49s
+[580/1140] subj=high_school_psychology gold=D bf16=D | 49.9s elapsed, ETA 48s
+[590/1140] subj=high_school_statistics gold=C bf16=D | 51.2s elapsed, ETA 48s
+[600/1140] subj=high_school_statistics gold=D bf16=C | 52.2s elapsed, ETA 47s
+[610/1140] subj=high_school_us_history gold=B bf16=A | 55.0s elapsed, ETA 48s
+[620/1140] subj=high_school_us_history gold=D bf16=D | 57.6s elapsed, ETA 48s
+[630/1140] subj=high_school_world_history gold=C bf16=B | 60.3s elapsed, ETA 49s
+[640/1140] subj=high_school_world_history gold=A bf16=A | 62.7s elapsed, ETA 49s
+[650/1140] subj=human_aging gold=B bf16=B | 63.4s elapsed, ETA 48s
+[660/1140] subj=human_aging gold=B bf16=B | 64.0s elapsed, ETA 47s
+[670/1140] subj=human_sexuality gold=A bf16=B | 64.6s elapsed, ETA 45s
+[680/1140] subj=human_sexuality gold=C bf16=C | 65.4s elapsed, ETA 44s
+[690/1140] subj=international_law gold=B bf16=B | 66.4s elapsed, ETA 43s
+[700/1140] subj=international_law gold=D bf16=A | 67.2s elapsed, ETA 42s
+[710/1140] subj=jurisprudence gold=D bf16=D | 68.0s elapsed, ETA 41s
+[720/1140] subj=jurisprudence gold=C bf16=B | 68.7s elapsed, ETA 40s
+[730/1140] subj=logical_fallacies gold=B bf16=A | 69.4s elapsed, ETA 39s
+[740/1140] subj=logical_fallacies gold=A bf16=A | 70.1s elapsed, ETA 38s
+[750/1140] subj=machine_learning gold=A bf16=A | 71.1s elapsed, ETA 37s
+[760/1140] subj=machine_learning gold=D bf16=A | 71.9s elapsed, ETA 36s
+[770/1140] subj=management gold=D bf16=B | 72.5s elapsed, ETA 35s
+[780/1140] subj=management gold=D bf16=D | 73.0s elapsed, ETA 34s
+[790/1140] subj=marketing gold=C bf16=A | 73.8s elapsed, ETA 33s
+[800/1140] subj=marketing gold=A bf16=C | 74.4s elapsed, ETA 32s
+[810/1140] subj=medical_genetics gold=A bf16=A | 75.0s elapsed, ETA 31s
+[820/1140] subj=medical_genetics gold=D bf16=B | 75.7s elapsed, ETA 30s
+[830/1140] subj=miscellaneous gold=C bf16=C | 76.3s elapsed, ETA 28s
+[840/1140] subj=miscellaneous gold=A bf16=A | 76.8s elapsed, ETA 27s
+[850/1140] subj=moral_disputes gold=D bf16=D | 77.6s elapsed, ETA 26s
+[860/1140] subj=moral_disputes gold=B bf16=D | 78.3s elapsed, ETA 25s
+[870/1140] subj=moral_scenarios gold=C bf16=D | 79.4s elapsed, ETA 25s
+[880/1140] subj=moral_scenarios gold=C bf16=C | 80.4s elapsed, ETA 24s
+[890/1140] subj=nutrition gold=B bf16=D | 81.3s elapsed, ETA 23s
+[900/1140] subj=nutrition gold=D bf16=D | 81.9s elapsed, ETA 22s
+[910/1140] subj=philosophy gold=C bf16=A | 82.6s elapsed, ETA 21s
+[920/1140] subj=philosophy gold=D bf16=D | 83.2s elapsed, ETA 20s
+[930/1140] subj=prehistory gold=C bf16=B | 84.1s elapsed, ETA 19s
+[940/1140] subj=prehistory gold=A bf16=B | 84.7s elapsed, ETA 18s
+[950/1140] subj=professional_accounting gold=B bf16=A | 85.9s elapsed, ETA 17s
+[960/1140] subj=professional_accounting gold=C bf16=C | 86.8s elapsed, ETA 16s
+[970/1140] subj=professional_law gold=B bf16=D | 89.3s elapsed, ETA 16s
+[980/1140] subj=professional_law gold=D bf16=D | 91.2s elapsed, ETA 15s
+[990/1140] subj=professional_medicine gold=D bf16=D | 92.9s elapsed, ETA 14s
+[1000/1140] subj=professional_medicine gold=C bf16=D | 94.7s elapsed, ETA 13s
+[1010/1140] subj=professional_psychology gold=B bf16=A | 95.7s elapsed, ETA 12s
+[1020/1140] subj=professional_psychology gold=C bf16=A | 96.8s elapsed, ETA 11s
+[1030/1140] subj=public_relations gold=B bf16=C | 97.5s elapsed, ETA 10s
+[1040/1140] subj=public_relations gold=B bf16=A | 98.1s elapsed, ETA 9s
+[1050/1140] subj=security_studies gold=C bf16=C | 99.6s elapsed, ETA 9s
+[1060/1140] subj=security_studies gold=C bf16=D | 100.7s elapsed, ETA 8s
+[1070/1140] subj=sociology gold=C bf16=A | 101.5s elapsed, ETA 7s
+[1080/1140] subj=sociology gold=A bf16=D | 102.2s elapsed, ETA 6s
+[1090/1140] subj=us_foreign_policy gold=A bf16=A | 103.0s elapsed, ETA 5s
+[1100/1140] subj=us_foreign_policy gold=B bf16=D | 103.7s elapsed, ETA 4s
+[1110/1140] subj=virology gold=D bf16=A | 104.3s elapsed, ETA 3s
+[1120/1140] subj=virology gold=A bf16=D | 105.0s elapsed, ETA 2s
+[1130/1140] subj=world_religions gold=D bf16=D | 105.6s elapsed, ETA 1s
+[1140/1140] subj=world_religions gold=C bf16=D | 106.1s elapsed, ETA 0s
+
+=== Results (1140 questions, 5-shot, 106.1s) ===
+  bf16-kv: 527/1140 = 46.2% (IC95 43.4-49.1)
+
+By subject (bf16-kv accuracy):
+  abstract_algebra: 4/20
+  anatomy: 11/20
+  astronomy: 12/20
+  business_ethics: 7/20
+  clinical_knowledge: 14/20
+  college_biology: 7/20
+  college_chemistry: 6/20
+  college_computer_science: 4/20
+  college_mathematics: 6/20
+  college_medicine: 8/20
+  college_physics: 4/20
+  computer_security: 11/20
+  conceptual_physics: 7/20
+  econometrics: 6/20
+  electrical_engineering: 13/20
+  elementary_mathematics: 7/20
+  formal_logic: 9/20
+  global_facts: 5/20
+  high_school_biology: 13/20
+  high_school_chemistry: 7/20
+  high_school_computer_science: 12/20
+  high_school_european_history: 10/20
+  high_school_geography: 13/20
+  high_school_government_and_politics: 14/20
+  high_school_macroeconomics: 8/20
+  high_school_mathematics: 6/20
+  high_school_microeconomics: 13/20
+  high_school_physics: 5/20
+  high_school_psychology: 17/20
+  high_school_statistics: 12/20
+  high_school_us_history: 10/20
+  high_school_world_history: 10/20
+  human_aging: 9/20
+  human_sexuality: 12/20
+  international_law: 8/20
+  jurisprudence: 12/20
+  logical_fallacies: 8/20
+  machine_learning: 8/20
+  management: 11/20
+  marketing: 14/20
+  medical_genetics: 8/20
+  miscellaneous: 12/20
+  moral_disputes: 10/20
+  moral_scenarios: 5/20
+  nutrition: 10/20
+  philosophy: 9/20
+  prehistory: 10/20
+  professional_accounting: 6/20
+  professional_law: 5/20
+  professional_medicine: 10/20
+  professional_psychology: 5/20
+  public_relations: 11/20
+  security_studies: 10/20
+  sociology: 9/20
+  us_foreign_policy: 13/20
+  virology: 8/20
+  world_religions: 13/20

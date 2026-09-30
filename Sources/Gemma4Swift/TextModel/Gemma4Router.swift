@@ -44,7 +44,10 @@ public class Gemma4Router: Module {
         let expertScores = proj(h)
         let routerProbs = softmax(expertScores, axis: -1)
 
-        let topKIndices = MLX.argPartition(-expertScores, kth: topK - 1, axis: -1)[.ellipsis, ..<topK]
+        // stopGradient : sans lui, l'entrainement (LoRA) meurt dans gatherMM, « Cannot
+        // calculate VJP with respect to indices » (K-33) ; sans effet en inference.
+        let topKIndices = stopGradient(
+            MLX.argPartition(-expertScores, kth: topK - 1, axis: -1)[.ellipsis, ..<topK])
 
         var topKWeights = MLX.takeAlong(routerProbs, topKIndices, axis: -1)
         topKWeights = topKWeights / MLX.sum(topKWeights, axis: -1, keepDims: true)

@@ -1,5 +1,7 @@
 # OCR Bench — DiffusionGemma vs Gemma 4 AR (mini OCRBench)
 
+> Les sorties brutes ne sont plus dans le dépôt (nettoyage du 2026-09-27) : elles restent consultables au commit `c9543739` via les liens ci-dessous.
+
 Comparaison de la qualité OCR de **DiffusionGemma 26B-A4B bf16** (block-AR diffusion) contre les modèles Gemma 4 autoregressifs sur un mini-bench dérivé de [OCRBench](https://huggingface.co/datasets/echo840/OCRBench) (Yuliang Liu et al., Science China Information Sciences 2024).
 
 ## Setup
@@ -118,9 +120,9 @@ python3 score.py a4b
 ## Fichiers
 
 - `meta.json` : 30 images stratifiées avec ground truth answers
-- `results/diff/*.txt` : sorties brutes DiffusionGemma
-- `results/e4b/*.txt` : sorties brutes Gemma 4 E4B 4-bit
-- `results/a4b/*.txt` : sorties brutes Gemma 4 26B-A4B 4-bit
+- [`results/diff/*.txt`](https://github.com/VincentGourbin/gemma-4-swift-mlx/tree/c9543739/docs/examples/ocr-bench/results/diff) : sorties brutes DiffusionGemma
+- [`results/e4b/*.txt`](https://github.com/VincentGourbin/gemma-4-swift-mlx/tree/c9543739/docs/examples/ocr-bench/results/e4b) : sorties brutes Gemma 4 E4B 4-bit
+- [`results/a4b/*.txt`](https://github.com/VincentGourbin/gemma-4-swift-mlx/tree/c9543739/docs/examples/ocr-bench/results/a4b) : sorties brutes Gemma 4 26B-A4B 4-bit
 - `score.py` : script de scoring (substring match case-insensitive)
 
 ## Notes méthodologiques

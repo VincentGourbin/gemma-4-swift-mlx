@@ -27,17 +27,18 @@ public class VisionPatchEmbedder: Module {
 
     /// Calcule les embeddings de position a partir des coordonnees de patches
     func positionEmbeddings(patchPositions: MLXArray, paddingPositions: MLXArray) -> MLXArray {
-        // one-hot: [B, numPatches, 2, posSize]
-        let oh = oneHot(patchPositions, numClasses: positionEmbeddingSize)
-        // [B, 2, numPatches, posSize]
-        let ohT = oh.transposed(0, 2, 1, 3).asType(positionEmbeddingTable.dtype)
-        // matmul: [B, 2, numPatches, hiddenSize]
-        var posEmb = matmul(ohT, positionEmbeddingTable)
-        // Somme sur la dim spatiale (2 axes: x, y) → [B, numPatches, hiddenSize]
-        posEmb = posEmb.sum(axis: 1)
+        // Lecture directe des lignes x et y de la table (lot I) : equivalente au one-hot x
+        // matmul du port Python (une seule ligne non nulle par position), sans le one-hot
+        // fp32 [B, N, 2, 10240] (~200 Mo pour 2 457 patches) qui faisait le pic de l'encodeur.
+        // Les positions de padding (-1) lisent la ligne 0, puis sont mises a zero ci-dessous.
+        let clamped = clip(patchPositions, min: Int32(0))
+        let xs = take(positionEmbeddingTable[0], clamped[.ellipsis, 0], axis: 0)  // [B, N, hidden]
+        let ys = take(positionEmbeddingTable[1], clamped[.ellipsis, 1], axis: 0)
+        var posEmb = xs + ys
         // Masquer les positions de padding
         let mask = expandedDimensions(paddingPositions, axis: -1)
-        posEmb = MLX.where(mask, MLXArray(Float(0.0)), posEmb)
+        // Zero au dtype de la table : une constante fp32 promouvait tout l'encodeur en fp32.
+        posEmb = MLX.where(mask, MLXArray(Float(0.0)).asType(posEmb.dtype), posEmb)
         return posEmb
     }
 
@@ -57,7 +58,10 @@ public class VisionPatchEmbedder: Module {
         patches = patches.reshaped(B, pH * pW, C * patchSize * patchSize)
         // Normalise vers [-1, 1]
         patches = 2 * (patches - 0.5)
-        return inputProj(patches.asType(inputProj.weight.dtype))
+        // Un QuantizedLinear (quantification a la volee sans exclusion des encodeurs)
+        // a un `weight` uint32 packe : le dtype de calcul est celui de ses `scales`.
+        let computeDType = (inputProj as? QuantizedLinear)?.scales.dtype ?? inputProj.weight.dtype
+        return inputProj(patches.asType(computeDType))
     }
 
     public func callAsFunction(

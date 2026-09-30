@@ -39,6 +39,15 @@ that fine-tunes on a background task while streaming inference can hit the same
 ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
 inference — serialize the two.
 
+`Gemma4ComputeGate.shared` enforces this for the package's own entry points: the
+three gradient loops (`trainLoRA`, `trainMultimodalLoRA`,
+`Gemma4DrafterTraining.trainDrafter`) take it exclusively, and every inference entry
+point of `Gemma4Pipeline` / `Gemma4MTPPipeline` fails fast with `trainingInProgress`
+while a training runs (and training fails with `inferenceInProgress` while an
+inference runs). It is non-blocking by design and cannot see a consumer's direct MLX
+calls (forward on a `ModelContainer`, custom gradients): those must serialize
+themselves. Any new gradient loop or inference entry point must take the gate.
+
 `Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
 (via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
 process). The whole suite then passes in ~1.2s. Drop the wrapper once the
@@ -80,14 +89,31 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
 `ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
 
+**Next bump (mlx-swift 0.32, mlx-swift-lm > 3.31.4) has a silent trap.** The protocol
+requirement becomes `prepare(_:cache:state:prefill:)` and `LLMModel` ships a default for it,
+so our three `prepare(_:cache:windowSize:)` (text, multimodal, unified) still compile but are
+**no longer called** by `TokenIterator`: images and audio would be skipped without any error.
+Each model needs a shim implementing the new requirement and forwarding
+`prefill.stepSize` as `windowSize`. The other breaks: `newCache(parameters:)` now `throws`,
+and `ChunkedPrefillParityTests` calls the old signature. The whole migration was validated in a
+throwaway worktree on 2026-09-29 (313/313 tests, see action-plans#602).
+
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
 from `.build/*/checkouts/mlx-swift-lm/.git/packed-refs` (or delete the checkout) and
 re-resolve.
 
+## Where models live
+
+`Gemma4ModelCache.modelsDirectory` = `customModelsDirectory` (apps) → `$GEMMA4_MODELS_DIR`
+(forwarded to tests by `Scripts/run-tests.sh`) → `~/Library/Caches/models`. The internal disk of
+the dev Mac is nearly full: put weights on the external SSD (`GEMMA4_MODELS_DIR=/Volumes/Lexar/models`).
+Downloads refuse an unmounted `/Volumes/<name>`. Tests must never write to the real models
+directory (the download-manager suite uses a temporary one).
+
 ## Architecture
 
-Swift 6.0 / macOS 14+ / Apple Silicon only. Two products: `Gemma4Swift` library and `gemma4-cli` executable.
+Swift 6.0 / macOS 15+ / Apple Silicon only. Two products: `Gemma4Swift` library and `gemma4-cli` executable.
 
 ### Multimodal Pipeline
 

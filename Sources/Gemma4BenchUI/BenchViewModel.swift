@@ -441,6 +441,9 @@ final class BenchViewModel: ObservableObject {
             pixelValues = nil
         }
         let hasImage = pixelValues != nil
+        // Materialiser avant le Task.detached : le graphe ne doit pas etre evalue
+        // sur un autre thread que celui qui l'a construit (D-08).
+        if let pixelValues { eval(pixelValues) }
 
         // Stream d'events Sendable (text déjà décodé côté pipeline)
         let stream = AsyncStream<DiffusionEvent>(bufferingPolicy: .unbounded) { continuation in
