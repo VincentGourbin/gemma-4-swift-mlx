@@ -18,7 +18,14 @@ jobs:
       - name: Xcode
         run: xcodebuild -version
       - name: Metal toolchain
-        run: xcodebuild -downloadComponent MetalToolchain || xcodebuild -showComponent MetalToolchain
+        # Xcode 26+ telecharge la chaine Metal a part ; Xcode 16 l'embarque et ne connait
+        # pas -downloadComponent (premier run de la CI, PR #55).
+        run: |
+          if xcodebuild -help 2>&1 | grep -q -- '-downloadComponent'; then
+            xcodebuild -downloadComponent MetalToolchain
+          else
+            echo "Chaine Metal incluse dans $(xcodebuild -version | head -1)"
+          fi
       - name: Build library, CLI and test bundle
         run: |
           xcodebuild build-for-testing \
