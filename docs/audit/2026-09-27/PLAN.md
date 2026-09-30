@@ -168,8 +168,17 @@ Tranchées le 2026-09-27 (suite) :
   Note : le consommateur entraîne sur **E2B 6 bits**, hors grille 4/8/16 → prévoir `lora-6bit-*` pour E2B.
 - **qwen38** : défauts du serveur remontés dans VincentGourbin/qwen38-mlx-swift#2.
 
-Ouvertes :
-1. 12B : profil `6bit-*` ou non (MMLU ≥ 1 000 questions, K-21).
+Tranchées le 2026-09-30 :
+- **Pas de profils 6 bits** : ni `lora-6bit-*` pour E2B (Fluxforge s'adaptera à la grille 4/8/16), ni
+  `6bit-*` pour le 12B (4 et 8 bits suffisent).
+- **K-17** : on laisse tel quel, suivi dans l'issue #54.
+- **Hugging Face** : publier tout poids d'un profil recommandé qu'on ne peut pas récupérer ailleurs →
+  les deux packs de diffusion (`VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-{8bit,4bit-mixed}`,
+  format propre, illisibles par mlx-community et inversement). Les profils d'inférence et
+  d'entraînement pointent tous sur des packs mlx-community.
+- **Branche** poussée sur `origin/fix/lot-a-stabilite` (sauvegarde, pas de PR).
+
+Ouvertes : aucune.
 
 ## 6. Hors plan
 DiffusionGemma (a ses propres préréglages), iOS au-delà du lot I (pas d'app déclarée), noyau SDPA fusionné pour head_dim 256/512 (P-12, amont MLX).
@@ -282,3 +291,4 @@ puis d2/d3 (`--image`). Ordre (audit-diffusion §E.2) : K-D10 base bf16 D1/D2/D3
 - K-32 (`1aa8ce24`) : gradient checkpointing par couche via `CustomFunction` (sans l'amont) ; director 200 pas : pertes identiques, pic 38,6 → 21,1 Go (−45 %), temps +35 % → option `--grad-checkpoint`, pas par défaut. Suivi mlx-swift 0.32 : action-plans#602 (mlx-swift-lm pas encore publié pour 0.32).
 - Essai mlx-swift 0.32.2 + mlx-swift-lm `main` (c043fb3b), worktree jetable, rien de commité côté dépendances : build et 313/313 tests. Ruptures : (1) **piège silencieux** — l'exigence devient `prepare(_:cache:state:prefill:)` avec un défaut dans `LLMModel`, nos `prepare(windowSize:)` ne seraient plus appelés (médias sautés sans erreur) → shim par modèle ; (2) `newCache(parameters:)` lève ; (3) test de parité du préfill. Correctif complet : `mlx-swift-0.32-migration.patch`. A/B/B/A E2B 4 bits `fast` (`benchmarks/mlx032-ab-20260929.jsonl`) : décodage identique (±1 %), sorties texte 1024/4096 identiques, description d'image identique ; **empreinte +640 à +830 Mo** et **TTFT image +60 %** (373-385 contre 223-237 ms, les deux passes B) en 0.32 → à recreuser à la montée réelle, noté dans action-plans#602. Tolérance du test K-30 d relâchée à 1e-5 (bruit fp32 de 1e-6 relatif en 0.32).
 - K-33 (code) : `Gemma4TrainingProfile` (12 candidats `lora-<bits>bit-<fast|lean>`, publiés seulement une fois mesurés), `lora train --reference`, `lora profiles`, `Scripts/bench-training-campaign.sh`. Checkpointing gardé en `fast` pour 12B/26B-A4B/31B (activations hors de portée de 96 Go sans). Campagne à lancer.
+- K-33 (mesures, `5944a7b0`) : 12 candidats, 11 publiés (table dans `Gemma4TrainingProfile.measurements`, `lora profiles`). La campagne a révélé deux bugs : **LoRA MoE impossible** (indices du routeur dans la VJP de `gatherMM`, `16dd66f4`) et **masque de réponse faux sur 12B/26B-A4B/31B** (leur gabarit ajoute `<|channel>thought\n<channel|>` à l'invite de génération : 4 jetons entraînés par exemple au lieu de 748, `bd867d40` ; touchait aussi `mtp-train` et le multimodal). Les runs 12B/26B/31B de `benchmarks/k33-20260929-2156` sont **invalides** (avant correctifs) ; les bons sont dans `k33-20260930-0314`. `b31b/lora-4bit-lean` diverge à lr 1e-4 (val 1,554 → 1,777) : non publié. Porte E7 lancée sur E4B `lora-16bit-fast` (époque complète).
