@@ -34,7 +34,8 @@ jobs:
             -scheme Gemma4Swift-Package \
             -destination 'platform=macOS' \
             -derivedDataPath .build/xcode \
-            -skipMacroValidation
+            -skipMacroValidation \
+            -skipPackagePluginValidation
       - name: Server isolation (consumers never resolve hummingbird / swift-nio)
         run: Scripts/check-server-isolation.sh
       - name: Build and test server package (fake backend, no GPU)
@@ -45,6 +46,7 @@ jobs:
             -destination 'platform=macOS' \
             -derivedDataPath ../.build/xcode-server \
             -skipMacroValidation \
+            -skipPackagePluginValidation \
             -only-testing:Gemma4ServerTests
       - name: Build library for iOS (K-46)
         run: |
@@ -52,4 +54,5 @@ jobs:
             -scheme Gemma4Swift \
             -destination 'generic/platform=iOS' \
             -derivedDataPath .build/xcode-ios \
-            -skipMacroValidation
+            -skipMacroValidation \
+            -skipPackagePluginValidation
