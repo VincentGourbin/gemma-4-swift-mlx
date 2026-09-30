@@ -28,8 +28,9 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
 
     public enum Kind: String, CaseIterable, Sendable { case fast, lean }
 
-    /// Mesure de reference : dataset director de Fluxforge (898 exemples, jusqu'a 3 320
-    /// jetons), graine 0, `steps` pas, M3 Max 128 Go.
+    /// Mesure de reference (campagne K-33, `Scripts/bench-training-campaign.sh`) : dataset
+    /// director de Fluxforge (898 exemples, jusqu'a 3 320 jetons), graine 0, `steps` pas,
+    /// validation sur 10 lots, M3 Max 96 Go. Lignes brutes : `benchmarks/k33-*`.
     public struct Measurement: Sendable, Equatable {
         /// Pic MLX (`Memory.peakMemory`), en Go.
         public let peakMLXGB: Double
@@ -37,7 +38,7 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         public let footprintGB: Double
         /// Jetons de reponse entraines par seconde, moyenne sur le run.
         public let trainedTokensPerSecond: Double
-        /// Perte de validation au dernier pas (25 lots).
+        /// Perte de validation au dernier pas (10 lots).
         public let validationLoss: Double
         public let steps: Int
         /// Porte qualite E7 (30 briefs tenus a l'ecart), si un run complet a ete evalue.
@@ -121,8 +122,24 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         make(.b31b, .four, .lean, numLayers: 16),
     ].compactMap { $0 }
 
-    /// Mesures de la campagne K-33 (vide tant qu'elle n'a pas tourne).
-    static let measurements: [String: Measurement] = [:]
+    /// Mesures de la campagne K-33 (2026-09-29/30), 50 pas. Pertes de validation au pas 1 :
+    /// E2B 1,85 (4 bits 1,89), E4B 1,41, 12B 1,40-1,42, 26B-A4B 1,71 (4 bits 1,87), 31B 1,55.
+    ///
+    /// `b31b/lora-4bit-lean` n'y est pas : a lr 1e-4, la perte **monte** (1,554 -> 1,777 au
+    /// pas 50) ; il reste candidat, non publie, jusqu'a une mesure a lr plus bas.
+    static let measurements: [String: Measurement] = [
+        "e2b/lora-16bit-fast": .init(peakMLXGB: 37.0, footprintGB: 13.9, trainedTokensPerSecond: 218, validationLoss: 1.276, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "e2b/lora-16bit-lean": .init(peakMLXGB: 20.7, footprintGB: 12.8, trainedTokensPerSecond: 168, validationLoss: 1.276, steps: 50, e7Valid: nil, date: "2026-09-29"),
+        "e2b/lora-4bit-lean": .init(peakMLXGB: 14.5, footprintGB: 6.7, trainedTokensPerSecond: 132, validationLoss: 1.339, steps: 50, e7Valid: nil, date: "2026-09-29"),
+        "e4b/lora-16bit-fast": .init(peakMLXGB: 35.7, footprintGB: 18.7, trainedTokensPerSecond: 144, validationLoss: 1.157, steps: 50, e7Valid: nil, date: "2026-09-29"),
+        "e4b/lora-16bit-lean": .init(peakMLXGB: 24.1, footprintGB: 18.3, trainedTokensPerSecond: 115, validationLoss: 1.157, steps: 50, e7Valid: nil, date: "2026-09-29"),
+        "e4b/lora-8bit-lean": .init(peakMLXGB: 16.8, footprintGB: 11.5, trainedTokensPerSecond: 85, validationLoss: 1.160, steps: 50, e7Valid: nil, date: "2026-09-29"),
+        "b12b/lora-16bit-fast": .init(peakMLXGB: 37.9, footprintGB: 27.5, trainedTokensPerSecond: 35, validationLoss: 1.131, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "b12b/lora-8bit-lean": .init(peakMLXGB: 27.9, footprintGB: 16.4, trainedTokensPerSecond: 30, validationLoss: 1.100, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "a4b/lora-16bit-fast": .init(peakMLXGB: 57.6, footprintGB: 52.3, trainedTokensPerSecond: 67, validationLoss: 1.084, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "a4b/lora-4bit-lean": .init(peakMLXGB: 20.4, footprintGB: 17.6, trainedTokensPerSecond: 68, validationLoss: 1.140, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "b31b/lora-8bit-fast": .init(peakMLXGB: 54.8, footprintGB: 35.9, trainedTokensPerSecond: 14, validationLoss: 1.289, steps: 50, e7Valid: nil, date: "2026-09-30"),
+    ]
 
     private static func make(
         _ family: Gemma4Pipeline.Model.Family, _ bits: Gemma4ReferenceProfile.Bits, _ kind: Kind,

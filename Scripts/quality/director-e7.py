@@ -7,6 +7,7 @@
 
   python3 Scripts/quality/director-e7.py --condition adapter --adapter <dir> --out <dir>
   python3 Scripts/quality/director-e7.py --score-only <dir>   # re-noter des sorties existantes
+  --base <dossier du modele>   autre base que E2B 6 bits (ex. E4B bf16, K-33)
 """
 import argparse, json, subprocess, sys, time
 from pathlib import Path
@@ -36,11 +37,11 @@ def prompt(brief, env):
     return json.loads(subprocess.run(args, capture_output=True, text=True, timeout=30, check=True).stdout)
 
 
-def generate(system, user, adapter, max_tokens=2048):
+def generate(system, user, adapter, base=BASE, max_tokens=2048):
     if adapter:
-        args = [str(CLI), "lora", "generate", "--model-path", str(BASE), "--adapter-path", str(adapter)]
+        args = [str(CLI), "lora", "generate", "--model-path", str(base), "--adapter-path", str(adapter)]
     else:
-        args = [str(CLI), "generate", "--model-path", str(BASE)]
+        args = [str(CLI), "generate", "--model-path", str(base)]
     args += ["--system", system, "--max-tokens", str(max_tokens), "--temperature", "0.3", user]
     out = subprocess.run(args, capture_output=True, text=True, timeout=400, check=True).stdout
     if "\n---\n" in out: out = out.split("\n---\n", 1)[1]
@@ -71,6 +72,7 @@ def main():
     ap.add_argument("--adapter")
     ap.add_argument("--out")
     ap.add_argument("--score-only")
+    ap.add_argument("--base", default=str(BASE))
     a = ap.parse_args()
     if a.score_only:
         print(json.dumps(score(Path(a.score_only)), ensure_ascii=False)); return
@@ -80,7 +82,7 @@ def main():
         path = out / f"{brief['id']}.txt"
         if path.exists(): continue
         p = prompt(brief, env); t0 = time.time()
-        path.write_text(generate(p["system"], p["user"], adapter), encoding="utf-8")
+        path.write_text(generate(p["system"], p["user"], adapter, Path(a.base)), encoding="utf-8")
         print(f"[{i}/30] {brief['id']} ({time.time() - t0:.0f} s)", flush=True)
     result = score(out)
     (out / "score.json").write_text(json.dumps(result, indent=1))
