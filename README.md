@@ -13,12 +13,15 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Thinking mode filter | ✅ **Working** | Filters `<\|channel>thought` blocks. Structured response separation |
 | LoRA/DoRA fine-tuning | ✅ **Working** | LoRA, DoRA, full SFT. Response masking, chat template. 97% accuracy on classifier benchmark |
 | Multimodal LoRA | ✅ **Working** | Audio + vision fine-tuning. 50% accuracy on 20-species bird call classification, LaTeX OCR verified |
-| Speculative decoding (MTP) | ✅ **Working** | Gemma 4 Assistant drafter with greedy bit-exact equivalence. Fine-tuneable: ×2.5 acceptance on domain-specific dataset |
+| Speculative decoding (MTP) | ✅ **Working** | Gemma 4 Assistant drafter. Matches greedy decoding except on near-ties of logits (not bit-exact in general). Fine-tuneable: ×2.5 acceptance on domain-specific dataset |
 | KV cache quantization | 🔄 **Migrating** | TurboQuant (custom) to be replaced by mlx-swift-lm native `QuantizedKVCache`. See [optimization report](#kv-cache-quantization) |
-| Multi-turn chat | ✅ **Working** | Via ChatSession streaming |
+| Multi-turn chat | ✅ **Working** | Via ChatSession streaming, or `Gemma4ChatEngine` (tools, thinking channel, images, prefix reuse: TTFT −78 % on the next turn) |
+| OpenAI-compatible server | ✅ **Working** | `Server/` package, `gemma4-server` (SSE, tools, images, API key, per-client conversation cache). See [Inference Server](#inference-server-openai-compatible) |
+| Reference profiles | ✅ **Measured** | `<bits>bit-<fast\|lean>` for inference (30 profiles), `lora-<bits>bit-<fast\|lean>` for training (11 profiles), `a4bdiff/*` for diffusion. `gemma4-cli references`, `lora profiles` |
+| iPhone / iPad | 🧪 **Profile ready** | `e2b/4bit-tiny`: under 4 GB footprint (text 3.1 GB, image 3.9 GB), measured on Mac only. See [docs/iOS.md](docs/iOS.md) |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
 | Model download | ✅ **Working** | Direct HTTPS from HuggingFace (no HF SDK dependency) |
-| **DiffusionGemma 26B-A4B** | ✅ **Ported** | Block-AR text diffusion + vision. **80.8% OCRBench**, **79% ScreenSpot v1**, 95% BFCL. Voir [docs/DIFFUSIONGEMMA.md](docs/DIFFUSIONGEMMA.md) |
+| **DiffusionGemma 26B-A4B** | ✅ **Ported** | Block-AR text diffusion + vision. **80.8% OCRBench**, **79% ScreenSpot v1**, 95% BFCL. Pre-quantized 8-bit and 4-bit (mixed) packs on Hugging Face: `gemma4-cli download diff-8bit` / `diff-4bit`. Voir [docs/DIFFUSIONGEMMA.md](docs/DIFFUSIONGEMMA.md) |
 | `gemma4-bench-ui` GUI | ✅ **Working** | 4 onglets (Bench AR vs Diffusion, Web agent step-by-step, Akinator VQA, iOS Sim agent) |
 
 ## Requirements
@@ -300,6 +303,7 @@ gemma4-cli lora train \
   --model-path <model> \
   --data <dataset-dir> \
   --output ./adapters \
+  --reference lora-16bit-fast \  # Measured profile (see below); overrides the knobs it sets
   --mask-prompt \              # Loss only on response tokens (recommended)
   --num-layers 16 \            # Number of layers to adapt
   --iterations 1300 \          # Training steps
@@ -328,16 +332,38 @@ gemma4-cli lora fuse \
   --output ./fused-model
 ```
 
-### Recommended hyperparameters
+### Training profiles
 
-| Model | Layers | LR | Iterations | Notes |
-|-------|:------:|:--:|:----------:|-------|
-| E2B (bf16) | 16 | 1e-4 | 1 epoch | Best for fine-tuning |
-| E4B (bf16) | 12 | 1e-4 | 1 epoch | Higher quality base |
-| E2B (4-bit) | 8 | 1e-5 | 1 epoch | Works but noisier gradients |
+`--reference <profile>` sets rank, scale, layers, learning rate, batch, gradient checkpointing,
+MLX cache limit and validation batches in one go (`gemma4-cli lora profiles` lists them).
+All use rank 8, scale 20, lr 1e-4, batch 1, loss and head on the response only. `lean` adds
+per-layer gradient checkpointing (same losses, −33 to −44 % peak, −20 to −23 % speed).
 
-- Always use `--mask-prompt` for chat-format data
-- Use bf16 models for training (not quantized)
+Measured on the Fluxforge "director" dataset (898 chat examples up to 3,320 tokens, 50 steps,
+M3 Max 96 GB); throughput counts trained (response) tokens:
+
+| Profile | Base weights | Peak MLX | Footprint | Throughput | Val loss (step 1 → 50) |
+|---|---|---|---|---|---|
+| `e2b/lora-16bit-fast` | E2B bf16 | 37.0 GB | 13.9 GB | 218 tok/s | 1.847 → 1.276 |
+| `e2b/lora-16bit-lean` | E2B bf16 | 20.7 GB | 12.8 GB | 168 tok/s | 1.847 → 1.276 |
+| `e2b/lora-4bit-lean` | E2B 4-bit | 14.5 GB | 6.7 GB | 132 tok/s | 1.893 → 1.339 |
+| `e4b/lora-16bit-fast` ✅ E7 29/30 | E4B bf16 | 35.7 GB | 18.7 GB | 144 tok/s | 1.411 → 1.157 |
+| `e4b/lora-16bit-lean` | E4B bf16 | 24.1 GB | 18.3 GB | 115 tok/s | 1.411 → 1.157 |
+| `e4b/lora-8bit-lean` | E4B 8-bit | 16.8 GB | 11.5 GB | 85 tok/s | 1.412 → 1.160 |
+| `b12b/lora-16bit-fast` | 12B bf16 | 37.9 GB | 27.5 GB | 35 tok/s | 1.424 → 1.131 |
+| `b12b/lora-8bit-lean` | 12B 8-bit | 27.9 GB | 16.4 GB | 30 tok/s | 1.401 → 1.100 |
+| `a4b/lora-16bit-fast` | 26B-A4B bf16 | 57.6 GB | 52.3 GB | 67 tok/s | 1.714 → 1.084 |
+| `a4b/lora-4bit-lean` | 26B-A4B 4-bit | 20.4 GB | 17.6 GB | 68 tok/s | 1.867 → 1.140 |
+| `b31b/lora-8bit-fast` | 31B 8-bit | 54.8 GB | 35.9 GB | 14 tok/s | 1.548 → 1.289 |
+
+- Quality gate (E7, 30 held-out briefs validated by `director-tool`): E4B `lora-16bit-fast`, one full
+  epoch → **29/30** (E4B base alone 19/30). E2B bf16 with the same defaults: 30/30.
+- 12B, 26B-A4B and 31B keep gradient checkpointing even in `fast` (activations would not fit in 96 GB).
+- MoE (26B-A4B): experts (`SwitchLinear`) are not adapted; attention and dense MLP are.
+- `b31b/lora-4bit-lean` is not published: it diverges at lr 1e-4.
+- Always use `--mask-prompt` for chat-format data. Long examples are not truncated by default
+  (`--max-seq-length` to bound memory; truncation cut the end of director answers: 30/30 → 27/30).
+- Reproducible runs (`--seed`), safe checkpoints and exact resume (`--resume`), JSONL metrics (`--metrics-out`).
 - Adapters trained in Swift work in Python mlx-lm and vice versa
 
 ### Library API
@@ -494,7 +520,7 @@ try await pipeline.fuseAdapter(from: adapterDirectoryURL)
 
 ## Speculative Decoding (MTP)
 
-Accelerate text generation with Google's `gemma-4-{E2B,E4B}-it-assistant` drafter models via Multi-Token Prediction. The drafter proposes K-1 tokens per round; the target verifies all in one parallel forward and accepts only those matching its own argmax. **Output is bit-exact identical to standard greedy generation**.
+Accelerate text generation with Google's `gemma-4-{E2B,E4B}-it-assistant` drafter models via Multi-Token Prediction. The drafter proposes K-1 tokens per round; the target verifies all in one parallel forward and accepts only those matching its own argmax. Output matches standard greedy generation, except where two logits are nearly tied: the batched verify pass can flip such an argmax, so it is not bit-exact in general.
 
 ### Quick start
 
@@ -546,14 +572,14 @@ Dataset format: same JSONL conventions as LoRA training (`{"text": "..."}` or `{
 | Acceptance moyenne | 8.8% | 22.4% | **×2.5** |
 | Temps de génération | baseline | -12% | **-12%** |
 
-Greedy equivalence preserved (output bit-exact identical). See PR #25 for full bench.
+Greedy equivalence preserved on this dataset. See PR #25 for full bench.
 
 ### Validation tools
 
 ```bash
 gemma4-cli mtp-smoke <repo>              # validate drafter weights load cleanly
 gemma4-cli mtp-forward                   # 1-round drafter parity test
-gemma4-cli mtp-generate --compare        # bit-exact equivalence vs standard
+gemma4-cli mtp-generate --compare        # compare against standard greedy generation
 gemma4-cli mtp-diag-verify               # sequential vs parallel hidden diff (advanced)
 ```
 

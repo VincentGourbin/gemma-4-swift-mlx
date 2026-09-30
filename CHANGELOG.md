@@ -33,7 +33,7 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   bits × fast/lean), avec poids recommandés, `kvBits`, tranche de préfill, limites mémoire MLX
   et vidage du cache après réponse. `Gemma4Pipeline.load(profile:)` et `apply(profile:)` ; sans
   profil, comportement inchangé. CLI : `gemma4-cli references`, `bench --reference`.
-  Valeurs initiales non mesurées (`docs/References.md`).
+  Matrice mesurée (30 profils, `docs/References.md`) ; voir plus bas `tiny`, audio et tours.
 - Préfill par tranches (`prefillStepSize` enfin respecté) et head calculé sur le seul dernier
   jeton du prompt, texte et multimodal E2B/E4B (Unified inchangé).
 - CLI : `gemma4-cli bench`, instrument de mesure du chemin de génération de la
@@ -58,7 +58,77 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   `MTPError` côté consommateur doit l'ajouter. (8d8708d8)
 - CI GitHub Actions : compilation de la bibliothèque, du CLI et des tests sur macOS
   (compilation seulement, les tests restent sur Apple Silicon via
-  `Scripts/run-tests.sh`). Ce workflow n'a pas encore tourné. (e89802e6)
+  `Scripts/run-tests.sh`), et build iOS (`generic/platform=iOS`). Déclenché par les pull
+  requests et `main`. (e89802e6, 198d0054)
+
+#### Inférence et profils
+
+- `Gemma4ChatEngine` : moteur de conversation sans dépendance serveur — messages de rôles
+  `system`/`user`/`assistant`/`tool`, appels d'outils au format Gemma 4, canal de pensée
+  séparé (`reasoning`), images, annulation (`Gemma4ChatRun.cancel()`), usage
+  (`Gemma4ChatUsage`, dont `cachedPromptTokens`). Protocole `Gemma4ChatBackend` pour
+  brancher un autre moteur. (4762bed5)
+- Réutilisation du préfixe de conversation entre tours (`setReusesConversation`,
+  `configureConversationCache(capacity:budgetBytes:)`, LRU par budget d'octets) : TTFT
+  −78 % au tour suivant. (29f3c27f, 90ff0c3b)
+- Profil `e2b/4bit-tiny` : E2B 4 bits sous 4 Go d'empreinte (texte 3,1 Go, image 3,9 Go),
+  pour iPhone/iPad ; `Gemma4ReferenceProfile.recommended()` le choisit sous 6 Go disponibles.
+  Guide : `docs/iOS.md`. (198d0054)
+- Chargement sans tour audio : `Gemma4Pipeline.load(from:multimodal:audio:)`,
+  `Gemma4Registration.loadContainer(..., audio:)`, `Gemma4ReferenceProfile.audio` et
+  `withAudioVariant()` (−0,6 Go). Un audio envoyé sans tour est refusé
+  (`audioTowerUnavailable`), jamais ignoré. (9a8ac015)
+- Tours vision/audio libérables après le préfill et rechargées à la demande
+  (`releaseEncodersAfterPrefill`, `releaseEncoders()`, `restoreEncodersIfNeeded()`) :
+  −1,24 Go en régime, +80 ms à l'image suivante. (b1e665f3)
+- `NoRepeatNGramLogitProcessor` : historique tenu sur le GPU, plus de synchronisation par
+  jeton (+17 % de débit avec n-gramme) ; `forceHostHistory` pour l'ancien chemin. (1ab24fc2)
+
+#### Entraînement (LoRA, drafter MTP)
+
+- `Gemma4TrainingProfile` : 12 profils `lora-<bits>bit-<fast|lean>` sur les 5 familles,
+  11 publiés avec leur mesure (pic, empreinte, débit, perte). Porte qualité E7 sur E4B
+  `lora-16bit-fast` : 29/30 (base 19/30). CLI : `lora train --reference`, `lora profiles`.
+  (1a17f7d4, 5944a7b0, e5fe4746)
+- Checkpoints sûrs et reprise exacte : `adapter_config.json` écrit au démarrage,
+  sauvegardes atomiques numérotées, état de l'optimiseur (`Gemma4ResumableAdam`, calcul
+  identique à l'Adam de MLX), `Gemma4TrainingCheckpoint`, `TrainingConfig.resume`. (8e6b26a9)
+- `TrainingConfig` : `seed` (init LoRA, dropout et mélange reproductibles, `SeededGenerator`),
+  `maxSeqLength`, `validationBatches`, `metricsURL` (une ligne JSON par rapport,
+  `Gemma4TrainingMetrics`), `responseOnlyHead`, `memoryPolicy`
+  (`Gemma4TrainingMemoryPolicy`), `multimodalFloat32`, `gradientCheckpointing` (pic −45 %,
+  temps +35 %, pertes identiques). (413c3604, f71ed1a4, fc110440, 1335189e, 1aa8ce24)
+- `Gemma4LoRAInference.fuseAndSave` : modèle fusionné complet et rechargeable (gabarit et
+  `processor_config.json` copiés, `config.json` cohérent). (4db495c6)
+- `Gemma4LoRADefaults.ModelFamily.from(directory:)` (famille lue dans `config.json`) et
+  famille `b12b`. (b5a4ddef)
+- `Gemma4Processor.droppingGenerationPrompt(_:)` : retire l'invite de génération quelle que
+  soit sa longueur selon le gabarit. (bd867d40)
+
+#### DiffusionGemma
+
+- Profils `a4bdiff/{16,8,4}bit-{fast,lean}` (`DiffusionReferenceProfile`), 4 bits en
+  précision mixte (couches 0-3 et 26-29 en 8 bits : autant de passes que le bf16, 38,7 tok/s).
+  (d9a03081, 50bef8fc)
+- Packs pré-quantifiés (`gemma4-diffusion-prequantized-v1`, SHA-256 par fichier) :
+  `export-diffusion`, chargement direct (4 bits : 11 s et 18,8 Go de pic au lieu de 62 s et
+  51 Go). Publiés sur Hugging Face (`VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit`
+  et `-4bit-mixed`), `DiffusionReferenceProfile.weightsRepository`, CLI
+  `download diff-8bit` / `diff-4bit`. (3c869e5e, 06f93ced)
+- CLI : `bench-diffusion`, `eval-screenspot` (ScreenSpot-100 : bf16 80, 8 bits 78,
+  4 bits 76). (b94a0e1e, 5c50f47e)
+
+#### Serveur et outils
+
+- Paquet imbriqué `Server/` (produit séparé, la bibliothèque ne dépend toujours d'aucun
+  serveur) : `gemma4-server`, API OpenAI (`/v1/chat/completions` avec SSE, outils, pensée,
+  images ; `/v1/models`, `/healthz`, `/metrics`), loopback par défaut, clé d'API obligatoire
+  hors loopback, file bornée (429), annulation à la déconnexion, cache de conversation.
+  (ef54c1bc, 90ff0c3b)
+- CLI : `eval-mmlu` avec préfixe 5-shot en cache (−75 % de temps), IC95 de Wilson, jeu
+  archivé de 1 140 questions, `--out`. (f936bc97)
+- CLI : `bench --no-repeat-ngram`, `--no-audio`, `--reference` ; `output_sha` pour la
+  parité A/B. (9a853c44, 5074ef36)
 
 ### Modifié
 
@@ -107,6 +177,24 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 - Documentation d'audit (stabilité, performance, plan de fiches) ajoutée sous
   `docs/audit/2026-09-27/`. (2848d71d, f0acb128)
 
+- **Rupture de comportement — gabarit de chat normalisé.** Le contrôle d'espaces du
+  `chat_template.jinja` est corrigé à la volée (défaut de swift-jinja) : le rendu est
+  désormais identique à celui de Hugging Face, donc les ids de prompt changent légèrement
+  par rapport à 1.7.x. (4762bed5)
+- **Rupture de comportement — profils `lean`** : sans tour audio et avec tours vision
+  libérées après le préfill (`withAudioVariant()` pour l'audio). (b1e665f3)
+- **Rupture de comportement — entraînement LoRA, défauts** : tête et perte sur la seule
+  réponse avec `maskPrompt` (+26 % de débit, perte identique), cache MLX borné à 2 Go
+  (empreinte 76 → 16 Go sur director), pas de troncature par défaut, multimodal en base bf16
+  avec LoRA en fp32 (pic 24 → 14 Go ; `multimodalFloat32` pour l'ancien chemin).
+  (fc110440, d3bd5a42, 1335189e)
+- Vision : seuls les patches réels passent dans l'encodeur (plus de padding systématique à
+  2 520), vidéo ×2,5 par frame ; `padToMaxPatches` pour l'ancien comportement. Sorties à
+  3,8·10⁻⁴ près. (af8e647b)
+- Quantification à la volée : les experts MoE (`SwitchLinear`) sont enfin quantifiés,
+  routeur en 8 bits (26B-A4B, DiffusionGemma). (2d6dbab5)
+- `swift-mlx-profiler` 1.5.1, dépendance inconditionnelle (compile pour iOS). (cf2b8f6c)
+
 ### Corrigé
 
 - Le prefill multimodal (image, vidéo, audio) ne promeut plus les embeddings, le
@@ -128,6 +216,25 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 - CLI : `gemma4-cli download --force` était sans effet ; il retélécharge
   désormais. (41d432f0)
 
+- LoRA sur 26B-A4B : l'entraînement mourait au premier pas (`gatherMM`, VJP par rapport aux
+  indices du routeur) ; indices hors gradient. (16dd66f4)
+- LoRA, multimodal et `mtp-train` sur 12B, 26B-A4B et 31B : l'invite de génération de ces
+  gabarits (`<|channel>thought\n<channel|>` après `<|turn>model\n`) n'était retirée qu'en
+  partie, et le masque de réponse ne gardait que 4 jetons par exemple (au lieu de ~750).
+  E2B/E4B inchangés. (bd867d40)
+- LoRA : l'écrêtage de gradient était affiché mais jamais appliqué ; mélange non
+  reproductible ; lignes rejetées sans explication ; full fine-tune accepté sur un pack
+  quantifié. (413c3604)
+- LoRA multimodal : ids directs au format de l'inférence (plus d'aller-retour
+  décodage/encodage) ; `lora eval` masqué comme l'entraînement. (f235d67c)
+- Drafter MTP : gabarit aligné sur l'inférence, poids chargés sans ambiguïté, entrées
+  validées (`DrafterTrainingError`), tirage seedé. (1f754c00)
+- DiffusionGemma : critère d'arrêt, fenêtre glissante de l'encodeur, blocs image
+  bidirectionnels, une seule copie des poids partagés, quantification couche par couche
+  (pic 77 → 51 Go), image après déchargement de la vision plus ignorée, génération
+  annulable et sous `Gemma4ComputeGate`. (b80f4ea0, 4a0b9ccd, fabe68ee, b326083a, bf93a1ce,
+  50bef8fc, 9ffc8871, f6b30ffc)
+
 ### Retiré
 
 - CLI : wrapper interne `LocalModelDownloader`, remplacé par
@@ -148,6 +255,13 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   (la `ChatSession` non `Sendable` conservée par le pipeline pour `continueChat`).
 - Plusieurs correctifs restent à valider sur de vrais modèles au-delà d'E2B
   (`kvBits` sur E4B / 26B / 31B, `--quantize-bits 4` sur E2B bf16).
+- Entraînement : `b31b/lora-4bit-lean` diverge au lr de 1e-4 (non publié). Seul
+  `e4b/lora-16bit-fast` a passé la porte E7 ; les autres profils sont mesurés sur 50 pas.
+- Échantillonnage top-p : 5,6 % du débit de décodage (tri sur 262 k logits), issue #54.
+- mlx-swift 0.32 : la montée demande un correctif (`prepare` du protocole, sinon médias
+  ignorés sans erreur), prêt dans `docs/audit/2026-09-27/mlx-swift-0.32-migration.patch` ;
+  en attente d'une release de mlx-swift-lm.
+- `e2b/4bit-tiny` n'a pas été mesuré sur un iPhone réel.
 
 ## [1.7.3] - 2026-09-12
 
