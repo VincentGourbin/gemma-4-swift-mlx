@@ -89,5 +89,8 @@ for row in "${ROWS[@]}"; do
 done
 
 echo "== fini $(date +%H:%M) — resultats dans $OUTDIR"
-[ "${#FETCHED[@]}" -gt 0 ] && printf 'Packs telecharges par la campagne (a supprimer sur decision) :\n%s\n' "${FETCHED[@]/#/  $MODELS/}"
+if [ "${#FETCHED[@]}" -gt 0 ]; then
+  echo "Packs telecharges par la campagne (a supprimer sur decision) :"
+  printf '  %s\n' "${FETCHED[@]/#/$MODELS/}"
+fi
 exit 0
