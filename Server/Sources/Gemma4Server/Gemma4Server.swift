@@ -92,6 +92,16 @@ public enum Gemma4ServerError: Error, LocalizedError, Equatable {
         default: return "invalid_request_error"
         }
     }
+
+    /// Types d'erreur de l'API Anthropic.
+    var anthropicType: String {
+        switch self {
+        case .unauthorized: return "authentication_error"
+        case .queueFull: return "rate_limit_error"
+        case .mediaTooLarge: return "request_too_large"
+        default: return "invalid_request_error"
+        }
+    }
 }
 
 /// File FIFO a une place : une generation a la fois, `maxDepth` en attente.
@@ -171,6 +181,10 @@ public actor Gemma4Server {
         router.post("v1/chat/completions") { [self] request, _ in
             await self.handling { try await self.chatCompletions(request) }
         }
+        // K-42 : API Messages d'Anthropic (Claude Code avec ANTHROPIC_BASE_URL).
+        router.post("v1/messages") { [self] request, _ in
+            await self.handling(anthropic: true) { try await self.anthropicMessages(request) }
+        }
         return router
     }
 
@@ -192,33 +206,21 @@ public actor Gemma4Server {
         return Self.json(Metrics(counters: counters, queueWaiting: await queue.waiting, running: await queue.running))
     }
 
-    private func chatCompletions(_ request: Request) async throws -> Response {
-        try authorize(request)
-        counters.requests += 1
+    /// Corps de requete borne par `maxBodyBytes`.
+    func readBody(_ request: Request) async throws -> Data {
         var request = request
-        let body: ByteBuffer
         do {
-            body = try await request.collectBody(upTo: configuration.maxBodyBytes)
+            return Data(buffer: try await request.collectBody(upTo: configuration.maxBodyBytes))
         } catch {
             throw Gemma4ServerError.mediaTooLarge("corps de requete au-dela de \(configuration.maxBodyBytes) octets")
         }
-        let input: ChatCompletionRequest
-        do {
-            input = try JSONDecoder().decode(ChatCompletionRequest.self, from: Data(buffer: body))
-        } catch {
-            throw Gemma4ServerError.invalidRequest("requete chat invalide : \(error.localizedDescription)")
-        }
-        let messages = try await convert(input.messages)
-        let tools = (input.tools ?? []).compactMap { JSONAny.sendable($0.value) as? [String: any Sendable] }
-        var options = Gemma4ChatOptions(
-            maxTokens: min(input.maxCompletionTokens ?? input.maxTokens ?? configuration.defaultMaxTokens,
-                           configuration.maxTokensCap, await backend.maxTokensCap ?? .max),
-            enableThinking: input.chatTemplateKwargs?.enableThinking ?? input.enableThinking ?? false)
-        if let t = input.temperature { options.temperature = t }
-        if let p = input.topP { options.topP = p }
-        if let k = input.topK { options.topK = k }
-        guard options.maxTokens > 0 else { throw Gemma4ServerError.invalidRequest("max_tokens doit etre > 0") }
+    }
 
+    /// Prend la file, puis lance la generation ; la file est rendue une fois le calcul fini.
+    func begin(
+        messages: [Gemma4ChatMessage], tools: [[String: any Sendable]], options: Gemma4ChatOptions
+    ) async throws -> (Gemma4ChatRun, ReleaseOnce) {
+        guard options.maxTokens > 0 else { throw Gemma4ServerError.invalidRequest("max_tokens doit etre > 0") }
         do { try await queue.acquire() } catch {
             counters.rejected += 1
             throw error
@@ -228,6 +230,37 @@ public actor Gemma4Server {
             await run.waitUntilFinished()
             await queue.release()
         }
+        return (run, release)
+    }
+
+    /// `max_tokens` demande, borne par le serveur et le profil.
+    func cappedMaxTokens(_ requested: Int?) async -> Int {
+        min(requested ?? configuration.defaultMaxTokens, configuration.maxTokensCap, await backend.maxTokensCap ?? .max)
+    }
+
+    func noteRequest() { counters.requests += 1 }
+    func noteFailure() { counters.failed += 1 }
+    var imagesAccepted: Bool { get async { await backend.acceptsImages } }
+
+    private func chatCompletions(_ request: Request) async throws -> Response {
+        try authorize(request)
+        counters.requests += 1
+        let body = try await readBody(request)
+        let input: ChatCompletionRequest
+        do {
+            input = try JSONDecoder().decode(ChatCompletionRequest.self, from: body)
+        } catch {
+            throw Gemma4ServerError.invalidRequest("requete chat invalide : \(error.localizedDescription)")
+        }
+        let messages = try await convert(input.messages)
+        let tools = (input.tools ?? []).compactMap { JSONAny.sendable($0.value) as? [String: any Sendable] }
+        var options = Gemma4ChatOptions(
+            maxTokens: await cappedMaxTokens(input.maxCompletionTokens ?? input.maxTokens),
+            enableThinking: input.chatTemplateKwargs?.enableThinking ?? input.enableThinking ?? false)
+        if let t = input.temperature { options.temperature = t }
+        if let p = input.topP { options.topP = p }
+        if let k = input.topK { options.topK = k }
+        let (run, release) = try await begin(messages: messages, tools: tools, options: options)
         let id = "chatcmpl-" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(24)
         let model = input.model ?? configuration.modelID
         let created = Int(Date().timeIntervalSince1970)
@@ -323,7 +356,7 @@ public actor Gemma4Server {
 
     enum Outcome { case completed, cancelled, failed }
 
-    private func count(_ outcome: Outcome) {
+    func count(_ outcome: Outcome) {
         switch outcome {
         case .completed: break
         case .cancelled: counters.cancelled += 1
@@ -331,7 +364,7 @@ public actor Gemma4Server {
         }
     }
 
-    private func record(_ usage: Gemma4ChatUsage?) {
+    func record(_ usage: Gemma4ChatUsage?) {
         guard let usage else { return }
         counters.completed += 1
         counters.promptTokens += usage.promptTokens
@@ -339,7 +372,7 @@ public actor Gemma4Server {
         counters.completionTokens += usage.completionTokens
     }
 
-    private static func isWriteFailure(_ error: any Error) -> Bool {
+    static func isWriteFailure(_ error: any Error) -> Bool {
         error is ChannelError || error is IOError
     }
 
@@ -398,7 +431,12 @@ public actor Gemma4Server {
         else {
             throw Gemma4ServerError.invalidRequest("image_url doit etre une URL data: en base64 (ni file:// ni http)")
         }
-        guard let data = Data(base64Encoded: String(url[url.index(after: comma)...]), options: .ignoreUnknownCharacters),
+        return try checkedImage(base64: String(url[url.index(after: comma)...]))
+    }
+
+    /// Image en base64 decodee, taille controlee sur les seuls en-tetes.
+    func checkedImage(base64: String) throws -> Data {
+        guard let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
               let source = CGImageSourceCreateWithData(data as CFData, nil),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? Int,
@@ -413,10 +451,14 @@ public actor Gemma4Server {
 
     // MARK: - Authentification et reponses
 
-    private func authorize(_ request: Request) throws {
+    /// `Authorization: Bearer <cle>` (OpenAI, Claude Code avec ANTHROPIC_AUTH_TOKEN) ou
+    /// `x-api-key: <cle>` (API Anthropic, ANTHROPIC_API_KEY).
+    func authorize(_ request: Request) throws {
         guard let key = configuration.apiKey, !key.isEmpty else { return }
         let header = request.headers[.authorization] ?? ""
-        let presented = header.hasPrefix("Bearer ") ? String(header.dropFirst(7)) : ""
+        let presented = header.hasPrefix("Bearer ")
+            ? String(header.dropFirst(7))
+            : (request.headers.first { $0.name.canonicalName == "x-api-key" }?.value ?? "")
         guard Self.constantTimeEquals(presented, key) else { throw Gemma4ServerError.unauthorized }
     }
 
@@ -429,22 +471,36 @@ public actor Gemma4Server {
         return diff == 0
     }
 
-    private func handling(_ handler: () async throws -> Response) async -> Response {
+    /// Erreurs au format OpenAI, ou Anthropic (`{"type":"error","error":{…}}`) pour `/v1/messages`.
+    private func handling(anthropic: Bool = false, _ handler: () async throws -> Response) async -> Response {
         do {
             return try await handler()
         } catch let error as Gemma4ServerError {
-            return Self.error(error.status, message: error.localizedDescription, type: error.type)
+            return Self.error(error.status, message: error.localizedDescription,
+                              type: anthropic ? error.anthropicType : error.type, anthropic: anthropic)
         } catch let error as Gemma4ChatEngineError {
-            return Self.error(.badRequest, message: error.localizedDescription, type: "invalid_request_error")
+            return Self.error(.badRequest, message: error.localizedDescription, type: "invalid_request_error",
+                              anthropic: anthropic)
         } catch {
-            return Self.error(.internalServerError, message: "erreur interne", type: "server_error")
+            return Self.error(.internalServerError, message: "erreur interne",
+                              type: anthropic ? "api_error" : "server_error", anthropic: anthropic)
         }
     }
 
-    static func error(_ status: HTTPResponse.Status, message: String, type: String) -> Response {
-        var response = json(ErrorBody(error: .init(message: message, type: type, code: nil)))
+    static func error(_ status: HTTPResponse.Status, message: String, type: String, anthropic: Bool = false) -> Response {
+        var response = anthropic
+            ? jsonObject(["type": "error", "error": ["type": type, "message": message]])
+            : json(ErrorBody(error: .init(message: message, type: type, code: nil)))
         response.status = status
         return response
+    }
+
+    /// Reponse JSON depuis un dictionnaire (blocs de contenu heterogenes d'Anthropic).
+    static func jsonObject(_ value: [String: Any]) -> Response {
+        let data = (try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])) ?? Data("{}".utf8)
+        var headers = HTTPFields()
+        headers[.contentType] = "application/json"
+        return Response(status: .ok, headers: headers, body: .init(byteBuffer: ByteBuffer(bytes: data)))
     }
 
     static func json(_ value: some Encodable) -> Response {

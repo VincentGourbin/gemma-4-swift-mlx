@@ -127,6 +127,9 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   images ; `/v1/models`, `/healthz`, `/metrics`), loopback par défaut, clé d'API obligatoire
   hors loopback, file bornée (429), annulation à la déconnexion, cache de conversation.
   (ef54c1bc, 90ff0c3b)
+- Serveur : `POST /v1/messages`, API Messages d'Anthropic, pour brancher Claude Code sur un Gemma 4
+  local (system, images base64, outils, pensée, SSE complet, erreurs au format Anthropic, clé en
+  `x-api-key` ou `Bearer`). Non validé avec un vrai modèle. (K-42)
 - CLI : `eval-mmlu` avec préfixe 5-shot en cache (−75 % de temps), IC95 de Wilson, jeu
   archivé de 1 140 questions, `--out`. (f936bc97)
 - CLI : `bench --no-repeat-ngram`, `--no-audio`, `--reference` ; `output_sha` pour la
