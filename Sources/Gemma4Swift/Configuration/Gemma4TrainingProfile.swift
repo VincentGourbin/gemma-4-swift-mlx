@@ -141,7 +141,9 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         "b12b/lora-16bit-fast": .init(peakMLXGB: 37.9, footprintGB: 27.5, trainedTokensPerSecond: 35, validationLoss: 1.131, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "b12b/lora-8bit-lean": .init(peakMLXGB: 27.9, footprintGB: 16.4, trainedTokensPerSecond: 30, validationLoss: 1.100, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "a4b/lora-16bit-fast": .init(peakMLXGB: 57.6, footprintGB: 52.3, trainedTokensPerSecond: 67, validationLoss: 1.084, steps: 50, e7Valid: nil, date: "2026-09-30"),
-        "a4b/lora-4bit-lean": .init(peakMLXGB: 20.4, footprintGB: 17.6, trainedTokensPerSecond: 68, validationLoss: 1.140, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        // E7 : epoque complete (898 pas, val 3,29 avant le 1er pas -> 0,958 au pas 600, pic 22,8 Go,
+        // 2 h 33) -> 30/30 (base 26B-A4B 14/30), 2026-10-01.
+        "a4b/lora-4bit-lean": .init(peakMLXGB: 20.4, footprintGB: 17.6, trainedTokensPerSecond: 68, validationLoss: 1.140, steps: 50, e7Valid: 30, date: "2026-09-30"),
         "b31b/lora-8bit-fast": .init(peakMLXGB: 54.8, footprintGB: 35.9, trainedTokensPerSecond: 14, validationLoss: 1.289, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "b31b/lora-4bit-lean": .init(peakMLXGB: 41.2, footprintGB: 20.4, trainedTokensPerSecond: 14, validationLoss: 0.945, steps: 50, e7Valid: nil, date: "2026-10-01"),
     ]

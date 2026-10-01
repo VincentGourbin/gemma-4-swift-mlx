@@ -367,12 +367,13 @@ M3 Max 96 GB); throughput counts trained (response) tokens:
 | `b12b/lora-16bit-fast` | 12B bf16 | 37.9 GB | 27.5 GB | 35 tok/s | 1.424 → 1.131 |
 | `b12b/lora-8bit-lean` | 12B 8-bit | 27.9 GB | 16.4 GB | 30 tok/s | 1.401 → 1.100 |
 | `a4b/lora-16bit-fast` | 26B-A4B bf16 | 57.6 GB | 52.3 GB | 67 tok/s | 1.714 → 1.084 |
-| `a4b/lora-4bit-lean` | 26B-A4B 4-bit | 20.4 GB | 17.6 GB | 68 tok/s | 1.867 → 1.140 |
+| `a4b/lora-4bit-lean` ✅ E7 30/30 | 26B-A4B 4-bit | 20.4 GB | 17.6 GB | 68 tok/s | 1.867 → 1.140 |
 | `b31b/lora-8bit-fast` | 31B 8-bit | 54.8 GB | 35.9 GB | 14 tok/s | 1.548 → 1.289 |
 | `b31b/lora-4bit-lean` | 31B 4-bit | 41.2 GB | 20.4 GB | 14 tok/s | 1.853 → 0.945 |
 
-- Quality gate (E7, 30 held-out briefs validated by `director-tool`): E4B `lora-16bit-fast`, one full
-  epoch → **29/30** (E4B base alone 19/30). E2B bf16 with the same defaults: 30/30.
+- Quality gate (E7, 30 held-out briefs validated by `director-tool`), one full epoch each: E4B
+  `lora-16bit-fast` → **29/30** (E4B base alone 19/30); 26B-A4B `lora-4bit-lean` → **30/30** (base alone 14/30,
+  2 h 33 of training, 22.8 GB peak); E2B bf16 with the same defaults: 30/30.
 - 12B, 26B-A4B and 31B keep gradient checkpointing even in `fast` (activations would not fit in 96 GB).
 - MoE (26B-A4B): experts (`SwitchLinear`) are not adapted; attention and dense MLP are.
 - The first validation of these runs was taken after the first optimizer step, so it already depends on
