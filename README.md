@@ -645,7 +645,9 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
   `--max-thinking-tokens N` caps the thinking channel: past N thinking tokens the server forces the end of the
   channel and the model answers (a request's own `thinking.budget_tokens` is honoured, bounded by the cap). The
   cap is applied on the GPU without a per-token sync: E2B 4-bit decodes at 131-137 tok/s with it, and the output
-  is token-identical while the budget is not reached.
+  is token-identical while the budget is not reached. Same Claude Code session on 26B-A4B with `--max-thinking-tokens 2048`: 10/10 turns,
+  the whole session in about 2 minutes instead of about 14; the turn that used to spend 316 s now ends in 43 s
+  (cap reached, channel closed, correct answer).
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
 
 ## Runtime beacon (SiliconScope)
