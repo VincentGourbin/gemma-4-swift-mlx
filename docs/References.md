@@ -34,7 +34,7 @@ Machine Mac15,10 (96 Go), Version 27.0 (Build 26A428), build release, commit e5a
 | `b12b/16bit-fast` | 255 / 370 / 376 | 11.6 / 11.4 / 11.3 | 10991 | 23639 | 25083 | — |
 | `b12b/16bit-lean` | 256 / 363 / 362 | 11.6 / 11.4 / 11.3 | 11409 | 23391 | 25244 | — |
 | `a4b/4bit-fast` | 416 / 930 / 965 | 81.3 / 77.1 / 74.4 | 4264 | 14439 | 15960 | — |
-| `a4b/4bit-lean` | 570 / 851 / 850 | 81.5 / 76.1 / 73.2 | 4842 | 14237 | 15136 | — |
+| `a4b/4bit-lean` | 570 / 851 / 850 ¹ | 81.5 / 76.1 / 73.2 | 4842 ¹ | 14237 | 15136 | — |
 | `a4b/8bit-fast` | 375 / 924 / 927 | 50.9 / 48.9 / 47.9 | 4445 | 26465 | 27991 | — |
 | `a4b/8bit-lean` | 421 / 789 / 796 | 50.9 / 48.9 / 47.5 | 5172 | 26185 | 27169 | — |
 | `a4b/16bit-fast` | 161 / 714 / 808 | 32.6 / 31.8 / 31.3 | 5120 | 48938 | 50509 | — |
@@ -45,6 +45,8 @@ Machine Mac15,10 (96 Go), Version 27.0 (Build 26A428), build release, commit e5a
 | `b31b/8bit-lean` | 114 / 133 / 125 | 8.2 / 8.0 / 7.7 | 32941 | 32832 | 33413 | — |
 | `b31b/16bit-fast` | 108 / 135 / 141 | 4.6 / 4.5 / 4.5 | 29305 | 60512 | 64095 | — |
 | `b31b/16bit-lean` | 109 / 129 / 134 | 4.6 / 4.5 / 4.4 | 30718 | 60144 | 63949 | — |
+
+¹ Mesuré avec l'ancienne tranche de 256. Le profil utilise 512 depuis le 2026-09-28 : préfill 1k / 4k 968-981 / 963-966 tok/s, TTFT 4k 4,26 s (A/B/B/A répété le 2026-10-01, `BENCHMARKS.md`).
 
 **Lecture** (une variable = le profil ; chiffres au repos, validation A/A de l'instrument : 2,9 % au pire) :
 - `lean` coûte ≤ 2 % de préfill et rien en décodage sur E2B, E4B, 12B et 31B, pour 3 à 12 % de mémoire en moins (pic MLX, empreinte).
@@ -104,19 +106,19 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
 | `a4bdiff/16bit-fast` | d2 | 488 | 13.0 | 35.4 | 49263 | 52617 |
 | `a4bdiff/16bit-fast` | d3 | 534 | 12.0 | 33.3 | 49263 | 52989 |
 | `a4bdiff/16bit-lean` | d1 | 504 | 15.0 | 32.5 | 49255 | 51266 |
-| `a4bdiff/16bit-lean` | d2 ⚠ à vérifier | 483 | 5.0 | 85.6 | 48169 | 50115 |
+| `a4bdiff/16bit-lean` | d2 (remesuré 2026-10-01) | 490 | 8.0 | 51.0 | 48169 | 50113 |
 | `a4bdiff/16bit-lean` | d3 | 538 | 16.0 | 27.4 | 48169 | 50245 |
 | `a4bdiff/8bit-fast` | d1 | 521 | 16.5 | 29.6 | 26682 | 28696 |
 | `a4bdiff/8bit-fast` | d2 | 521 | 10.0 | 43.3 | 26689 | 30015 |
 | `a4bdiff/8bit-fast` | d3 | 543 | 11.0 | 36.1 | 26689 | 30396 |
 | `a4bdiff/8bit-lean` | d1 | 528 | 16.5 | 29.1 | 26682 | 28561 |
-| `a4bdiff/8bit-lean` | d2 ⚠ à vérifier | 524 | 4.0 | 110.1 | 25596 | 27327 |
+| `a4bdiff/8bit-lean` | d2 (remesuré 2026-09-28) | 528 | 10.0 | 41.8 | 25596 | 27379 |
 | `a4bdiff/8bit-lean` | d3 | 552 | 12.0 | 35.3 | 25596 | 27602 |
 | `a4bdiff/4bit-fast` | d1 | 548 | 43.5 | 10.6 | 14647 | 16726 |
-| `a4bdiff/4bit-fast` | d2 ⚠ perturbé (ollama) | 2017 | 17.0 | 7.5 | 14655 | 18117 |
+| `a4bdiff/4bit-fast` | d2 (remesuré 2026-10-01, pack) | 455 | 9.0 | 53.5 | 18786 | 21892 |
 | `a4bdiff/4bit-fast` | d3 | 534 | 22.0 | 19.8 | 14655 | 18431 |
 | `a4bdiff/4bit-lean` | d1 | 530 | 43.5 | 10.9 | 14648 | 16563 |
-| `a4bdiff/4bit-lean` | d2 ⚠ à vérifier | 502 | 7.0 | 68.6 | 13561 | 15508 |
+| `a4bdiff/4bit-lean` | d2 (remesuré 2026-10-01, pack) | 457 | 9.0 | 52.2 | 17693 | 19451 |
 | `a4bdiff/4bit-lean` | d3 | 521 | 24.0 | 19.5 | 13561 | 15499 |
 
 **Lecture** (M3 Max 96 Go, Release, cooldown 120 s, 2 passes ; A/A de l'instrument 0,0 à 0,7 %) :

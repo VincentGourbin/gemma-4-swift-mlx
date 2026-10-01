@@ -502,6 +502,10 @@ Lignes brutes : [`benchmarks/a4b-lean-20260928.jsonl`](benchmarks/a4b-lean-20260
 
 **Décision** : `a4b/*-lean` passe à une tranche de 512 (+13 % de préfill, empreinte inchangée) ; l'économie de mémoire du profil lean (−5,4 % contre fast) vient des limites de cache, pas de la tranche.
 
+Répété le 2026-10-01 sur le code de la 1.8.0 (`benchmarks/a4b-lean-prefill-20261001.jsonl`, A/B/B/A, 512 puis 256) :
+tranche 512 → préfill 968-981 / 963-966 tok/s, TTFT 4k 4,26-4,27 s ; tranche 256 → 851-861 / 851 tok/s, TTFT 4k 4,83 s ;
+décodage égal, pic MLX +200 Mo, sorties identiques. Même conclusion.
+
 ## DiffusionGemma 26B-A4B — profils `a4bdiff/*` — 2026-09-28
 
 Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/4 bits de ce fichier précèdent le correctif mémoire et ne comptent pas), `benchmarks/diffusion-20260928-1148.jsonl` (8bit-fast), `benchmarks/diffusion-20260928-1857.jsonl` (8bit-lean, 4 bits). Charges : d1 texte (25 jetons de prompt, 2 canvases), d2 image (`UI.png`, 305 jetons, 1 canvas), d3 contexte (773 jetons, 1 canvas).
@@ -512,19 +516,19 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
 | `a4bdiff/16bit-fast` | d2 | 488 | 13.0 | 35.4 | 49263 | 52617 |
 | `a4bdiff/16bit-fast` | d3 | 534 | 12.0 | 33.3 | 49263 | 52989 |
 | `a4bdiff/16bit-lean` | d1 | 504 | 15.0 | 32.5 | 49255 | 51266 |
-| `a4bdiff/16bit-lean` | d2 ⚠ à vérifier | 483 | 5.0 | 85.6 | 48169 | 50115 |
+| `a4bdiff/16bit-lean` | d2 (remesuré 2026-10-01) | 490 | 8.0 | 51.0 | 48169 | 50113 |
 | `a4bdiff/16bit-lean` | d3 | 538 | 16.0 | 27.4 | 48169 | 50245 |
 | `a4bdiff/8bit-fast` | d1 | 521 | 16.5 | 29.6 | 26682 | 28696 |
 | `a4bdiff/8bit-fast` | d2 | 521 | 10.0 | 43.3 | 26689 | 30015 |
 | `a4bdiff/8bit-fast` | d3 | 543 | 11.0 | 36.1 | 26689 | 30396 |
 | `a4bdiff/8bit-lean` | d1 | 528 | 16.5 | 29.1 | 26682 | 28561 |
-| `a4bdiff/8bit-lean` | d2 ⚠ à vérifier | 524 | 4.0 | 110.1 | 25596 | 27327 |
+| `a4bdiff/8bit-lean` | d2 (remesuré 2026-09-28) | 528 | 10.0 | 41.8 | 25596 | 27379 |
 | `a4bdiff/8bit-lean` | d3 | 552 | 12.0 | 35.3 | 25596 | 27602 |
 | `a4bdiff/4bit-fast` | d1 | 548 | 43.5 | 10.6 | 14647 | 16726 |
-| `a4bdiff/4bit-fast` | d2 ⚠ perturbé (ollama) | 2017 | 17.0 | 7.5 | 14655 | 18117 |
+| `a4bdiff/4bit-fast` | d2 (remesuré 2026-10-01, pack) | 455 | 9.0 | 53.5 | 18786 | 21892 |
 | `a4bdiff/4bit-fast` | d3 | 534 | 22.0 | 19.8 | 14655 | 18431 |
 | `a4bdiff/4bit-lean` | d1 | 530 | 43.5 | 10.9 | 14648 | 16563 |
-| `a4bdiff/4bit-lean` | d2 ⚠ à vérifier | 502 | 7.0 | 68.6 | 13561 | 15508 |
+| `a4bdiff/4bit-lean` | d2 (remesuré 2026-10-01, pack) | 457 | 9.0 | 52.2 | 17693 | 19451 |
 | `a4bdiff/4bit-lean` | d3 | 521 | 24.0 | 19.5 | 13561 | 15499 |
 
 **Lecture** (M3 Max 96 Go, Release, cooldown 120 s, 2 passes ; A/A de l'instrument 0,0 à 0,7 %) :
@@ -555,8 +559,13 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
   Porte « chargement ≤ ⅓ du bf16 (58 s) » : 4 bits tenue (11 s), 8 bits non (32 s, lecture de 28 Go limitée par le disque USB). Sorties identiques (début de réponse, passes, mémoire active) ; aller-retour bit-exact vérifié en test unitaire.
 - **Pic de chargement corrigé** : la quantification se fait maintenant couche par couche (chaque couche de l'encodeur quantifiée, évaluée, reprise aussitôt par le décodeur). Pic mesuré (`benchmarks/diffusion-layerwise-quant-20260928.jsonl`) : 8 bits 77,2 → 51,0 Go, 4 bits mixte 68,7 → 51,0 Go, soit le bf16 seul ; mémoire en régime et passes inchangées.
 - **8 bits** : le compromis mesuré aujourd'hui (−46 % de mémoire, −10 % de débit en texte).
-- ❌ **`lean` + image (d2), lignes ci-dessus invalides** : l'échauffement déchargeait la vision et la passe mesurée ignorait l'image, sans erreur (bug de bibliothèque, pas seulement du bench : tout appel avec image après un déchargement). Corrigé (`9ffc8871`, rechargement à la demande) ; remesuré (`benchmarks/diffusion-vision-reload-20260928.jsonl`) : `8bit-lean` d2 10 passes, même réponse que `8bit-fast`, 25,6 Go actifs contre 26,7.
-- ⚠ `4bit-fast` d2 : les deux passes sont perturbées (un `ollama` actif pendant la mesure) ; à refaire.
+- **`lean` + image (d2), premières lignes invalides (remplacées depuis dans le tableau)** : l'échauffement déchargeait la vision et la passe mesurée ignorait l'image, sans erreur (bug de bibliothèque, pas seulement du bench : tout appel avec image après un déchargement). Corrigé (`9ffc8871`, rechargement à la demande) ; remesuré (`benchmarks/diffusion-vision-reload-20260928.jsonl`) : `8bit-lean` d2 10 passes, même réponse que `8bit-fast`, 25,6 Go actifs contre 26,7.
+- **Remesure d2 du 2026-10-01** (`benchmarks/diffusion-d2-lean-20261001.jsonl`, code de la 1.8.0, 4 bits sur le pack
+  pré-quantifié) : les lignes d2 `16bit-lean`, `4bit-lean` et `4bit-fast` du tableau sont remplacées. `lean` et `fast`
+  donnent **la même réponse** dans la même session (16 bits `[55, 115]`, 4 bits `[521, 85]`) : l'image est bien prise en
+  compte. `16bit-fast` d2 sur le même code : 487 ms par pas, 8 passes, 53,7 tok/s, 49,3 Go actifs (la ligne du tableau,
+  13 passes, précède les correctifs de diffusion). `lean` économise 1,1 Go actifs à réponse égale. La passe 1 de
+  `16bit-lean` (40 tok/s) a tourné pendant un téléchargement sur le même disque ; la ligne retient la passe 2.
 - **Qualité — ScreenSpot-100** (`gemma4-cli eval-screenspot`, les 100 cas du bench de référence reconstruits par `Scripts/quality/screenspot-sample.py` ; `benchmarks/screenspot-diffusion-20260928.jsonl`). Le bf16 retrouve 80/100 (79 dans la mesure d'origine) :
 
   | Config | Score | vs bf16 (perdus / gagnés) | Réponses identiques au bf16 | s/cas |
