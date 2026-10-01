@@ -83,6 +83,9 @@ public enum DiffusionGemmaRegistration {
         guard FileManager.default.fileExists(atPath: directory.path) else {
             throw LoadError.directoryNotFound(directory)
         }
+        let beacon = RuntimeBeacon.begin(task: "load-models", model: directory.lastPathComponent)
+        defer { beacon?.end() }
+        beacon?.update(phase: "loading-weights")
 
         // 1) Modele + config
         let (model, config): (DiffusionGemmaForBlockDiffusion, DiffusionGemmaConfig)

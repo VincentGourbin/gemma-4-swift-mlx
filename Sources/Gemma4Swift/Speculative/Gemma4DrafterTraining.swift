@@ -204,6 +204,8 @@ public enum Gemma4DrafterTraining {
         }
         try Gemma4ComputeGate.shared.beginTraining()
         defer { Gemma4ComputeGate.shared.endTraining() }
+        let beacon = RuntimeBeacon.begin(task: "train", model: "mtp-drafter")
+        defer { beacon?.end() }
         target.train(false)   // target en eval mode (frozen)
         target.freeze()
         drafter.train()       // drafter en train mode
@@ -248,6 +250,7 @@ public enum Gemma4DrafterTraining {
 
         let batchSize = max(config.batchSize, 1)
         for iter in 0 ..< config.iterations {
+            beacon?.update(phase: "train", step: iter + 1, totalSteps: config.iterations)
             // Sample batchSize chunks au hasard (tous de longueur fixe seqLen → pas de padding)
             var flatTokens: [Int32] = []
             flatTokens.reserveCapacity(batchSize * seqLen)

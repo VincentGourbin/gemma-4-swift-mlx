@@ -1,0 +1,33 @@
+# K-42 — session Claude Code 2.1.285 contre gemma4-server (26B-A4B 4 bits, a4b/4bit-fast, cache de conversation 16 Go), 2026-10-01
+# Config Claude Code isolee + MCP serena et context7 (outils listes, non autorises), outils en lecture, dossier temoin de 3 fichiers.
+# Tours 7 a 10 : une compilation tournait en parallele (debit 22-34 tok/s au lieu de 57-59), non representatif.
+## Tours
+TOUR 1 code=0 duree=40s is_error=False turns=2 :: Voici les fichiers présents dans ce dossier :  - `calc.py` - `data.csv` - `notes.md`
+TOUR 2 code=0 duree=3s is_error=False turns=2 :: Ce fichier contient une brève note indiquant qu'il s'agit d'un projet témoin composé de trois fichiers : `notes.md`, `calc.py` et `data.csv`.
+TOUR 3 code=0 duree=6s is_error=False turns=2 :: La fonction `moyenne` dans `calc.py` calcule la moyenne arithmétique d'une liste de valeurs.
+TOUR 4 code=0 duree=4s is_error=False turns=2 :: Il y a 3 villes dans le fichier `data.csv`.
+TOUR 5 code=0 duree=4s is_error=False turns=1 :: La ville avec la température la plus haute est Lyon, avec 21.
+TOUR 6 code=0 duree=6s is_error=False turns=2 :: Le mot `moyenne` a été trouvé dans le fichier `calc.py`.
+TOUR 7 code=0 duree=459s is_error=False turns=2 :: Non. Si la liste est vide, `len(valeurs)` est égal à 0, ce qui provoque une erreur de division par zéro (`ZeroDivisionError`).
+TOUR 8 code=0 duree=5s is_error=False turns=2 :: La moyenne des températures est de 18.
+TOUR 9 code=0 duree=8s is_error=False turns=1 :: Le fichier avec l'extension `.py` est `calc.py`.
+TOUR 10 code=0 duree=316s is_error=False turns=2 :: Ce dossier contient un projet témoin composé de trois fichiers : `calc.py`, `data.csv` et `notes.md`. Il permet d'illustrer des opérations de base comme le calc
+## Serveur (--log-requests, sans contenu)
+[gemma4-server] generation : prompt 23551 (cache 0), sortie 153, fin tool_calls, TTFT 30.05 s, 56.9 tok/s
+[gemma4-server] generation : prompt 23635 (cache 23551), sortie 96, fin stop, TTFT 0.30 s, 58.6 tok/s
+[gemma4-server] generation : prompt 23713 (cache 23635), sortie 20, fin tool_calls, TTFT 0.30 s, 58.3 tok/s
+[gemma4-server] generation : prompt 23796 (cache 23713), sortie 45, fin stop, TTFT 0.26 s, 58.6 tok/s
+[gemma4-server] generation : prompt 23881 (cache 23796), sortie 53, fin tool_calls, TTFT 0.30 s, 58.0 tok/s
+[gemma4-server] generation : prompt 23963 (cache 23881), sortie 126, fin stop, TTFT 0.26 s, 58.9 tok/s
+[gemma4-server] generation : prompt 24039 (cache 23963), sortie 53, fin tool_calls, TTFT 0.30 s, 57.7 tok/s
+[gemma4-server] generation : prompt 24124 (cache 24039), sortie 101, fin stop, TTFT 0.26 s, 58.4 tok/s
+[gemma4-server] generation : prompt 24186 (cache 24124), sortie 135, fin stop, TTFT 0.32 s, 58.1 tok/s
+[gemma4-server] generation : prompt 24248 (cache 24186), sortie 104, fin tool_calls, TTFT 0.30 s, 57.8 tok/s
+[gemma4-server] generation : prompt 24310 (cache 24248), sortie 79, fin stop, TTFT 0.23 s, 58.0 tok/s
+[gemma4-server] generation : prompt 24382 (cache 24310), sortie 8192, fin length, TTFT 0.31 s, 50.0 tok/s
+[gemma4-server] generation : prompt 32622 (cache 24382), sortie 6143, fin stop, TTFT 15.17 s, 22.1 tok/s
+[gemma4-server] generation : prompt 32704 (cache 32622), sortie 20, fin tool_calls, TTFT 0.76 s, 25.8 tok/s
+[gemma4-server] generation : prompt 32789 (cache 32704), sortie 14, fin stop, TTFT 0.36 s, 21.4 tok/s
+[gemma4-server] generation : prompt 32844 (cache 32789), sortie 146, fin stop, TTFT 0.61 s, 23.0 tok/s
+[gemma4-server] generation : prompt 32907 (cache 32844), sortie 8192, fin length, TTFT 0.66 s, 33.7 tok/s
+[gemma4-server] generation : prompt 32947 (cache 0), sortie 55, fin stop, TTFT 68.18 s, 29.9 tok/s

@@ -131,6 +131,11 @@ public actor DiffusionGemmaPipeline {
                 stopReason: .trainingInProgress)
         }
         defer { Gemma4ComputeGate.shared.endInference() }
+        // Beacon opt-in (SiliconScope) : progression = pas de debruitage sur le budget
+        // maxBlocks x maxDenoisingSteps (l'arret adaptatif finit souvent avant).
+        let beacon = RuntimeBeacon.begin(task: "generate", model: "diffusiongemma-26B-A4B-it")
+        defer { beacon?.end() }
+        let beaconTotal = maxBlocks * genConfig.maxDenoisingSteps
 
         if let problem = validate(promptIds: promptIds, pixelValues: pixelValues)
             ?? restoreVisionIfNeeded(pixelValues: pixelValues) {
@@ -200,6 +205,10 @@ public actor DiffusionGemmaPipeline {
             // 3) Inner denoising loop : steps decroissants
             var stepsExecuted = 0
             for step in (1 ... genConfig.maxDenoisingSteps).reversed() {
+                beacon?.update(
+                    phase: "denoising",
+                    step: canvasIdx * genConfig.maxDenoisingSteps + genConfig.maxDenoisingSteps - step + 1,
+                    totalSteps: beaconTotal)
                 // Annulation verifiee a chaque pas, avant le forward (D-07) : un
                 // consommateur qui abandonne libere le modele en moins d'un pas.
                 if Task.isCancelled {

@@ -263,6 +263,9 @@ public func trainLoRA(
     guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()
     defer { Gemma4ComputeGate.shared.endTraining() }
+    // Beacon opt-in (SiliconScope) : pas d'entrainement et validations.
+    let beacon = RuntimeBeacon.begin(task: "train")
+    defer { beacon?.end() }
     // Activer le mode training (ref: Python model.train())
     model.train()
 
@@ -282,6 +285,7 @@ public func trainLoRA(
 
     /// Validation : perte, metriques, progression ; `.stop` si l'appelant arrete.
     func runValidation(_ iteration: Int) -> LoRATrain.ProgressDisposition {
+        beacon?.update(phase: "validation", step: iteration + 1, totalSteps: iterations)
         let valStart = Date.timeIntervalSinceReferenceDate
         model.train(false)  // Mode eval pour la validation
         let valLoss = evaluateTraining(
@@ -312,6 +316,7 @@ public func trainLoRA(
         // deja du lr (31B 4 bits : 2,08 a 1e-5, 1,55 a 1e-4).
         if iteration == 0 && startIteration == 0, runValidation(iteration) == .stop { break }
         // Forward + backward (ref: Python step())
+        beacon?.update(phase: "train", step: iteration + 1, totalSteps: iterations)
         headFrom = responseOnlyHead ? max(0, lengths[0..., 0].min().item(Int.self) - 1) : 0
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]
@@ -545,6 +550,9 @@ public func trainMultimodalLoRA(
     guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()
     defer { Gemma4ComputeGate.shared.endTraining() }
+    // Beacon opt-in (SiliconScope) : pas d'entrainement et validations.
+    let beacon = RuntimeBeacon.begin(task: "train")
+    defer { beacon?.end() }
     model.train()
 
     // Le modele multimodal pour setter les pending properties
@@ -566,6 +574,7 @@ public func trainMultimodalLoRA(
 
     /// Validation : perte, metriques, progression ; `.stop` si l'appelant arrete.
     func runValidation(_ iteration: Int) -> LoRATrain.ProgressDisposition {
+        beacon?.update(phase: "validation", step: iteration + 1, totalSteps: iterations)
         let valStart = Date.timeIntervalSinceReferenceDate
         model.train(false)  // Mode eval pour la validation
         let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples, maxBatches: validationBatches)
@@ -606,6 +615,7 @@ public func trainMultimodalLoRA(
         mmModel.pendingAudioFeatures = nil
         mmModel.pendingAudioMask = nil
 
+        beacon?.update(phase: "train", step: iteration + 1, totalSteps: iterations)
         headFrom = responseOnlyHead ? max(0, lengths[0..., 0].min().item(Int.self) - 1) : 0
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
         let lvalue = resultArray[0]

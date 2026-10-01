@@ -639,7 +639,54 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
   and tool list are prefilled once (2.8 s), then served from the conversation cache (≥ 98 %, first token
   in 0.05 s). Use `--log-requests` to follow a session (token counts and timings only). A small model
   still makes tool mistakes (E2B once searched `type: "js"` for a Python identifier).
+  On 26B-A4B 4-bit with ~23k tokens of tools (built-in + serena + context7): 10 turns without error, correct
+  answers, first token 30 s cold then 0.23-0.36 s from the cache, 57-59 tok/s. Two turns spent the whole
+  8,192-token budget thinking (`adaptive` thinking) before Claude Code retried; one retry missed the cache.
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
+
+## Runtime beacon (SiliconScope)
+
+Gemma 4 is statically linked into its host (an app, `gemma4-cli`, `gemma4-server`), so a process
+monitor only sees "a process using N GB and a busy GPU". With the beacon on, every heavy operation keeps
+a small JSON manifest in `~/Library/Application Support/ai-runtime-beacons/` while it runs, and deletes
+it when it ends (errors and cancellation included). [SiliconScope](https://github.com/VincentGourbin/SiliconScope)
+reads it and shows the operation in its AI Workload card. The contract (schema v1) is described in
+SiliconScope's `docs/ai-runtime-beacons.md`; `Sources/Gemma4Swift/Runtime/RuntimeBeacon.swift` is its reference
+producer with the Gemma 4 identity (`runtime: "gemma-4-swift-mlx"`).
+
+**Off by default.** Turn it on with any of:
+
+```bash
+gemma4-cli --beacon generate --model-path … "prompt"   # any gemma4-cli command
+gemma4-server --beacon --model-path …
+export GEMMA4_RUNTIME_BEACON=1                         # read at each operation
+```
+
+```swift
+RuntimeBeacon.isEnabled = true   // from an app (not sandboxed: a sandbox hides the folder)
+```
+
+Sample manifest during a generation:
+
+```json
+{"version": 1, "pid": 3245, "runtime": "gemma-4-swift-mlx", "displayName": "Gemma 4",
+ "task": "generate", "model": "gemma-4-e2b-it-4bit", "phase": "decode", "step": 120, "totalSteps": 300,
+ "startedAt": "2026-10-01T17:20:11Z", "updatedAt": "2026-10-01T17:20:12Z"}
+```
+
+| Operation | `task` | `phase` (progress) |
+|---|---|---|
+| Model loading (`Gemma4Registration.loadContainer`, DiffusionGemma load) | `load-models` | `loading-weights` |
+| `Gemma4ChatEngine` (server), `Gemma4Pipeline`, CLI `generate` / `chat` | `generate` | `prefill`, then `decode` (tokens / `max_tokens`) |
+| CLI `describe` | `describe` | `generate` |
+| MTP speculative decoding | `generate` | `speculative-decode` (tokens / max) |
+| DiffusionGemma | `generate` | `denoising` (steps / `maxBlocks` × max steps) |
+| LoRA training (text, multimodal), drafter training | `train` | `train`, `validation` (step / iterations) |
+| `lora eval` | `evaluate` | — |
+
+Updates are written at most once per second (and at each phase change), atomically. A beacon that cannot be
+written disables itself and never fails the operation. Stale manifests left by a killed process are cleaned up
+by the next session.
 
 ## Library Integration
 

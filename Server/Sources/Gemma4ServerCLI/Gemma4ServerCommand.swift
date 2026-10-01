@@ -46,6 +46,9 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu)")
     var logRequests = false
 
+    @Flag(name: .long, help: "Beacon de runtime pendant chaque generation (SiliconScope) ; equivalent : GEMMA4_RUNTIME_BEACON=1")
+    var beacon = false
+
     func run() async throws {
         let key = apiKey ?? ProcessInfo.processInfo.environment["GEMMA4_SERVER_API_KEY"]
         let url = URL(fileURLWithPath: modelPath)
@@ -53,6 +56,7 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
             host: host, port: port, apiKey: key, modelID: url.lastPathComponent,
             maxQueueDepth: maxQueue, maxTokensCap: maxTokensCap)
         config.logRequests = logRequests
+        if beacon { RuntimeBeacon.isEnabled = true }
         try config.validate()
 
         let profile = try reference.map { id -> Gemma4ReferenceProfile in

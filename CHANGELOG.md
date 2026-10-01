@@ -12,6 +12,12 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- Beacon de runtime pour SiliconScope (`RuntimeBeacon`, contrat `ai-runtime-beacons` schema v1) :
+  pendant chaque opération lourde (chargement, génération, entraînement, évaluation, diffusion,
+  MTP), un manifeste JSON dans `~/Library/Application Support/ai-runtime-beacons/` donne la tâche,
+  le modèle, la phase et la progression ; supprimé à la fin, erreurs comprises. Désactivé par
+  défaut : `RuntimeBeacon.isEnabled`, `GEMMA4_RUNTIME_BEACON=1`, `gemma4-cli --beacon`,
+  `gemma4-server --beacon`.
 - Serveur : `POST /v1/messages`, API Messages d'Anthropic, pour brancher Claude Code sur un Gemma 4
   local (system, images base64, outils, pensée, SSE complet, erreurs au format Anthropic, clé en
   `x-api-key` ou `Bearer`). Validé avec Claude Code 2.1.285 sur E2B 4 bits : 10 tours sans erreur,
