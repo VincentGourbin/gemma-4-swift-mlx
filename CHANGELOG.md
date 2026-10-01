@@ -18,6 +18,15 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   cache de préfixe ≥ 98 % (premier jeton 2,8 s puis 0,05 s). Accepte la pensée `adaptive` et les
   messages `system` en cours de conversation qu'envoie Claude Code. `gemma4-server --log-requests`
   (une ligne par génération, sans contenu). (K-42)
+- Profil `b31b/lora-4bit-lean` publié, avec son propre lr (3e-5 : 1e-4 diverge sur cette base, 1e-5
+  et 3e-5 convergent à 0,957 et 0,945 en 50 pas). `Gemma4TrainingProfile` : 12 profils publiés.
+
+### Corrigé
+
+- LoRA (texte et multimodal) : la validation initiale est prise **avant** le premier pas, comme
+  mlx-lm, et donne la perte du modèle de départ. Elle était prise après la première mise à jour et
+  dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées
+  avec les profils de la 1.8.0 sont donc des pertes après un pas.
 
 ## [1.8.0] - 2026-09-30
 

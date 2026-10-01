@@ -19,7 +19,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | KV cache quantization | ✅ **Working** | mlx-swift-lm native `QuantizedKVCache` via `kvBits`, all families (8-bit KV in the `lean` profiles of 26B-A4B and 31B). TurboQuant kept, explicit only. See [KV Cache Quantization](#kv-cache-quantization) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming, or `Gemma4ChatEngine` (tools, thinking channel, images, prefix reuse: TTFT −78 % on the next turn) |
 | OpenAI-compatible server | ✅ **Working** | `Server/` package, `gemma4-server` (SSE, tools, images, API key, per-client conversation cache). See [Inference Server](#inference-server-openai-compatible) |
-| Reference profiles | ✅ **Measured** | `<bits>bit-<fast\|lean>` for inference (30 profiles), `lora-<bits>bit-<fast\|lean>` for training (11 profiles), `a4bdiff/*` for diffusion. `gemma4-cli references`, `lora profiles` |
+| Reference profiles | ✅ **Measured** | `<bits>bit-<fast\|lean>` for inference (30 profiles), `lora-<bits>bit-<fast\|lean>` for training (12 profiles), `a4bdiff/*` for diffusion. `gemma4-cli references`, `lora profiles` |
 | iPhone / iPad | 🧪 **Profile ready** | `e2b/4bit-tiny`: under 4 GB footprint (text 3.1 GB, image 3.9 GB), measured on Mac only. See [docs/iOS.md](docs/iOS.md) |
 | Profiling toolkit | ✅ **Working** | Chrome Trace export, SQLite benchmarks, context sweep |
 | Model download | ✅ **Working** | Direct HTTPS from HuggingFace (no HF SDK dependency) |
@@ -350,13 +350,13 @@ gemma4-cli lora fuse \
 
 `--reference <profile>` sets rank, scale, layers, learning rate, batch, gradient checkpointing,
 MLX cache limit and validation batches in one go (`gemma4-cli lora profiles` lists them).
-All use rank 8, scale 20, lr 1e-4, batch 1, loss and head on the response only. `lean` adds
+All use rank 8, scale 20, lr 1e-4 (3e-5 for 31B 4-bit, where 1e-4 diverges), batch 1, loss and head on the response only. `lean` adds
 per-layer gradient checkpointing (same losses, −33 to −44 % peak, −20 to −23 % speed).
 
 Measured on the Fluxforge "director" dataset (898 chat examples up to 3,320 tokens, 50 steps,
 M3 Max 96 GB); throughput counts trained (response) tokens:
 
-| Profile | Base weights | Peak MLX | Footprint | Throughput | Val loss (step 1 → 50) |
+| Profile | Base weights | Peak MLX | Footprint | Throughput | Val loss (after step 1 → step 50) |
 |---|---|---|---|---|---|
 | `e2b/lora-16bit-fast` | E2B bf16 | 37.0 GB | 13.9 GB | 218 tok/s | 1.847 → 1.276 |
 | `e2b/lora-16bit-lean` | E2B bf16 | 20.7 GB | 12.8 GB | 168 tok/s | 1.847 → 1.276 |
@@ -369,12 +369,15 @@ M3 Max 96 GB); throughput counts trained (response) tokens:
 | `a4b/lora-16bit-fast` | 26B-A4B bf16 | 57.6 GB | 52.3 GB | 67 tok/s | 1.714 → 1.084 |
 | `a4b/lora-4bit-lean` | 26B-A4B 4-bit | 20.4 GB | 17.6 GB | 68 tok/s | 1.867 → 1.140 |
 | `b31b/lora-8bit-fast` | 31B 8-bit | 54.8 GB | 35.9 GB | 14 tok/s | 1.548 → 1.289 |
+| `b31b/lora-4bit-lean` | 31B 4-bit | 41.2 GB | 20.4 GB | 14 tok/s | 1.853 → 0.945 |
 
 - Quality gate (E7, 30 held-out briefs validated by `director-tool`): E4B `lora-16bit-fast`, one full
   epoch → **29/30** (E4B base alone 19/30). E2B bf16 with the same defaults: 30/30.
 - 12B, 26B-A4B and 31B keep gradient checkpointing even in `fast` (activations would not fit in 96 GB).
 - MoE (26B-A4B): experts (`SwitchLinear`) are not adapted; attention and dense MLP are.
-- `b31b/lora-4bit-lean` is not published: it diverges at lr 1e-4.
+- The first validation of these runs was taken after the first optimizer step, so it already depends on
+  the learning rate; since 2026-10-01 it is taken before (the base model's loss, as in mlx-lm). Step-50
+  values are unaffected.
 - Always use `--mask-prompt` for chat-format data. Long examples are not truncated by default
   (`--max-seq-length` to bound memory; truncation cut the end of director answers: 30/30 → 27/30).
 - Reproducible runs (`--seed`), safe checkpoints and exact resume (`--resume`), JSONL metrics (`--metrics-out`).

@@ -17,7 +17,7 @@ import Foundation
 /// deja a 38,6 Go de pic sur director, et les activations croissent avec largeur x couches
 /// (x 3,4 pour le 12B) ; une machine de 96 Go n'y suffirait pas.
 ///
-/// Communs : rang 8, echelle 20, lr 1e-4, batch 1, tete sur la reponse seule (K-30 a),
+/// Communs : rang 8, echelle 20, lr 1e-4 (31B 4 bits : 3e-5), batch 1, tete sur la reponse seule (K-30 a),
 /// 25 lots de validation au plus, **aucune troncature** (sur le dataset director, borner a
 /// 2048 jetons coupait la fin des reponses : 30/30 -> 27/30). Les exemples longs font le
 /// pic : le profil ne le borne pas, `maxSeqLength` reste au choix de l'appelant.
@@ -119,14 +119,17 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         make(.a4b, .sixteen, .fast, numLayers: 10),
         make(.a4b, .four, .lean, numLayers: 10),
         make(.b31b, .eight, .fast, numLayers: 16),
-        make(.b31b, .four, .lean, numLayers: 16),
+        // lr 1e-4 diverge sur cette base (val 1,554 -> 1,777 en 50 pas) ; 1e-5 et 3e-5 convergent
+        // (0,957 et 0,945), 3e-5 retenu (2026-10-01, `benchmarks/k33-31b4-lr-20261001`).
+        make(.b31b, .four, .lean, numLayers: 16, learningRate: 3e-5),
     ].compactMap { $0 }
 
     /// Mesures de la campagne K-33 (2026-09-29/30), 50 pas. Pertes de validation au pas 1 :
     /// E2B 1,85 (4 bits 1,89), E4B 1,41, 12B 1,40-1,42, 26B-A4B 1,71 (4 bits 1,87), 31B 1,55.
     ///
-    /// `b31b/lora-4bit-lean` n'y est pas : a lr 1e-4, la perte **monte** (1,554 -> 1,777 au
-    /// pas 50) ; il reste candidat, non publie, jusqu'a une mesure a lr plus bas.
+    /// Les pertes « au pas 1 » de ces mesures ont ete prises **apres** la premiere mise a jour
+    /// (corrige le 2026-10-01 : la validation initiale precede desormais le premier pas) ; les
+    /// pertes au pas 50 ne sont pas concernees.
     static let measurements: [String: Measurement] = [
         "e2b/lora-16bit-fast": .init(peakMLXGB: 37.0, footprintGB: 13.9, trainedTokensPerSecond: 218, validationLoss: 1.276, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "e2b/lora-16bit-lean": .init(peakMLXGB: 20.7, footprintGB: 12.8, trainedTokensPerSecond: 168, validationLoss: 1.276, steps: 50, e7Valid: nil, date: "2026-09-29"),
@@ -140,11 +143,12 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         "a4b/lora-16bit-fast": .init(peakMLXGB: 57.6, footprintGB: 52.3, trainedTokensPerSecond: 67, validationLoss: 1.084, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "a4b/lora-4bit-lean": .init(peakMLXGB: 20.4, footprintGB: 17.6, trainedTokensPerSecond: 68, validationLoss: 1.140, steps: 50, e7Valid: nil, date: "2026-09-30"),
         "b31b/lora-8bit-fast": .init(peakMLXGB: 54.8, footprintGB: 35.9, trainedTokensPerSecond: 14, validationLoss: 1.289, steps: 50, e7Valid: nil, date: "2026-09-30"),
+        "b31b/lora-4bit-lean": .init(peakMLXGB: 41.2, footprintGB: 20.4, trainedTokensPerSecond: 14, validationLoss: 0.945, steps: 50, e7Valid: nil, date: "2026-10-01"),
     ]
 
     private static func make(
         _ family: Gemma4Pipeline.Model.Family, _ bits: Gemma4ReferenceProfile.Bits, _ kind: Kind,
-        numLayers: Int
+        numLayers: Int, learningRate: Float = 1e-4
     ) -> Gemma4TrainingProfile? {
         guard let model = Gemma4ReferenceProfile.named("\(bits.rawValue)bit-fast", family: family)?.model
         else { return nil }
@@ -160,7 +164,7 @@ public struct Gemma4TrainingProfile: Sendable, Identifiable, Equatable {
         if family == .a4b { notes.append("Experts MoE non adaptes (SwitchLinear n'est pas un Linear) ; MLP dense et attention le sont.") }
         return Gemma4TrainingProfile(
             family: family, bits: bits, kind: kind, model: model,
-            rank: 8, scale: 20, numLayers: numLayers, learningRate: 1e-4, batchSize: 1,
+            rank: 8, scale: 20, numLayers: numLayers, learningRate: learningRate, batchSize: 1,
             gradientCheckpointing: checkpointing,
             memoryPolicy: Gemma4TrainingMemoryPolicy(cacheLimitMB: lean ? 1024 : 2048),
             validationBatches: 25,
