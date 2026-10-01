@@ -29,6 +29,8 @@ public struct Gemma4ServerConfiguration: Sendable {
     public var maxTokensCap: Int
     /// Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu).
     public var logRequests: Bool = false
+    /// Plafond de jetons de pensee pour toute requete avec pensee (`nil` : aucun).
+    public var maxThinkingTokens: Int?
 
     public init(
         host: String = "127.0.0.1", port: Int = 8080, apiKey: String? = nil, modelID: String = "gemma-4",
@@ -258,7 +260,8 @@ public actor Gemma4Server {
         let tools = (input.tools ?? []).compactMap { JSONAny.sendable($0.value) as? [String: any Sendable] }
         var options = Gemma4ChatOptions(
             maxTokens: await cappedMaxTokens(input.maxCompletionTokens ?? input.maxTokens),
-            enableThinking: input.chatTemplateKwargs?.enableThinking ?? input.enableThinking ?? false)
+            enableThinking: input.chatTemplateKwargs?.enableThinking ?? input.enableThinking ?? false,
+            maxThinkingTokens: configuration.maxThinkingTokens)
         if let t = input.temperature { options.temperature = t }
         if let p = input.topP { options.topP = p }
         if let k = input.topK { options.topK = k }

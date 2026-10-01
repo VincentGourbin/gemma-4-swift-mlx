@@ -158,6 +158,36 @@ struct AnthropicMessagesTests {
         }
     }
 
+    @Test("budget de pensee : budget_tokens borne par le plafond du serveur ; adaptive prend le plafond")
+    func testThinkingBudget() async throws {
+        var config = Gemma4ServerConfiguration()
+        config.maxThinkingTokens = 512
+        let cases: [(String, Int?)] = [
+            (#"{"type":"enabled","budget_tokens":1024}"#, 512),
+            (#"{"type":"enabled","budget_tokens":128}"#, 128),
+            (#"{"type":"adaptive"}"#, 512),
+        ]
+        for (thinking, expected) in cases {
+            let backend = ScriptedBackend(Self.text)
+            let body = #"{"max_tokens":64,"thinking":"# + thinking + #","messages":[{"role":"user","content":"x"}]}"#
+            try await app(backend, config).test(.router) { client in
+                try await client.execute(uri: "/v1/messages", method: .post, body: ByteBuffer(string: body)) {
+                    #expect($0.status == .ok)
+                }
+            }
+            #expect(await backend.lastOptions?.maxThinkingTokens == expected, "\(thinking)")
+        }
+        // Sans plafond serveur ni budget : aucun.
+        let backend = ScriptedBackend(Self.text)
+        try await app(backend).test(.router) { client in
+            try await client.execute(uri: "/v1/messages", method: .post,
+                                     body: ByteBuffer(string: #"{"max_tokens":8,"thinking":{"type":"adaptive"},"messages":[{"role":"user","content":"x"}]}"#)) {
+                #expect($0.status == .ok)
+            }
+        }
+        #expect(await backend.lastOptions?.maxThinkingTokens == nil)
+    }
+
     @Test("cle d'API : x-api-key accepte, erreurs au format Anthropic")
     func testAuthAndErrors() async throws {
         let config = Gemma4ServerConfiguration(apiKey: "secret")

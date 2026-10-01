@@ -12,6 +12,13 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- Budget de pensée : `Gemma4ChatOptions.maxThinkingTokens` (`Gemma4ThinkingBudgetProcessor`) ferme le
+  canal de pensée au-delà de N jetons et laisse le modèle répondre ; `gemma4-server --max-thinking-tokens`,
+  et `thinking.budget_tokens` respecté sur `/v1/messages`. État sur le GPU, sans synchronisation par
+  jeton (E2B 4 bits : 131-137 tok/s avec, 129-132 sans ; sortie identique tant que le budget n'est pas
+  atteint). Comme le n-gramme, ce chemin construit le `TokenIterator` sans `kvBits`.
+  Claude Code sur 26B-A4B avec `--max-thinking-tokens 2048` : 10 tours sur 10, environ 2 min pour la
+  session au lieu de 14 ; le tour qui prenait 316 s se termine en 43 s (plafond atteint, réponse juste).
 - Beacon de runtime pour SiliconScope (`RuntimeBeacon`, contrat `ai-runtime-beacons` schema v1) :
   pendant chaque opération lourde (chargement, génération, entraînement, évaluation, diffusion,
   MTP), un manifeste JSON dans `~/Library/Application Support/ai-runtime-beacons/` donne la tâche,
