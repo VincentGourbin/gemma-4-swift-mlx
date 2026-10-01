@@ -116,6 +116,8 @@ public actor Gemma4MTPPipeline {
         // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
+        let beacon = RuntimeBeacon.begin(task: "generate", model: "mtp")
+        defer { beacon?.end() }
 
         nonisolated(unsafe) let drafterRef = drafter
         let bs = blockSize
@@ -204,6 +206,7 @@ public actor Gemma4MTPPipeline {
 
             // 6) Boucle MTP
             while s.emittedTokens < maxTok {
+                beacon?.update(phase: "speculative-decode", step: s.emittedTokens, totalSteps: maxTok)
                 // Le consommateur a lache le stream : onTermination a annule la Task.
                 try Task.checkCancellation()
                 // Lecture des K/V partages depuis le cache (etat valide jusqu'a cache.offset)

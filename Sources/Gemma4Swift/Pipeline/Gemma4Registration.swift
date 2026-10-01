@@ -127,6 +127,9 @@ public enum Gemma4Registration {
         multimodal: Bool = true,
         audio: Bool = true
     ) async throws -> ModelContainer {
+        let beacon = RuntimeBeacon.begin(task: "load-models", model: directory.lastPathComponent)
+        defer { beacon?.end() }
+        beacon?.update(phase: "loading-weights")
         // Fabrique privee a l'appel : passer par le registre global (last-write-wins)
         // laissait deux chargements concurrents avec des `multimodal` differents
         // s'intercaler, et l'un recevait le mauvais type de modele.

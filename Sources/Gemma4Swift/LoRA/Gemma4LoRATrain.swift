@@ -180,6 +180,8 @@ public enum Gemma4LoRATrain {
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         return await container.perform { context in
+            let beacon = RuntimeBeacon.begin(task: "evaluate", model: RuntimeBeacon.modelName(context.configuration))
+            defer { beacon?.end() }
             let prepared = samples.compactMap { trainingSample($0, maskPrompt: maskPrompt) }
             context.model.train(false)
             return evaluateTraining(model: context.model, samples: prepared, batchSize: batchSize)

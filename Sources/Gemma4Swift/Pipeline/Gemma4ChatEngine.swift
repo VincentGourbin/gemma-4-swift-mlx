@@ -378,6 +378,10 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         context: ModelContext,
         continuation: AsyncThrowingStream<Gemma4ChatEvent, Error>.Continuation
     ) async throws {
+        // Beacon opt-in (SiliconScope) : une session par generation, supprimee en sortie.
+        let beacon = RuntimeBeacon.begin(task: "generate", model: RuntimeBeacon.modelName(context.configuration))
+        defer { beacon?.end() }
+        beacon?.update(phase: "prefill")
         let allImages = messages.flatMap(\.images)
         let ids = try promptIds(
             messages: messages, tools: tools, enableThinking: options.enableThinking,
@@ -466,6 +470,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             case .token(let id):
                 completion += 1
                 if firstToken == nil { firstToken = Date().timeIntervalSince(start) }
+                beacon?.update(phase: "decode", step: completion, totalSteps: options.maxTokens)
                 // `<|tool_response>` : le modele attend la reponse de l'outil.
                 if id == Gemma4ChannelRouter.toolResponseTokenId {
                     stoppedOnToolResponse = true

@@ -48,6 +48,18 @@ struct Gemma4CLI: AsyncParsableCommand {
         subcommands: [Generate.self, Chat.self, Describe.self, Models.self, Download.self, Bench.self, BenchDiffusion.self, ExportDiffusion.self, EvalScreenSpot.self, References.self, Profile.self, EvalMmlu.self, LoRA.self, MtpSmoke.self, MtpForward.self, MtpGenerate.self, MtpDiagVerify.self, MtpTrain.self, DiffusionCommand.self, ProfileDiffusion.self],
         defaultSubcommand: Generate.self
     )
+
+    /// `--beacon`, accepte sur toute commande : publie un beacon de runtime pendant les
+    /// operations lourdes (SiliconScope, `RuntimeBeacon`). Equivalent :
+    /// `GEMMA4_RUNTIME_BEACON=1`. Retire des arguments avant l'analyse.
+    static func main() async {
+        var arguments = Array(CommandLine.arguments.dropFirst())
+        if let index = arguments.firstIndex(of: "--beacon") {
+            arguments.remove(at: index)
+            RuntimeBeacon.isEnabled = true
+        }
+        await main(arguments)
+    }
 }
 
 // MARK: - Models (liste et info)
@@ -395,12 +407,16 @@ struct Generate: AsyncParsableCommand {
 
         let session = ChatSession(container, instructions: system, generateParameters: params)
 
+        // Beacon opt-in (--beacon, SiliconScope)
+        let beacon = RuntimeBeacon.begin(task: "generate", model: URL(fileURLWithPath: path).lastPathComponent)
+        defer { beacon?.end() }
         // Streaming token par token
         let stream = session.streamResponse(to: prompt)
         for try await token in stream {
             print(token, terminator: "")
             fflush(stdout)
             tokenCount += 1
+            beacon?.update(phase: "decode", step: tokenCount, totalSteps: maxTokens)
         }
 
         let genTime = Date().timeIntervalSince(startGen)
@@ -506,11 +522,14 @@ struct Chat: AsyncParsableCommand {
             if input.lowercased() == "quit" || input.lowercased() == "exit" { break }
 
             print("Gemma> ", terminator: "")
+            let beacon = RuntimeBeacon.begin(task: "generate", model: URL(fileURLWithPath: path).lastPathComponent)
+            beacon?.update(phase: "decode")
             let stream = session.streamResponse(to: input)
             for try await token in stream {
                 print(token, terminator: "")
                 fflush(stdout)
             }
+            beacon?.end()
             print("\n")
         }
 
@@ -841,6 +860,9 @@ struct Describe: AsyncParsableCommand {
         nonisolated(unsafe) let capturedInputIds = inputIds
         let tokenFilter = Gemma4TokenFilter(mode: .disabled)
 
+        let beacon = RuntimeBeacon.begin(task: "describe", model: URL(fileURLWithPath: path).lastPathComponent)
+        defer { beacon?.end() }
+        beacon?.update(phase: "generate")
         let result = try await container.perform { context in
             var generatedTokens: [Int] = []
 
