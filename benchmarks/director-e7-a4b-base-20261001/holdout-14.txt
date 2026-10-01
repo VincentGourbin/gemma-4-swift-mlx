@@ -1,0 +1,51 @@
+```json
+{
+  "version": 1,
+  "title": "The Perfect Pour",
+  "synopsis": "A cinematic exploration of a morning coffee ritual, focusing on the steam, the flow of espresso, and the final moment of satisfaction.",
+  "casting": {
+    "ambient_audio": true,
+    "aspect": "landscape",
+    "dialogue_language": "en",
+    "subject_hint": "a professional barista with focused eyes and steady hands",
+    "use_subject_photo": false
+  },
+  "shots": [
+    {
+      "id": "s1",
+      "tool": "generate_clip",
+      "args": {
+        "duration_seconds": 4,
+        "prompt": "Close-up of a sleek, chrome espresso machine in a sunlit modern kitchen. Steam swirls elegantly from the nozzle as golden morning light catches the micro-particles in the air.",
+        "start": "none"
+      },
+      "note": "Establishes the setting and the machine."
+    },
+    {
+      "id": "s2",
+      "tool": "generate_clip",
+      "args": {
+        "duration_seconds": 5,
+        "focus": "The espresso flows from the machine into a glass cup in slow motion, rich crema forming on the surface.",
+        "prompt": "Extreme close-up of dark, viscous espresso pouring in slow motion into a clear glass cup. The liquid ripples and swirls, creating thick golden crema under bright, warm lighting.",
+        "start": "continuity"
+      },
+      "note": "Focuses on the liquid motion."
+    },
+    {
+      "id": "s3",
+      "tool": "generate_clip",
+      "args": {
+        "duration_seconds": 3,
+        "focus": "The subject's hand enters the frame to slide the cup forward.",
+        "prompt": "A hand gently slides the glass cup of espresso toward the camera across a white marble countertop. The sunlight glints off the chrome of the machine in the background.",
+        "start": "continuity"
+      },
+      "note": "The final action of the ritual."
+    }
+  ],
+  "synopsis": "A sleek espresso machine takes over a sunlit kitchen: steam swirls, coffee pours in slow motion, and a hand slides the perfect cup toward the camera.",
+  "title": "The Perfect Pour",
+  "version": 1
+}
+```

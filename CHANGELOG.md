@@ -12,6 +12,8 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- Porte qualité E7 sur `a4b/lora-4bit-lean` (26B-A4B 4 bits, époque complète, 2 h 33, pic 22,8 Go) :
+  **30/30** (modèle seul 14/30), inscrite dans `Gemma4TrainingProfile`.
 - Budget de pensée : `Gemma4ChatOptions.maxThinkingTokens` (`Gemma4ThinkingBudgetProcessor`) ferme le
   canal de pensée au-delà de N jetons et laisse le modèle répondre ; `gemma4-server --max-thinking-tokens`,
   et `thinking.budget_tokens` respecté sur `/v1/messages`. État sur le GPU, sans synchronisation par
