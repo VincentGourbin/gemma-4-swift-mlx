@@ -1,0 +1,29 @@
+[Gemma4Config] audio_config present but decode failed (DecodingError.valueNotFound: Expected value of type Dictionary<String, Any>. Path: audio_config. Debug description: Cannot get keyed decoding container -- found null value instead); fallback to text-only
+Chargement du modele: /Volumes/Lexar/models/mlx-community/gemma-4-31b-it-4bit
+Modele charge. GPU: 16471 Mo
+Famille detectee: dense31b (60 couches)
+Chargement des donnees depuis /Users/vincent/Developpements/Fluxforge Studio/Scripts/director/dataset...
+Train: 899 samples, Valid: 101 samples
+
+--- Debut du training ---
+Mode: lora + response masking, Rank: 8, Scale: 20.0, LR: 3e-05
+Batch: 1, Iterations: 50
+Couches: 16
+Sortie: /Volumes/Lexar/tmp/k33-adapters/b31b-lr3e-5
+---
+
+Note : 597 exemple(s) de plus de 2048 jetons (max 3320), non tronques (--max-seq-length pour borner la memoire)
+Parametres trainables: 16336896 / 4813920572 (0.34%)
+Train: 899 samples (avg response: 748 tokens)
+Iteration 1: validation loss 1,852869, validation time 203,454602s
+Iteration 10: training loss 1,55927, iterations/sec 0,021417, Tokens/sec 15,818367
+Iteration 20: training loss 1,160709, iterations/sec 0,017224, Tokens/sec 13,295565
+Iteration 30: training loss 1,128103, iterations/sec 0,016486, Tokens/sec 13,518769
+Iteration 40: training loss 1,033599, iterations/sec 0,021112, Tokens/sec 14,176876
+Iteration 50: training loss 1,013095, iterations/sec 0,019772, Tokens/sec 13,982499
+Iteration 50: validation loss 0,945364, validation time 226,654773s
+Iteration 50: saved weights to /Volumes/Lexar/tmp/k33-adapters/b31b-lr3e-5/adapters.safetensors
+Adapter sauvegarde dans /Volumes/Lexar/tmp/k33-adapters/b31b-lr3e-5
+
+Training termine.
+GPU pic: 42237 Mo

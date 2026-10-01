@@ -57,6 +57,29 @@ struct LoRATrainingLoopTests {
         return (out, model)
     }
 
+    @Test("validation initiale prise avant le premier pas : perte du modele de depart, quel que soit le lr")
+    func testInitialValidationBeforeFirstStep() throws {
+        try Device.withDefaultDevice(.cpu) {
+            func firstValidation(lr: Float) throws -> Float? {
+                let model = try loraModel()
+                var first: Float?
+                try trainLoRA(
+                    model: model, trainSamples: samples(4), validSamples: samples(2),
+                    optimizer: Adam(learningRate: lr), iterations: 2, stepsPerReport: 1, stepsPerEval: 1_000
+                ) { progress in
+                    if case .validation(_, let loss, _) = progress, first == nil { first = loss }
+                    return .more
+                }
+                return first
+            }
+            let reference = evaluateTraining(model: try loraModel(), samples: samples(2), batchSize: 1)
+            let slow = try #require(try firstValidation(lr: 1e-4))
+            let fast = try #require(try firstValidation(lr: 1.0))
+            #expect(slow == reference)
+            #expect(fast == reference)
+        }
+    }
+
     @Test("meme graine : pertes identiques bit a bit ; autre graine : melange different")
     func testReproducible() throws {
         try Device.withDefaultDevice(.cpu) {

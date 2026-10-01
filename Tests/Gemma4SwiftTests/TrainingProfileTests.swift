@@ -21,9 +21,11 @@ struct TrainingProfileTests {
     @Test("seuls les profils mesures sont publies")
     func testPublication() {
         #expect(Gemma4TrainingProfile.all.allSatisfy { $0.measurement != nil })
-        #expect(Gemma4TrainingProfile.all.count == 11)
-        // A diverge a lr 1e-4 : candidat, non publie.
-        #expect(Gemma4TrainingProfile.named("b31b/lora-4bit-lean") == nil)
+        #expect(Gemma4TrainingProfile.all.count == 12)
+        // 31B 4 bits : lr propre (1e-4 diverge), les autres a 1e-4.
+        #expect(Gemma4TrainingProfile.named("b31b/lora-4bit-lean")?.learningRate == 3e-5)
+        #expect(Gemma4TrainingProfile.candidates.filter { $0.qualifiedID != "b31b/lora-4bit-lean" }
+            .allSatisfy { $0.learningRate == 1e-4 })
         for profile in Gemma4TrainingProfile.candidates where profile.measurement == nil {
             #expect(Gemma4TrainingProfile.named(profile.qualifiedID) == nil)
             #expect(Gemma4TrainingProfile.named(profile.qualifiedID, includingUnmeasured: true) == profile)

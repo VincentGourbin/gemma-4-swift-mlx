@@ -280,6 +280,25 @@ public func trainLoRA(
     var processedCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
+    /// Validation : perte, metriques, progression ; `.stop` si l'appelant arrete.
+    func runValidation(_ iteration: Int) -> LoRATrain.ProgressDisposition {
+        let valStart = Date.timeIntervalSinceReferenceDate
+        model.train(false)  // Mode eval pour la validation
+        let valLoss = evaluateTraining(
+            model: model, samples: validSamples, batchSize: batchSize, maxBatches: validationBatches)
+        model.train()  // Retour en mode training
+        let now = Date.timeIntervalSinceReferenceDate
+        metrics?(Gemma4TrainingMetrics(
+            kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
+            processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
+            activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
+        let disposition = progress(LoRATrain.Progress.validation(
+            iteration: iteration, validationLoss: valLoss, validationTime: now - valStart))
+        memoryPolicy?.afterValidationOrSave()
+        start = Date.timeIntervalSinceReferenceDate
+        return disposition
+    }
+
     var lastIteration = startIteration
     for (iteration, (batch, lengths)) in TrainingBatchIterator(
         samples: trainSamples, batchSize: batchSize, train: true, seed: seed
@@ -288,6 +307,10 @@ public func trainLoRA(
         if iteration < startIteration { continue }
         // Arret propre (A-02) : annulation -> sortie de boucle et sauvegarde finale.
         if Task.isCancelled { break }
+        // Validation initiale AVANT le premier pas, comme mlx-lm (« Iter 1: Val loss ») : la
+        // perte du modele de depart. Mesuree apres le pas (avant 2026-10-01), elle dependait
+        // deja du lr (31B 4 bits : 2,08 a 1e-5, 1,55 a 1e-4).
+        if iteration == 0 && startIteration == 0, runValidation(iteration) == .stop { break }
         // Forward + backward (ref: Python step())
         headFrom = responseOnlyHead ? max(0, lengths[0..., 0].min().item(Int.self) - 1) : 0
         let (resultArray, grad) = lossValueGrad(model, [batch, lengths])
@@ -329,24 +352,7 @@ public func trainLoRA(
         }
 
         // Validation
-        if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
-            let valStart = Date.timeIntervalSinceReferenceDate
-            model.train(false)  // Mode eval pour la validation
-            let valLoss = evaluateTraining(
-                model: model, samples: validSamples, batchSize: batchSize, maxBatches: validationBatches)
-            model.train()  // Retour en mode training
-            let now = Date.timeIntervalSinceReferenceDate
-            metrics?(Gemma4TrainingMetrics(
-                kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
-                processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
-                activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
-
-            let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
-                                   validationTime: now - valStart)
-            if progress(p) == .stop { break }
-            memoryPolicy?.afterValidationOrSave()
-            start = Date.timeIntervalSinceReferenceDate
-        }
+        if (iteration + 1) % stepsPerEval == 0, runValidation(iteration) == .stop { break }
 
         // Save
         if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
@@ -558,6 +564,24 @@ public func trainMultimodalLoRA(
     var processedCount = 0
     var start = Date.timeIntervalSinceReferenceDate
 
+    /// Validation : perte, metriques, progression ; `.stop` si l'appelant arrete.
+    func runValidation(_ iteration: Int) -> LoRATrain.ProgressDisposition {
+        let valStart = Date.timeIntervalSinceReferenceDate
+        model.train(false)  // Mode eval pour la validation
+        let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples, maxBatches: validationBatches)
+        model.train()  // Retour en mode training
+        let now = Date.timeIntervalSinceReferenceDate
+        metrics?(Gemma4TrainingMetrics(
+            kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
+            processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
+            activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
+        let disposition = progress(LoRATrain.Progress.validation(
+            iteration: iteration, validationLoss: valLoss, validationTime: now - valStart))
+        memoryPolicy?.afterValidationOrSave()
+        start = Date.timeIntervalSinceReferenceDate
+        return disposition
+    }
+
     var lastIteration = startIteration
     var iterator = MultimodalBatchIterator(samples: trainSamples, train: true, seed: seed)
     var iteration = -1
@@ -565,6 +589,10 @@ public func trainMultimodalLoRA(
         iteration += 1
         if iteration < startIteration { continue }
         if Task.isCancelled { break }
+        // Validation initiale AVANT le premier pas, comme mlx-lm (« Iter 1: Val loss ») : la
+        // perte du modele de depart. Mesuree apres le pas (avant 2026-10-01), elle dependait
+        // deja du lr (31B 4 bits : 2,08 a 1e-5, 1,55 a 1e-4).
+        if iteration == 0 && startIteration == 0, runValidation(iteration) == .stop { break }
         let batch = MLXArray(sample.tokens.map { Int32($0) }).reshaped(1, sample.tokens.count)
         let lengths = MLXArray([Int32(sample.promptOffset), Int32(sample.tokens.count)]).reshaped(1, 2)
 
@@ -613,23 +641,7 @@ public func trainMultimodalLoRA(
         }
 
         // Validation
-        if (iteration == 0 && startIteration == 0) || (iteration + 1) % stepsPerEval == 0 {
-            let valStart = Date.timeIntervalSinceReferenceDate
-            model.train(false)
-            let valLoss = evaluateMultimodalTraining(model: model, samples: validSamples, maxBatches: validationBatches)
-            model.train()
-            let now = Date.timeIntervalSinceReferenceDate
-            metrics?(Gemma4TrainingMetrics(
-                kind: .validation, iteration: iteration + 1, loss: valLoss, iterationsPerSecond: 0,
-                processedTokensPerSecond: 0, trainedTokensPerSecond: 0, seconds: now - valStart,
-                activeMB: Memory.activeMemory >> 20, peakMB: Memory.peakMemory >> 20))
-
-            let p = LoRATrain.Progress.validation(iteration: iteration, validationLoss: valLoss,
-                                   validationTime: now - valStart)
-            if progress(p) == .stop { break }
-            memoryPolicy?.afterValidationOrSave()
-            start = Date.timeIntervalSinceReferenceDate
-        }
+        if (iteration + 1) % stepsPerEval == 0, runValidation(iteration) == .stop { break }
 
         // Save
         if let url = weightsURL, (iteration + 1) % saveEvery == 0 {
