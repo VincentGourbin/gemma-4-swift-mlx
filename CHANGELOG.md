@@ -10,6 +10,15 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ## [Non publié]
 
+### Ajouté
+
+- Serveur : `POST /v1/messages`, API Messages d'Anthropic, pour brancher Claude Code sur un Gemma 4
+  local (system, images base64, outils, pensée, SSE complet, erreurs au format Anthropic, clé en
+  `x-api-key` ou `Bearer`). Validé avec Claude Code 2.1.285 sur E2B 4 bits : 10 tours sans erreur,
+  cache de préfixe ≥ 98 % (premier jeton 2,8 s puis 0,05 s). Accepte la pensée `adaptive` et les
+  messages `system` en cours de conversation qu'envoie Claude Code. `gemma4-server --log-requests`
+  (une ligne par génération, sans contenu). (K-42)
+
 ## [1.8.0] - 2026-09-30
 
 ### Sécurité
