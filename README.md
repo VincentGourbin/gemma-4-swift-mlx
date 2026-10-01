@@ -642,6 +642,10 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
   On 26B-A4B 4-bit with ~23k tokens of tools (built-in + serena + context7): 10 turns without error, correct
   answers, first token 30 s cold then 0.23-0.36 s from the cache, 57-59 tok/s. Two turns spent the whole
   8,192-token budget thinking (`adaptive` thinking) before Claude Code retried; one retry missed the cache.
+  `--max-thinking-tokens N` caps the thinking channel: past N thinking tokens the server forces the end of the
+  channel and the model answers (a request's own `thinking.budget_tokens` is honoured, bounded by the cap). The
+  cap is applied on the GPU without a per-token sync: E2B 4-bit decodes at 131-137 tok/s with it, and the output
+  is token-identical while the budget is not reached.
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
 
 ## Runtime beacon (SiliconScope)

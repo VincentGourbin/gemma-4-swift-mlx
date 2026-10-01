@@ -61,10 +61,14 @@ public struct Gemma4ChatOptions: Sendable, Equatable {
     /// Variable `enable_thinking` du gabarit : le modele raisonne dans le canal de pensee.
     public var enableThinking: Bool
     public var noRepeatNGramSize: Int?
+    /// Plafond de jetons de pensee (avec `enableThinking`) : au-dela, le canal est ferme et
+    /// le modele repond (`Gemma4ThinkingBudgetProcessor`). `nil` : pas de plafond. Comme
+    /// le n-gramme, ce chemin construit le `TokenIterator` sans `kvBits`.
+    public var maxThinkingTokens: Int?
 
     public init(
         maxTokens: Int = 1024, temperature: Float = 0.3, topP: Float = 0.95, topK: Int = 0,
-        enableThinking: Bool = false, noRepeatNGramSize: Int? = nil
+        enableThinking: Bool = false, noRepeatNGramSize: Int? = nil, maxThinkingTokens: Int? = nil
     ) {
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -72,6 +76,7 @@ public struct Gemma4ChatOptions: Sendable, Equatable {
         self.topK = topK
         self.enableThinking = enableThinking
         self.noRepeatNGramSize = noRepeatNGramSize
+        self.maxThinkingTokens = maxThinkingTokens
     }
 }
 
@@ -432,10 +437,17 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         let start = Date()
         let input = LMInput(tokens: MLXArray(suffix.map { Int32($0) }))
         let iterator: TokenIterator
-        if let n = options.noRepeatNGramSize {
+        // Processeur sur mesure (n-gramme, budget de pensee) : TokenIterator sans kvBits.
+        var custom: LogitProcessor? = options.noRepeatNGramSize.map { NoRepeatNGramLogitProcessor(ngramSize: $0) }
+        if options.enableThinking, let budget = options.maxThinkingTokens {
+            let thinking = Gemma4ThinkingBudgetProcessor(budget: budget)
+            let base = custom ?? parameters.processor()
+            custom = base.map { Gemma4ChainedLogitProcessor($0, thinking) } ?? thinking
+        }
+        if let custom {
             iterator = try TokenIterator(
                 input: input, model: context.model, cache: cache,
-                processor: NoRepeatNGramLogitProcessor(ngramSize: n),
+                processor: custom,
                 sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
                 maxTokens: options.maxTokens)
         } else {

@@ -27,7 +27,11 @@ struct AnthropicRequest: Decodable {
     let thinking: Thinking?
 
     struct ToolChoice: Decodable { let type: String }
-    struct Thinking: Decodable { let type: String }
+    struct Thinking: Decodable {
+        let type: String
+        let budgetTokens: Int?
+        enum CodingKeys: String, CodingKey { case type; case budgetTokens = "budget_tokens" }
+    }
 
     enum CodingKeys: String, CodingKey {
         case model, system, messages, tools, stream, temperature, thinking
@@ -137,7 +141,10 @@ extension Gemma4Server {
         var options = Gemma4ChatOptions(
             maxTokens: await cappedMaxTokens(input.maxTokens),
             // Claude Code envoie `{"type": "adaptive"}` ; `disabled` ou absent : sans pensee.
-            enableThinking: ["enabled", "adaptive"].contains(input.thinking?.type ?? ""))
+            enableThinking: ["enabled", "adaptive"].contains(input.thinking?.type ?? ""),
+            // `budget_tokens` de la requete, borne par le plafond du serveur.
+            maxThinkingTokens: [input.thinking?.budgetTokens, configuration.maxThinkingTokens]
+                .compactMap { $0 }.min())
         if let t = input.temperature { options.temperature = t }
         if let p = input.topP { options.topP = p }
         if let k = input.topK { options.topK = k }

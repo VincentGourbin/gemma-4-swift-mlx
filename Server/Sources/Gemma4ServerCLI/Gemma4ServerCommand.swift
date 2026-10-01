@@ -46,6 +46,9 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu)")
     var logRequests = false
 
+    @Option(name: .long, help: "Plafond de jetons de pensee par reponse (au-dela : canal ferme, le modele repond). Ex. 2048 pour Claude Code")
+    var maxThinkingTokens: Int?
+
     @Flag(name: .long, help: "Beacon de runtime pendant chaque generation (SiliconScope) ; equivalent : GEMMA4_RUNTIME_BEACON=1")
     var beacon = false
 
@@ -56,6 +59,7 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
             host: host, port: port, apiKey: key, modelID: url.lastPathComponent,
             maxQueueDepth: maxQueue, maxTokensCap: maxTokensCap)
         config.logRequests = logRequests
+        config.maxThinkingTokens = maxThinkingTokens
         if beacon { RuntimeBeacon.isEnabled = true }
         try config.validate()
 
