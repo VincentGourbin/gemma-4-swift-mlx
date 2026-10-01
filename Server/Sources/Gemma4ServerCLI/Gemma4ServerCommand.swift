@@ -43,12 +43,16 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Ne pas charger la tour audio (E2B/E4B : -0,6 Go)")
     var noAudio = false
 
+    @Flag(name: .long, help: "Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu)")
+    var logRequests = false
+
     func run() async throws {
         let key = apiKey ?? ProcessInfo.processInfo.environment["GEMMA4_SERVER_API_KEY"]
         let url = URL(fileURLWithPath: modelPath)
         var config = Gemma4ServerConfiguration(
             host: host, port: port, apiKey: key, modelID: url.lastPathComponent,
             maxQueueDepth: maxQueue, maxTokensCap: maxTokensCap)
+        config.logRequests = logRequests
         try config.validate()
 
         let profile = try reference.map { id -> Gemma4ReferenceProfile in

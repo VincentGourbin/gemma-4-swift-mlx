@@ -27,6 +27,8 @@ public struct Gemma4ServerConfiguration: Sendable {
     public var maxQueueDepth: Int
     public var defaultMaxTokens: Int
     public var maxTokensCap: Int
+    /// Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu).
+    public var logRequests: Bool = false
 
     public init(
         host: String = "127.0.0.1", port: Int = 8080, apiKey: String? = nil, modelID: String = "gemma-4",
@@ -366,6 +368,13 @@ public actor Gemma4Server {
 
     func record(_ usage: Gemma4ChatUsage?) {
         guard let usage else { return }
+        if configuration.logRequests {
+            let ttft = usage.timeToFirstToken.map { String(format: "%.2f s", $0) } ?? "-"
+            Self.log(String(
+                format: "generation : prompt %d (cache %d), sortie %d, fin %@, TTFT %@, %.1f tok/s",
+                usage.promptTokens, usage.cachedPromptTokens, usage.completionTokens,
+                usage.finishReason.rawValue, ttft, usage.tokensPerSecond))
+        }
         counters.completed += 1
         counters.promptTokens += usage.promptTokens
         counters.cachedPromptTokens += usage.cachedPromptTokens
@@ -476,6 +485,7 @@ public actor Gemma4Server {
         do {
             return try await handler()
         } catch let error as Gemma4ServerError {
+            if configuration.logRequests { Self.log("refus \(error.status.code) : \(error.localizedDescription)") }
             return Self.error(error.status, message: error.localizedDescription,
                               type: anthropic ? error.anthropicType : error.type, anthropic: anthropic)
         } catch let error as Gemma4ChatEngineError {
@@ -485,6 +495,10 @@ public actor Gemma4Server {
             return Self.error(.internalServerError, message: "erreur interne",
                               type: anthropic ? "api_error" : "server_error", anthropic: anthropic)
         }
+    }
+
+    static func log(_ line: String) {
+        FileHandle.standardError.write(Data("[gemma4-server] \(line)\n".utf8))
     }
 
     static func error(_ status: HTTPResponse.Status, message: String, type: String, anthropic: Bool = false) -> Response {

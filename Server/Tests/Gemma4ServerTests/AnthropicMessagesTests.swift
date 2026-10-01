@@ -85,6 +85,7 @@ struct AnthropicMessagesTests {
          "tools":[{"name":"get_weather","description":"meteo","input_schema":{"type":"object","properties":{"city":{"type":"string"}}}}],
          "messages":[
           {"role":"user","content":"Meteo a Paris ?"},
+          {"role":"system","content":[{"type":"text","text":"Contexte de session."}]},
           {"role":"assistant","content":[{"type":"thinking","thinking":"...","signature":"s"},
                                          {"type":"text","text":"Je regarde."},
                                          {"type":"tool_use","id":"toolu_1","name":"get_weather","input":{"city":"Paris"}}]},
@@ -94,18 +95,21 @@ struct AnthropicMessagesTests {
         """#
         let backend = ScriptedBackend(Self.text)
         try await app(backend).test(.router) { client in
-            try await client.execute(uri: "/v1/messages", method: .post, body: ByteBuffer(string: body)) {
+            // Comme Claude Code : `?beta=true` et pensee `adaptive`.
+            let adaptive = body.replacingOccurrences(of: #""type":"enabled","budget_tokens":1024"#, with: #""type":"adaptive""#)
+            try await client.execute(uri: "/v1/messages?beta=true", method: .post, body: ByteBuffer(string: adaptive)) {
                 #expect($0.status == .ok)
             }
         }
         let messages = await backend.lastMessages
-        #expect(messages.map(\.role) == [.system, .user, .assistant, .tool, .user])
+        #expect(messages.map(\.role) == [.system, .user, .system, .assistant, .tool, .user])
         #expect(messages[0].content == "Tu es utile.")
-        #expect(messages[2].content == "Je regarde.")
-        #expect(messages[2].toolCalls.first?.name == "get_weather")
-        #expect(messages[2].toolCalls.first?.argumentsJSON == #"{"city":"Paris"}"#)
-        #expect(messages[3].content == "18 C" && messages[3].toolName == "get_weather" && messages[3].toolCallID == "toolu_1")
-        #expect(messages[4].content == "Et demain ?")
+        #expect(messages[2].content == "Contexte de session.")
+        #expect(messages[3].content == "Je regarde.")
+        #expect(messages[3].toolCalls.first?.name == "get_weather")
+        #expect(messages[3].toolCalls.first?.argumentsJSON == #"{"city":"Paris"}"#)
+        #expect(messages[4].content == "18 C" && messages[4].toolName == "get_weather" && messages[4].toolCallID == "toolu_1")
+        #expect(messages[5].content == "Et demain ?")
         #expect(await backend.lastOptions?.enableThinking == true)
         let tool = try #require(await backend.lastTools.first)
         #expect(tool["type"] as? String == "function")
@@ -178,7 +182,7 @@ struct AnthropicMessagesTests {
             #"{"max_tokens":8,"stop_sequences":["\n"],"messages":[{"role":"user","content":"x"}]}"#,
             #"{"max_tokens":8,"messages":[{"role":"user","content":[{"type":"image","source":{"type":"url","url":"https://example.com/a.png"}}]}]}"#,
             #"{"max_tokens":8,"messages":[{"role":"user","content":[{"type":"document","source":{"type":"base64","media_type":"application/pdf","data":"AA=="}}]}]}"#,
-            #"{"max_tokens":8,"messages":[{"role":"system","content":"x"}]}"#,
+            #"{"max_tokens":8,"messages":[{"role":"tool","content":"x"}]}"#,
         ]
         try await app(ScriptedBackend(Self.text)).test(.router) { client in
             for body in bodies {

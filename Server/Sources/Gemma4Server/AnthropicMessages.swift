@@ -136,7 +136,8 @@ extension Gemma4Server {
         let tools = input.toolChoice?.type == "none" ? [] : (input.tools ?? []).map(\.openAIFunction)
         var options = Gemma4ChatOptions(
             maxTokens: await cappedMaxTokens(input.maxTokens),
-            enableThinking: input.thinking?.type == "enabled")
+            // Claude Code envoie `{"type": "adaptive"}` ; `disabled` ou absent : sans pensee.
+            enableThinking: ["enabled", "adaptive"].contains(input.thinking?.type ?? ""))
         if let t = input.temperature { options.temperature = t }
         if let p = input.topP { options.topP = p }
         if let k = input.topK { options.topK = k }
@@ -274,15 +275,29 @@ extension Gemma4Server {
         var toolNames: [String: String] = [:]
         var mediaCount = 0
         for message in input.messages {
-            guard message.role == "user" || message.role == "assistant" else {
-                throw Gemma4ServerError.invalidRequest("role inconnu : \(message.role) (user ou assistant)")
+            guard ["user", "assistant", "system"].contains(message.role) else {
+                throw Gemma4ServerError.invalidRequest("role inconnu : \(message.role) (user, assistant ou system)")
             }
             let blocks: [AnthropicContentBlock]
             switch message.content {
             case .text(let s):
-                result.append(Gemma4ChatMessage(role: message.role == "user" ? .user : .assistant, content: s))
+                let role: Gemma4ChatMessage.Role = message.role == "user" ? .user : message.role == "system" ? .system : .assistant
+                result.append(Gemma4ChatMessage(role: role, content: s))
                 continue
             case .blocks(let b): blocks = b
+            }
+            // Claude Code (2.1.x) place un message `system` apres le tour user (contexte de session).
+            // Garde a sa place : le gabarit rend un tour system a toute position, et le fusionner en
+            // tete casserait le cache de prefixe quand son contenu change.
+            if message.role == "system" {
+                let text = try blocks.map { block -> String in
+                    guard block.type == "text" else {
+                        throw Gemma4ServerError.invalidRequest("message system : seuls les blocs texte sont acceptes (\(block.type))")
+                    }
+                    return block.text ?? ""
+                }.joined(separator: "\n")
+                if !text.isEmpty { result.append(Gemma4ChatMessage(role: .system, content: text)) }
+                continue
             }
             var text = ""
             var images: [Data] = []

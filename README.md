@@ -632,6 +632,10 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
   base64 images, tools (`tool_use` / `tool_result`), thinking (`thinking: {type: "enabled"}`), full SSE
   (`message_start` … `message_stop`), Anthropic error format, `x-api-key` or `Bearer`. Rejected with a
   clear 400: `stop_sequences`, image URLs, documents (PDF), images inside a `tool_result`.
+  Validated with Claude Code 2.1.285 on E2B 4-bit: 10 turns without error; the ~15k-token system prompt
+  and tool list are prefilled once (2.8 s), then served from the conversation cache (≥ 98 %, first token
+  in 0.05 s). Use `--log-requests` to follow a session (token counts and timings only). A small model
+  still makes tool mistakes (E2B once searched `type: "js"` for a Python identifier).
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
 
 ## Library Integration
