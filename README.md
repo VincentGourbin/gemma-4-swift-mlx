@@ -649,6 +649,12 @@ cd Server && xcodebuild -scheme gemma4-server -configuration Release -destinatio
   is token-identical while the budget is not reached. Same Claude Code session on 26B-A4B with `--max-thinking-tokens 2048`: 10/10 turns,
   the whole session in about 2 minutes instead of about 14; the turn that used to spend 316 s now ends in 43 s
   (cap reached, channel closed, correct answer).
+- `--batch N` (K-41) decodes up to N concurrent text requests in the same forward (left-padded batch,
+  per-row masks). E2B 4-bit, 8 clients × 4 short requests: **×2.1 aggregate throughput** (267-271 vs 128 tok/s)
+  and time to first token p90 1.4-1.7 s instead of 5.8-6.0 s. Batched requests skip conversation-prefix reuse,
+  images, n-gram blocking and the thinking budget (those go through the one-at-a-time path). **Outputs are not
+  batch-invariant**: at temperature 0 a batched answer can differ from the same request run alone, and from one
+  run to the next, since the batch composition changes the bf16 rounding.
 - The engine is `Gemma4ChatEngine` in the library (no extra dependency): usable directly from an app.
 
 ## Runtime beacon (SiliconScope)

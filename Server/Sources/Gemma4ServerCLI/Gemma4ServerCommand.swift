@@ -46,6 +46,9 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
     @Flag(name: .long, help: "Une ligne par generation sur stderr (jetons, cache, temps ; jamais de contenu)")
     var logRequests = false
 
+    @Option(name: .long, help: "Lot (K-41) : jusqu'a N requetes texte decodees ensemble (1 = une a la fois). Ces requetes ne reutilisent pas le prefixe de conversation")
+    var batch: Int = 1
+
     @Option(name: .long, help: "Plafond de jetons de pensee par reponse (au-dela : canal ferme, le modele repond). Ex. 2048 pour Claude Code")
     var maxThinkingTokens: Int?
 
@@ -60,6 +63,7 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
             maxQueueDepth: maxQueue, maxTokensCap: maxTokensCap)
         config.logRequests = logRequests
         config.maxThinkingTokens = maxThinkingTokens
+        config.concurrentGenerations = max(1, batch)
         if beacon { RuntimeBeacon.isEnabled = true }
         try config.validate()
 
@@ -77,7 +81,8 @@ struct Gemma4ServerCommand: AsyncParsableCommand {
             await engine.configureConversationCache(
                 capacity: conversationCacheCount, budgetBytes: Int(conversationCacheGb * 1_073_741_824))
         }
-        config.modelID = profile.map { "\(url.lastPathComponent) (\($0.qualifiedID))" } ?? url.lastPathComponent
+        if batch > 1 { await engine.configureBatching(maxBatch: batch) }
+                config.modelID = profile.map { "\(url.lastPathComponent) (\($0.qualifiedID))" } ?? url.lastPathComponent
         FileHandle.standardError.write(Data("ecoute sur http://\(host):\(port)\n".utf8))
         try await Gemma4Server(backend: engine, configuration: config).run()
     }

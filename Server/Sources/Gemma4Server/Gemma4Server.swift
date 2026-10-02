@@ -31,6 +31,8 @@ public struct Gemma4ServerConfiguration: Sendable {
     public var logRequests: Bool = false
     /// Plafond de jetons de pensee pour toute requete avec pensee (`nil` : aucun).
     public var maxThinkingTokens: Int?
+    /// Generations simultanees laissees au moteur (lot K-41) ; 1 : une a la fois.
+    public var concurrentGenerations: Int = 1
 
     public init(
         host: String = "127.0.0.1", port: Int = 8080, apiKey: String? = nil, modelID: String = "gemma-4",
@@ -108,20 +110,25 @@ public enum Gemma4ServerError: Error, LocalizedError, Equatable {
     }
 }
 
-/// File FIFO a une place : une generation a la fois, `maxDepth` en attente.
+/// File FIFO a `capacity` places (1 sans lot : une generation a la fois ; N avec le lot
+/// K-41, le moteur regroupant les generations simultanees), `maxDepth` en attente.
 actor RequestQueue {
-    private var busy = false
+    private var active = 0
     private var waiters: [CheckedContinuation<Void, Never>] = []
     let maxDepth: Int
+    let capacity: Int
 
-    init(maxDepth: Int) { self.maxDepth = maxDepth }
+    init(maxDepth: Int, capacity: Int = 1) {
+        self.maxDepth = maxDepth
+        self.capacity = max(1, capacity)
+    }
 
     var waiting: Int { waiters.count }
-    var running: Bool { busy }
+    var running: Bool { active > 0 }
 
     func acquire() async throws {
-        if !busy {
-            busy = true
+        if active < capacity {
+            active += 1
             return
         }
         guard waiters.count < maxDepth else { throw Gemma4ServerError.queueFull }
@@ -130,7 +137,7 @@ actor RequestQueue {
 
     func release() {
         if waiters.isEmpty {
-            busy = false
+            active -= 1
         } else {
             waiters.removeFirst().resume()
         }
@@ -158,7 +165,8 @@ public actor Gemma4Server {
     public init(backend: any Gemma4ChatBackend, configuration: Gemma4ServerConfiguration) {
         self.backend = backend
         self.configuration = configuration
-        self.queue = RequestQueue(maxDepth: configuration.maxQueueDepth)
+        self.queue = RequestQueue(
+            maxDepth: configuration.maxQueueDepth, capacity: configuration.concurrentGenerations)
     }
 
     /// Demarre et bloque jusqu'a l'arret du service.
