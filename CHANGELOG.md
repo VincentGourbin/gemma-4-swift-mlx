@@ -12,6 +12,10 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Ajouté
 
+- DiffusionGemma : `DiffusionGemmaPipeline.setUseCompiledEntropy(_:)` et
+  `configureStepping(entropyBound:confidenceThreshold:)` ; CLI `bench-diffusion --compiled-entropy`,
+  `--eval-every-n-layers`, `--keep-vision`, `--entropy-bound`, `--confidence-threshold` (leviers K-D13,
+  balayage K-D15). Mesures K-D13 : aucun levier ne tient sa porte (détail dans le PLAN).
 - Porte qualité E7 sur `a4b/lora-4bit-lean` (26B-A4B 4 bits, époque complète, 2 h 33, pic 22,8 Go) :
   **30/30** (modèle seul 14/30), inscrite dans `Gemma4TrainingProfile`.
 - Budget de pensée : `Gemma4ChatOptions.maxThinkingTokens` (`Gemma4ThinkingBudgetProcessor`) ferme le

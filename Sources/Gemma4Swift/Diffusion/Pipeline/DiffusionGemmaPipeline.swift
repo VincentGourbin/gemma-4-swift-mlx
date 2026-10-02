@@ -59,9 +59,9 @@ public enum DiffusionStopReason: Sendable, Equatable {
 public actor DiffusionGemmaPipeline {
     public let model: DiffusionGemmaForBlockDiffusion
     public let genConfig: DiffusionGenerationConfig
-    public let sampler: EntropyBoundSampler
+    public private(set) var sampler: EntropyBoundSampler
     public let temperatureSchedule: LinearTemperatureSchedule
-    public let stopping: StableConfidentStopping
+    public private(set) var stopping: StableConfidentStopping
     /// Politique memoire appliquee pendant la generation (D-10).
     public let memoryConfig: DiffusionMemoryConfig
     /// Dossier du checkpoint, pour recharger la vision dechargee par un appel precedent.
@@ -97,6 +97,26 @@ public actor DiffusionGemmaPipeline {
             stabilityThreshold: genConfig.stabilityThreshold,
             confidenceThreshold: genConfig.confidenceThreshold
         )
+    }
+
+    /// Entropie par une fonction compilee (`EntropyBoundSampler.useCompiledEntropy`, K-D13 a).
+    public func setUseCompiledEntropy(_ enabled: Bool) {
+        sampler.useCompiledEntropy = enabled
+    }
+
+    /// Variante de pas (K-D15) : seuil d'entropie d'acceptation et seuil de confiance de
+    /// l'arret, a la place de ceux de `generation_config.json`. `nil` garde la valeur.
+    public func configureStepping(entropyBound: Float? = nil, confidenceThreshold: Float? = nil) {
+        if let entropyBound {
+            var updated = EntropyBoundSampler(
+                entropyBound: entropyBound, vocabSize: sampler.vocabSize, canvasLength: sampler.canvasLength)
+            updated.useCompiledEntropy = sampler.useCompiledEntropy
+            sampler = updated
+        }
+        if let confidenceThreshold {
+            stopping = StableConfidentStopping(
+                stabilityThreshold: genConfig.stabilityThreshold, confidenceThreshold: confidenceThreshold)
+        }
     }
 
     /// Genere des canvases successifs jusqu'a EOS ou maxBlocks atteint.
