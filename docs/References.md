@@ -137,6 +137,8 @@ officiel (`google/diffusiongemma-26B-A4B-it`, ~48 Go). Mesures du 2026-09-28 :
 - **Suivi 4 bits** (`benchmarks/diffusion-4bit-followup-20260928.jsonl`, 2 passes chacun, sorties identiques entre passes) :
   - `--quant-variant 4bit-aggressive` (couches 0-1 et 28-29 en 8 bits), d1 : 20,5 passes/canvas, 27,0 tok/s, 17 227 Mo actifs, 19 303 Mo d'empreinte — sous 18 Go en actif seulement, et −30 % de débit contre le mixte pour −1,5 Go : le mixte reste le défaut.
   - `4bit-fast` (mixte), avec le correctif vision : d2 8 passes, 58,7 tok/s, empreinte 22,2 Go ; d3 9 passes, 47,4 tok/s, 22,6 Go. Remplace les lignes d2 perturbées par ollama.
+- **Variante de pas rapide (K-D15, hors profils)** : `configureStepping(confidenceThreshold: 0.02)` — ScreenSpot-100
+  77 contre 78, **−30 % de passes de débruitage** (4,17 contre 5,99 par cas) ; `BENCHMARKS.md`.
 - **Packs pré-quantifiés (K-D12)** — publiés sur Hugging Face : `gemma4-cli download diff-8bit` (`VincentGOURBIN/diffusiongemma-26B-A4B-it-gemma4swift-8bit`, 28 Go) et `gemma4-cli download diff-4bit` (`…-gemma4swift-4bit-mixed`, 19,7 Go) ; `DiffusionReferenceProfile.weightsRepository` donne le dépôt de chaque profil. Les packs `mlx-community/diffusiongemma-*` ne se chargent pas ici. Pour refaire un pack : `gemma4-cli export-diffusion --model-path <bf16> --reference a4bdiff/8bit-fast --out <pack>` ; le pack se passe ensuite partout comme `--model-path` (format `gemma4-diffusion-prequantized-v1`, SHA-256 par fichier, une seule copie des modules partagés). Mesures d1 (`benchmarks/diffusion-packs-20260929.jsonl`, Lexar USB) :
 
   | Poids | Taille | Chargement | Pic au chargement | Passes/canvas | Débit | Sortie |
