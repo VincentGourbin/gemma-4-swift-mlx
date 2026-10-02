@@ -577,6 +577,36 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
 
   8 bits tient la porte (≤ 2 pts). Les 4 bits perdent 3-4 pts : au bord de l'écart-type d'un échantillon de 100 (~4 pts), donc ni tenue ni rejet nets de la porte ; le mixte n'est pas moins bon que l'uniforme et il est 25 % plus rapide par cas. BFCL non relancé : saturé à 95 % pour tous les modèles, il ne départage pas.
 
+## DiffusionGemma — leviers K-D13 et variante de pas K-D15 — 2026-10-02
+
+Pack 4 bits (`a4bdiff/4bit-*`), M3 Max. Lignes brutes : `benchmarks/diffusion-kd13-20261002.jsonl`,
+`benchmarks/screenspot-kd15-20261002.jsonl`. Une application MLX (VoxtralApp) a pris le GPU par moments :
+les temps de K-D13 (b) et (d) sont perturbés, les mémoires, scores et nombres de passes ne le sont pas.
+
+**K-D13, leviers (A/B/B/A)** — aucun ne tient sa porte :
+
+| Levier | Mesure | Porte | Verdict |
+|---|---|---|---|
+| (a) entropie compilée (`--compiled-entropy`) | pas −1,2 %, débit +0,3 %, sortie identique | +5 % | retiré |
+| (b) `evalEveryNLayers` 8 | pic identique (19 996 Mo) | pic −10 % | retiré |
+| (c) déchargement vision, d2 sur 2 canvases | pic −379 Mo, actif −1,09 Go, même réponse | pic −0,5 Go | manquée sur le pic ; déjà le réglage `lean`, gardé |
+| (d) cache `lean` (1 Go) | cache 1 024 contre 1 763 Mo, empreinte −0,2 Go | empreinte ≤ actif + 1 Go | non tenue : ≈ 0,87 Go hors cache MLX |
+
+**K-D15, variante de pas (ScreenSpot-100, `4bit-fast`, graine 0)** :
+
+| Variante | Score | Passes / cas | Écart |
+|---|---|---|---|
+| référence (`entropy_bound` 0,1, `confidence_threshold` 0,005) | 78 | 5,99 | — |
+| `entropy_bound` 0,2 | 78 | 5,35 | −10,7 % |
+| `entropy_bound` 0,4 | 78 | 5,27 | −12,0 % |
+| **`confidence_threshold` 0,02** | **77** | **4,17** | **−30,4 %** |
+
+`confidence_threshold` 0,02 tient la porte (passes −≥ 15 %, score ± 1 pt) : variante publiée **hors profils**
+(les profils gardent `generation_config.json`). À choisir quand le débit compte plus qu'un point de
+ScreenSpot : `DiffusionGemmaPipeline.configureStepping(confidenceThreshold: 0.02)`, ou
+`--confidence-threshold 0.02` sur `bench-diffusion` / `eval-screenspot`. Non mesurée sur texte libre (d1) ni
+sur BFCL.
+
 ## Leviers K-15 à K-18 — 2026-09-29 (E2B 4 bits, M3 Max, A/B/B/A, cooldown 60 s)
 
 Lignes brutes : `benchmarks/{ngram-k15,sampling-k17,vision-k18,noaudio-k16}-20260929.jsonl`. Une première série K-15 perturbée par une compilation est archivée (`benchmarks/archive/ngram-k15-20260929-perturbe.jsonl`).

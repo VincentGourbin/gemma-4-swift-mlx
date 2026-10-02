@@ -37,6 +37,12 @@ struct EvalScreenSpot: AsyncParsableCommand {
     @Option(name: .long, help: "Etiquette libre")
     var label: String = ""
 
+    @Option(name: .long, help: "K-D15 : seuil d'entropie d'acceptation (defaut : generation_config.json)")
+    var entropyBound: Float?
+
+    @Option(name: .long, help: "K-D15 : seuil de confiance de l'arret (defaut : generation_config.json)")
+    var confidenceThreshold: Float?
+
     struct Case: Decodable {
         let idx: Int
         let image: String
@@ -71,11 +77,13 @@ struct EvalScreenSpot: AsyncParsableCommand {
         if let quantVariant { context.fields["quant_variant"] = quantVariant }
 
         var correct = 0
+        var totalSteps = 0
         var byGroup: [String: (ok: Int, n: Int)] = [:]
         let start = Date()
         for (i, item) in cases.enumerated() {
             let caseStart = Date()
-            let output = try await generate(container: container, item: item)
+            let (output, steps) = try await generate(container: container, item: item)
+            totalSteps += steps
             let click = Self.parseClick(output)
             let ok = click.map { Self.inside($0, item.bbox) } ?? false
             if ok { correct += 1 }
@@ -86,7 +94,7 @@ struct EvalScreenSpot: AsyncParsableCommand {
             var line: [String: Any] = [
                 "kind": "screenspot_case", "idx": item.idx, "data_source": item.data_source,
                 "data_type": item.data_type, "correct": ok,
-                "output": String(output.prefix(120)),
+                "output": String(output.prefix(120)), "decoder_steps": steps,
                 "seconds": Bench.round(Date().timeIntervalSince(caseStart)),
             ]
             if let click { line["click"] = [click.0, click.1] }
@@ -102,14 +110,17 @@ struct EvalScreenSpot: AsyncParsableCommand {
             "score_pct": Bench.round(100 * Double(correct) / Double(max(1, cases.count))),
             "total_s": Bench.round(Date().timeIntervalSince(start)),
             "by_group": byGroup.mapValues { "\($0.ok)/\($0.n)" },
+            "decoder_steps_mean": Bench.round(Double(totalSteps) / Double(max(1, cases.count))),
         ]
+        if let entropyBound { summary["entropy_bound"] = entropyBound }
+        if let confidenceThreshold { summary["confidence_threshold"] = confidenceThreshold }
         summary.merge(context.fields) { current, _ in current }
         try Bench.writeLine(summary, to: out)
         print("ScreenSpot \(profile.qualifiedID)\(quantVariant.map { " (\($0))" } ?? "") : \(correct)/\(cases.count)")
     }
 
     /// Prompt de run_ss.py, `<|image|>` en tete, 1 canvas, graine 0 (comme `diffusion`).
-    private func generate(container: DiffusionGemmaContainer, item: Case) async throws -> String {
+    private func generate(container: DiffusionGemmaContainer, item: Case) async throws -> (String, Int) {
         let prompt = """
             Look at this UI screenshot (\(item.width)x\(item.height) pixels).
             Goal: \(item.instruction)
@@ -137,13 +148,17 @@ struct EvalScreenSpot: AsyncParsableCommand {
         }
         let promptIds = MLXArray(ids.map { Int32($0) }).reshaped(1, -1)
         nonisolated(unsafe) let pixelsCapture = pixels
-        let result = await container.makePipeline().generate(
+        let pipeline = container.makePipeline()
+        if entropyBound != nil || confidenceThreshold != nil {
+            await pipeline.configureStepping(entropyBound: entropyBound, confidenceThreshold: confidenceThreshold)
+        }
+        let result = await pipeline.generate(
             promptIds: promptIds, pixelValues: pixelsCapture, maxBlocks: 1, seed: 0)
         if case .invalidInput(let message) = result.stopReason {
             throw ValidationError("cas \(item.idx) : \(message)")
         }
         let generated = result.generatedIds.reshaped(-1).asArray(Int32.self).map(Int.init)
-        return container.tokenizer.decode(tokens: generated, skipSpecialTokens: true)
+        return (container.tokenizer.decode(tokens: generated, skipSpecialTokens: true), result.totalDecoderSteps)
     }
 
     /// Meme ordre de formats que `parse_click` de run_ss.py.

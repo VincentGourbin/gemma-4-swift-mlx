@@ -55,6 +55,22 @@ struct BenchDiffusion: AsyncParsableCommand {
     @Flag(name: .long, help: "Ne pas faire la passe d'echauffement (1 canvas, non chronometree)")
     var noWarmup = false
 
+    // Leviers K-D13 / variantes K-D15 (balayage, hors profils).
+    @Flag(name: .long, help: "K-D13 a : entropie par fonction compilee")
+    var compiledEntropy = false
+
+    @Option(name: .long, help: "K-D13 b : eval() toutes les N couches du decodeur (0 = jamais)")
+    var evalEveryNLayers: Int?
+
+    @Flag(name: .long, help: "K-D13 c : garder la vision chargee entre canvases (sinon : politique du profil)")
+    var keepVision = false
+
+    @Option(name: .long, help: "K-D15 : seuil d'entropie d'acceptation (defaut : generation_config.json)")
+    var entropyBound: Float?
+
+    @Option(name: .long, help: "K-D15 : seuil de confiance de l'arret (defaut : generation_config.json)")
+    var confidenceThreshold: Float?
+
     func run() async throws {
         guard var profile = DiffusionReferenceProfile.named(reference) else {
             throw ValidationError("profil inconnu : \(reference) (voir `gemma4-cli references --family a4bdiff`)")
@@ -110,6 +126,11 @@ struct BenchDiffusion: AsyncParsableCommand {
             line.merge(context.fields) { current, _ in current }
             line["pass"] = pass
             line["label"] = label
+            line["compiled_entropy"] = compiledEntropy
+            line["eval_every_n_layers"] = evalEveryNLayers ?? 0
+            line["keep_vision"] = keepVision
+            if let entropyBound { line["entropy_bound"] = entropyBound }
+            if let confidenceThreshold { line["confidence_threshold"] = confidenceThreshold }
             line["cooldown_s"] = cooldown
             try Bench.writeLine(line, to: out)
         }
@@ -123,7 +144,16 @@ struct BenchDiffusion: AsyncParsableCommand {
     private func measure(
         container: DiffusionGemmaContainer, ids: [Int], pixels: MLXArray?, blocks: Int
     ) async throws -> [String: Any] {
-        let pipeline = container.makePipeline()
+        var memory = container.memoryConfig
+        if keepVision { memory.unloadVisionAfterFirstCanvas = false }
+        let pipeline = DiffusionGemmaPipeline(
+            model: container.model, genConfig: container.generationConfig, memoryConfig: memory,
+            modelDirectory: container.modelDirectory)
+        if compiledEntropy { await pipeline.setUseCompiledEntropy(true) }
+        if entropyBound != nil || confidenceThreshold != nil {
+            await pipeline.configureStepping(entropyBound: entropyBound, confidenceThreshold: confidenceThreshold)
+        }
+        if let evalEveryNLayers { container.model.decoder.evalEveryNLayers = evalEveryNLayers }
         let clock = StepClock()
         nonisolated(unsafe) let pixelsCapture = pixels
         let promptIds = MLXArray(ids.map { Int32($0) }).reshaped(1, -1)
