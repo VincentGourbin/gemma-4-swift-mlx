@@ -19,6 +19,10 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 - DiffusionGemma, variante de pas mesurée (K-D15) : `confidenceThreshold` 0,02 donne −30 % de passes
   de débruitage pour −1 point sur ScreenSpot-100 (77 contre 78). Publiée hors profils, à activer par
   `configureStepping(confidenceThreshold: 0.02)`.
+- Génération par lot (K-41) : `Gemma4BatchGeneration` (prompts complétés à gauche, masques par ligne,
+  `Gemma4TextModel.batchPadding`), mode lot du moteur (`Gemma4ChatEngine.configureBatching`) et
+  `gemma4-server --batch N`. E2B 4 bits, 8 clients : ×2,1 de débit agrégé, TTFT p90 −71 à −75 %. Sorties non
+  invariantes au lot (arrondis bf16). CLI `bench-batch` (plafond du décodage par lot).
 - Porte qualité E7 sur `a4b/lora-4bit-lean` (26B-A4B 4 bits, époque complète, 2 h 33, pic 22,8 Go) :
   **30/30** (modèle seul 14/30), inscrite dans `Gemma4TrainingProfile`.
 - Budget de pensée : `Gemma4ChatOptions.maxThinkingTokens` (`Gemma4ThinkingBudgetProcessor`) ferme le
@@ -45,6 +49,9 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Corrigé
 
+- RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rend des lignes fausses au-delà de
+  la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]`. `RoPEWrapper` replie le lot dans l'axe des
+  têtes (exact) ; touchait tout décodage par lot. Défaut amont (MLX), à remonter.
 - LoRA (texte et multimodal) : la validation initiale est prise **avant** le premier pas, comme
   mlx-lm, et donne la perte du modèle de départ. Elle était prise après la première mise à jour et
   dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées

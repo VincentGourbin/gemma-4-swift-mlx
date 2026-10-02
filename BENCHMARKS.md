@@ -577,6 +577,31 @@ Lignes brutes : `benchmarks/diffusion-20260928-0940.jsonl` (bf16 ; les lignes 8/
 
   8 bits tient la porte (≤ 2 pts). Les 4 bits perdent 3-4 pts : au bord de l'écart-type d'un échantillon de 100 (~4 pts), donc ni tenue ni rejet nets de la porte ; le mixte n'est pas moins bon que l'uniforme et il est 25 % plus rapide par cas. BFCL non relancé : saturé à 95 % pour tous les modèles, il ne départage pas.
 
+## Serveur — génération par lot (K-41) — 2026-10-02
+
+E2B 4 bits (`e2b/4bit-fast`), M3 Max. Lignes brutes : `benchmarks/k41-batch-ceiling-20261002.jsonl` (plafond),
+`benchmarks/k41-load-20261002.jsonl` (charge ; `-v1` et `-v2` : versions fautives, voir plus bas).
+
+**Plafond** (`gemma4-cli bench-batch`, prompt 256, pas de décodage synchronisé) : B=1 9,2 ms/pas (109 tok/s),
+B=2 9,1 ms (218), B=4 13,1 ms (306), **B=8 22,5 ms (356 tok/s, ×3,3)**, pic +1,2 Go.
+
+**Charge** (8 clients × 4 requêtes, prompts courts, `max_tokens` 128, température 0, A/B/B/A) :
+
+| | `--batch 1` | `--batch 8` |
+|---|---|---|
+| Débit agrégé | 127,7-127,9 tok/s | **267-271 tok/s (×2,1)** |
+| TTFT p50 | 5,56-5,58 s | 0,16 s |
+| TTFT p90 | 5,76-5,98 s | **1,44-1,71 s** |
+| Réponses identiques au mode série | 32/32 | 4-6/32 |
+
+Porte K-41 (×1,5, TTFT p90 ≤ +20 %) tenue. Les réponses du lot divergent de la génération seule après une
+douzaine de jetons (logits au 1er pas : 0,84 % d'écart relatif, même argmax) et d'une passe à l'autre (20/32
+identiques), selon la composition du lot.
+
+**Défaut MLX trouvé en route** : les premières versions donnaient des lignes fausses (6 lignes sur 8 en boucle
+« La mer / La mer ») : `MLXFast.RoPE` sur une entrée contiguë `[B > 1, H, 1, D]` calcule faux les lignes au-delà
+de la première (écart 5,5-6 entre deux lignes identiques ; `RoPEBatchTests`). Contourné dans `RoPEWrapper`.
+
 ## DiffusionGemma — leviers K-D13 et variante de pas K-D15 — 2026-10-02
 
 Pack 4 bits (`a4bdiff/4bit-*`), M3 Max. Lignes brutes : `benchmarks/diffusion-kd13-20261002.jsonl`,

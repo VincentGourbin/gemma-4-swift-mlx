@@ -240,6 +240,20 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
     /// Oublie les instantanes : le prochain tour re-prefille tout.
     public func resetConversation() { conversation.removeAll() }
 
+    // Mode lot (K-41), voir Gemma4ChatEngine+Batching.swift.
+    var batchMaxSize = 1
+    var batchWindow: Duration?
+    var batchQueue: [Gemma4PendingBatchRequest] = []
+    var batchRunner: Task<Void, Never>?
+
+    /// Active le mode lot : les requetes texte (sans image, n-gramme ni budget de pensee)
+    /// arrivees dans la meme fenetre sont decodees ensemble, jusqu'a `maxBatch`. Ces
+    /// requetes ne reutilisent pas le prefixe de conversation. `maxBatch` 1 : desactive.
+    public func configureBatching(maxBatch: Int, window: Duration = .milliseconds(15)) {
+        batchMaxSize = max(1, maxBatch)
+        batchWindow = window
+    }
+
     public init(container: ModelContainer, profile: Gemma4ReferenceProfile? = nil) {
         self.container = container
         self.profile = profile
@@ -346,6 +360,9 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         tools: [[String: any Sendable]] = [],
         options: Gemma4ChatOptions = .init()
     ) -> Gemma4ChatRun {
+        if batchMaxSize > 1, Self.batchable(messages: messages, options: options) {
+            return enqueueBatched(messages: messages, tools: tools, options: options)
+        }
         let container = container
         let profile = profile
         let store: ConversationStore? = reusesConversation ? conversation : nil
@@ -463,15 +480,10 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             promptTokenCount: suffix.count, modelConfiguration: context.configuration,
             tokenizer: context.tokenizer, iterator: iterator)
 
-        var router = Gemma4ChannelRouter()
-        var content = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
-        var reasoning = Gemma4StreamingDetokenizer(tokenizer: context.tokenizer)
-        let toolParser = tools.isEmpty ? nil : ToolCallProcessor(format: .gemma4, tools: tools)
+        var decoder = Gemma4TokenEventDecoder(tokenizer: context.tokenizer, tools: tools)
         var firstToken: TimeInterval?
         var completion = 0
         var info: GenerateCompletionInfo?
-        var reasoningStarted = false
-        var stoppedOnToolResponse = false
 
         for await event in tokens {
             if Task.isCancelled {
@@ -483,26 +495,8 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
                 completion += 1
                 if firstToken == nil { firstToken = Date().timeIntervalSince(start) }
                 beacon?.update(phase: "decode", step: completion, totalSteps: options.maxTokens)
-                // `<|tool_response>` : le modele attend la reponse de l'outil.
-                if id == Gemma4ChannelRouter.toolResponseTokenId {
-                    stoppedOnToolResponse = true
+                if !decoder.consume(id, emit: { continuation.yield($0) }) {
                     generation.cancel()
-                    continue
-                }
-                switch router.route(Int32(id)) {
-                case .markup:
-                    continue
-                case .reasoning:
-                    guard var text = reasoning.append(token: id) else { continue }
-                    if !reasoningStarted {
-                        text = String(text.drop(while: \.isNewline))
-                        reasoningStarted = !text.isEmpty
-                    }
-                    if !text.isEmpty { continuation.yield(.reasoning(text)) }
-                case .content:
-                    guard let text = content.append(token: id) else { continue }
-                    let visible = toolParser.map { $0.processChunk(text) ?? "" } ?? text
-                    if !visible.isEmpty { continuation.yield(.text(visible)) }
                 }
             case .info(let completionInfo):
                 info = completionInfo
@@ -510,21 +504,12 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         }
         await generation.value
 
-        if let toolParser, let tail = toolParser.processEOS(returnBufferedText: true), !tail.isEmpty {
-            continuation.yield(.text(tail))
-        }
-        let calls = toolParser?.toolCalls ?? []
-        for call in calls {
-            let arguments = (try? JSONEncoder().encode(call.function.arguments))
-                .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
-            let id = "call_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(24)
-            continuation.yield(.toolCall(Gemma4ToolCall(id: id, name: call.function.name, argumentsJSON: arguments)))
-        }
+        let callCount = decoder.finish(emit: { continuation.yield($0) })
 
         let finish: Gemma4ChatUsage.FinishReason
         if Task.isCancelled {
             finish = .cancelled
-        } else if !calls.isEmpty || stoppedOnToolResponse {
+        } else if callCount > 0 || decoder.stoppedOnToolResponse {
             finish = .toolCalls
         } else if info?.stopReason == .length || completion >= options.maxTokens {
             finish = .length
@@ -541,6 +526,63 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             tokensPerSecond: decode > 0 ? Double(completion) / decode : 0,
             timeToFirstToken: firstToken, peakMemoryBytes: Memory.peakMemory,
             finishReason: finish)))
+    }
+}
+
+/// Jetons generes -> evenements (pensee, texte, appels d'outil). Commun au chemin
+/// standard et a la generation par lot (K-41), pour que les deux rendent la meme chose.
+struct Gemma4TokenEventDecoder {
+    private var router = Gemma4ChannelRouter()
+    private var content: Gemma4StreamingDetokenizer
+    private var reasoning: Gemma4StreamingDetokenizer
+    private let toolParser: ToolCallProcessor?
+    private var reasoningStarted = false
+    private(set) var stoppedOnToolResponse = false
+
+    init(tokenizer: any Tokenizer, tools: [[String: any Sendable]]) {
+        content = Gemma4StreamingDetokenizer(tokenizer: tokenizer)
+        reasoning = Gemma4StreamingDetokenizer(tokenizer: tokenizer)
+        toolParser = tools.isEmpty ? nil : ToolCallProcessor(format: .gemma4, tools: tools)
+    }
+
+    /// Rend `false` quand la generation doit s'arreter (`<|tool_response>` : le modele attend
+    /// la reponse de l'outil).
+    mutating func consume(_ id: Int, emit: (Gemma4ChatEvent) -> Void) -> Bool {
+        if id == Gemma4ChannelRouter.toolResponseTokenId {
+            stoppedOnToolResponse = true
+            return false
+        }
+        switch router.route(Int32(id)) {
+        case .markup:
+            break
+        case .reasoning:
+            guard var text = reasoning.append(token: id) else { break }
+            if !reasoningStarted {
+                text = String(text.drop(while: \.isNewline))
+                reasoningStarted = !text.isEmpty
+            }
+            if !text.isEmpty { emit(.reasoning(text)) }
+        case .content:
+            guard let text = content.append(token: id) else { break }
+            let visible = toolParser.map { $0.processChunk(text) ?? "" } ?? text
+            if !visible.isEmpty { emit(.text(visible)) }
+        }
+        return true
+    }
+
+    /// Fin de generation : texte retenu par l'analyseur d'outils, puis les appels. Rend leur nombre.
+    func finish(emit: (Gemma4ChatEvent) -> Void) -> Int {
+        if let toolParser, let tail = toolParser.processEOS(returnBufferedText: true), !tail.isEmpty {
+            emit(.text(tail))
+        }
+        let calls = toolParser?.toolCalls ?? []
+        for call in calls {
+            let arguments = (try? JSONEncoder().encode(call.function.arguments))
+                .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+            let id = "call_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(24)
+            emit(.toolCall(Gemma4ToolCall(id: id, name: call.function.name, argumentsJSON: arguments)))
+        }
+        return calls.count
     }
 }
 

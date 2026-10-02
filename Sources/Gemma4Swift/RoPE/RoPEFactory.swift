@@ -20,8 +20,15 @@ public final class RoPEWrapper {
         self.inner = inner
     }
 
+    /// Lot de plus d'une ligne : le lot est replie dans l'axe des tetes avant le RoPE.
+    /// `MLXFast.RoPE` (standard comme a frequences explicites) rend des lignes fausses au-dela
+    /// de la premiere sur GPU pour une entree contigue `[B > 1, H, 1, D]` (decodage par lot,
+    /// K-41 : ecart 5,5-6 sur deux lignes identiques, `RoPEBatchTests`). Le RoPE ne depend
+    /// que de la position et toutes les lignes ont le meme `offset` : le repli est exact.
     public func callAsFunction(_ x: MLXArray, offset: Int = 0) -> MLXArray {
-        inner(x, offset: offset)
+        guard x.ndim == 4, x.dim(0) > 1 else { return inner(x, offset: offset) }
+        let (b, h, l, d) = (x.dim(0), x.dim(1), x.dim(2), x.dim(3))
+        return inner(x.reshaped(1, b * h, l, d), offset: offset).reshaped(b, h, l, d)
     }
 }
 

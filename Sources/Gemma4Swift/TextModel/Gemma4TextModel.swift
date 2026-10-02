@@ -315,6 +315,28 @@ public class Gemma4TextModel: Module {
     /// entrees, pour que leurs gradients remontent (comme `nn.utils.checkpoint` en Python).
     public var gradientCheckpointing = false
 
+    /// Lot complete a gauche (K-41) : nombre de jetons de padding en tete de chaque ligne.
+    /// Quand il est pose, les masques global et glissant sont materialises par ligne : les
+    /// cles de padding sont masquees (une position de padding ne voit qu'elle-meme, pour
+    /// eviter une ligne de softmax entierement masquee). Les caches glissants doivent alors
+    /// garder toutes les positions (`makeCache(slidingCapacity:)` >= longueur totale) : la
+    /// fenetre est appliquee par le masque, et l'indice d'une cle reste sa position absolue.
+    /// Le RoPE etant relatif, decaler une ligne de `pad` positions ne change pas ses scores.
+    public var batchPadding: [Int]?
+
+    /// Masques d'un lot complete a gauche : `[B, 1, T, S]` booleens.
+    static func paddedBatchMasks(
+        padding: [Int], queryLength t: Int, offset: Int, windowSize: Int
+    ) -> (global: MLXArray, sliding: MLXArray) {
+        let keys = MLXArray(Int32(0) ..< Int32(offset + t))[.newAxis]                 // [1, S]
+        let queries = MLXArray(Int32(offset) ..< Int32(offset + t))[0..., .newAxis]   // [T, 1]
+        let causal = queries .>= keys
+        let windowed = causal & (queries .< keys + Int32(windowSize))
+        let pads = MLXArray(padding.map { Int32($0) }).reshaped(padding.count, 1, 1, 1)
+        let visible = (keys .>= pads) | (keys .== queries)                             // [B, 1, T, S]
+        return (causal & visible, windowed & visible)
+    }
+
     private func checkpointedLayer(
         _ layer: Gemma4DecoderLayer, _ x: MLXArray,
         mask: MLXFast.ScaledDotProductAttentionMaskMode, perLayerInput: MLXArray?,
@@ -398,6 +420,15 @@ public class Gemma4TextModel: Module {
             cache: firstSlidingCacheIdx < cacheArray.count ? cacheArray[firstSlidingCacheIdx] : nil,
             windowSize: windowSize
         )
+
+        // Lot complete a gauche (K-41) : masques par ligne.
+        if let padding = batchPadding {
+            let offset = (firstFullCacheIdx < cacheArray.count ? cacheArray[firstFullCacheIdx]?.offset : nil) ?? 0
+            let masks = Self.paddedBatchMasks(
+                padding: padding, queryLength: h.dim(1), offset: offset, windowSize: windowSize)
+            globalMask = .array(masks.global)
+            slidingWindowMask = .array(masks.sliding)
+        }
 
         // Overlay bidirectionnel pour les blocs vision (gemma4_unified) :
         // materialise les masques causaux + OR avec same_block.

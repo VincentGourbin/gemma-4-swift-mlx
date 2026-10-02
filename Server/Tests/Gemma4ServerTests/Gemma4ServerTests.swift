@@ -169,6 +169,27 @@ struct Gemma4ServerTests {
         #expect(await backend.finished == 3)
     }
 
+    @Test("lot (K-41) : avec concurrentGenerations = 2, deux generations a la fois au plus")
+    func testConcurrentGenerations() async throws {
+        let backend = FakeBackend(delay: .milliseconds(40))
+        var config = Gemma4ServerConfiguration()
+        config.concurrentGenerations = 2
+        try await app(backend, config).test(.router) { client in
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                for _ in 0 ..< 4 {
+                    group.addTask {
+                        try await client.execute(uri: "/v1/chat/completions", method: .post, body: ByteBuffer(string: Self.chatBody)) {
+                            #expect($0.status == .ok)
+                        }
+                    }
+                }
+                try await group.waitForAll()
+            }
+        }
+        #expect(await backend.maxActive == 2)
+        #expect(await backend.finished == 4)
+    }
+
     @Test("429 : file pleine")
     func testQueueFull() async throws {
         let backend = FakeBackend(delay: .milliseconds(150))
