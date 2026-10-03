@@ -49,10 +49,16 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Corrigé
 
-- RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rend des lignes fausses au-delà de
-  la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]`. `RoPEWrapper` replie le lot dans l'axe des
-  têtes (exact) ; touchait tout décodage par lot. Défaut connu de MLX (ml-explore/mlx#3494), corrigé
-  dans MLX 0.32 (mlx#3498) ; mlx-swift 0.31.6 embarque encore mlx-core 0.31.1.
+- RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rendait des lignes fausses au-delà
+  de la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]` ; touchait tout décodage par lot.
+  Défaut connu de MLX (ml-explore/mlx#3494), corrigé par mlx#3498 dans MLX 0.32, qu'embarque désormais
+  mlx-swift 0.32 : le repli du lot d'abord ajouté à `RoPEWrapper` est retiré (`RoPEBatchTests` vérifie
+  le noyau brut).
+- Interblocage `CompiledFunction` / `evalLock` de mlx-swift (gradient sur un thread, forward sur un
+  autre) : corrigé en amont (mlx-swift 0.32, #461). `Gemma4ComputeGate` est conservée ; ses messages
+  ne parlent plus d'interblocage.
+- Détokenisation en flux des chemins `ChatSession` : le `NaiveStreamingDetokenizer` amont ne perd
+  plus les drapeaux, séquences ZWJ et accents combinants (mlx-swift-lm 3.32, #613).
 - LoRA (texte et multimodal) : la validation initiale est prise **avant** le premier pas, comme
   mlx-lm, et donne la perte du modèle de départ. Elle était prise après la première mise à jour et
   dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées
