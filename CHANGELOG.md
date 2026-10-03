@@ -51,7 +51,8 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 - RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rend des lignes fausses au-delà de
   la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]`. `RoPEWrapper` replie le lot dans l'axe des
-  têtes (exact) ; touchait tout décodage par lot. Défaut amont (MLX), à remonter.
+  têtes (exact) ; touchait tout décodage par lot. Défaut connu de MLX (ml-explore/mlx#3494), corrigé
+  dans MLX 0.32 (mlx#3498) ; mlx-swift 0.31.6 embarque encore mlx-core 0.31.1.
 - LoRA (texte et multimodal) : la validation initiale est prise **avant** le premier pas, comme
   mlx-lm, et donne la perte du modèle de départ. Elle était prise après la première mise à jour et
   dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées
