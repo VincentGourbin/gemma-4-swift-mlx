@@ -602,7 +602,7 @@ identiques), selon la composition du lot.
 « La mer / La mer ») : `MLXFast.RoPE` sur une entrée contiguë `[B > 1, H, 1, D]` calcule faux les lignes au-delà
 de la première (écart 5,5-6 entre deux lignes identiques ; `RoPEBatchTests`). Contourné dans `RoPEWrapper`.
 Reproduit en MLX Python 0.31.2 sur GPU (correct sur CPU) : défaut connu, [ml-explore/mlx#3494](https://github.com/ml-explore/mlx/issues/3494),
-corrigé par mlx#3498 et absent de MLX 0.32.3. mlx-swift 0.31.6 embarque mlx-core 0.31.1 : le contournement
+corrigé par mlx#3498 (inclus depuis MLX 0.32.0, plus reproduit en MLX 0.32.3). mlx-swift 0.31.6 embarque mlx-core 0.31.1 : le contournement
 reste nécessaire jusqu'à la montée vers mlx-swift 0.32 (plan action-plans#602).
 
 ## DiffusionGemma — leviers K-D13 et variante de pas K-D15 — 2026-10-02
