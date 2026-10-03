@@ -30,7 +30,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 
 - macOS 15+ (Sequoia) — `Package.swift` : `.macOS(.v15)`
 - Apple Silicon (M1/M2/M3/M4)
-- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.31.6 declares swift-tools-version 6.3; CI builds with
+- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.32 declares swift-tools-version 6.3; CI builds with
   Xcode 26.6, development uses Xcode 27)
 
 ## Quick Start

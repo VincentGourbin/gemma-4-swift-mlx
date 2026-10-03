@@ -204,7 +204,7 @@ struct EvalMmlu: AsyncParsableCommand {
             for (cfgName, kv) in cfgs {
                 let answer: Int
                 if cot {
-                    answer = await Self.predictAnswerCoT(
+                    answer = try await Self.predictAnswerCoT(
                         container: container,
                         prompt: prompt,
                         nChoices: nChoices,
@@ -217,7 +217,7 @@ struct EvalMmlu: AsyncParsableCommand {
                             container: container, cache: prefixCache, subject: item.subject,
                             prefix: prefix, prompt: prompt, letterTokens: candidateTokens)
                     } else {
-                        answer = await Self.predictAnswerLogits(
+                        answer = try await Self.predictAnswerLogits(
                             container: container,
                             prompt: prompt,
                             letterTokens: candidateTokens,
@@ -297,13 +297,13 @@ struct EvalMmlu: AsyncParsableCommand {
         nChoices: Int,
         maxTokens: Int,
         kvBits: Int?
-    ) async -> Int {
+    ) async throws -> Int {
         let kvBitsArg = kvBits
-        let generated: String = await container.perform { context in
+        let generated: String = try await container.perform { context in
             let promptIds = context.tokenizer.encode(text: prompt)
             let inputIds = MLXArray(promptIds.map { Int32($0) })
             let params = kvBitsArg != nil ? GenerateParameters(kvBits: kvBitsArg) : nil
-            let cache = context.model.newCache(parameters: params)
+            let cache = try context.model.newCache(parameters: params)
 
             // Prefill
             let prefillOut = context.model(inputIds.reshaped(1, -1), cache: cache)
@@ -430,13 +430,13 @@ struct EvalMmlu: AsyncParsableCommand {
         prompt: String,
         letterTokens: [Int],
         kvBits: Int?
-    ) async -> Int {
+    ) async throws -> Int {
         let kvBitsArg = kvBits
-        return await container.perform { context in
+        return try await container.perform { context in
             let promptIds = context.tokenizer.encode(text: prompt)
             let inputIds = MLXArray(promptIds.map { Int32($0) }).reshaped(1, -1)
             let params = kvBitsArg != nil ? GenerateParameters(kvBits: kvBitsArg) : nil
-            let cache = context.model.newCache(parameters: params)
+            let cache = try context.model.newCache(parameters: params)
             // Tete sur la seule derniere position quand le modele le permet (K-34).
             let logits = (context.model as? Gemma4LLMModel).map {
                 $0.languageModel(inputs: inputIds, cache: cache.map { $0 as KVCache? }, logitsFrom: inputIds.dim(1) - 1)

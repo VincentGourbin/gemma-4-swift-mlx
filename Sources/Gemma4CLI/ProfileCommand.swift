@@ -152,7 +152,7 @@ struct ProfileRun: AsyncParsableCommand {
             if let kvBits = self.kvBits, let gemma = context.model as? Gemma4LLMModel {
                 cache = gemma.languageModel.makeCache(kvBits: Float(kvBits))
             } else {
-                cache = context.model.newCache(parameters: nil)
+                cache = try context.model.newCache(parameters: nil)
             }
             session.endPhase("3. KV Cache Allocation", category: .kvCache)
 
@@ -403,7 +403,7 @@ struct ProfileSweep: AsyncParsableCommand {
 
                     let params = kvBitsFloat != nil ? GenerateParameters(kvBits: Int(kvBitsFloat!)) : nil
                     session.beginPhase("Prefill", category: .prefill)
-                    let cache = context.model.newCache(parameters: params)
+                    let cache = try context.model.newCache(parameters: params)
                     let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
                     let prefillLogits = prefillOutput[0..., prefillOutput.dim(1) - 1, 0...]
                     let firstToken = argMax(prefillLogits, axis: -1)

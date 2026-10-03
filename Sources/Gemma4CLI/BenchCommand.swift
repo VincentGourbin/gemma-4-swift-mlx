@@ -38,7 +38,7 @@ struct Bench: AsyncParsableCommand {
     @Option(name: .long, help: "Image : mesure le chemin multimodal (prompt court fixe)")
     var image: String?
 
-    @Option(name: .long, help: "Tranche de prefill (GenerateParameters.prefillStepSize)")
+    @Option(name: .long, help: "Tranche de prefill (GenerateParameters.prefill.stepSize)")
     var prefillStep: Int?
 
     @Option(name: .long, help: "Profil de reference a appliquer (ex. e2b/4bit-lean ; voir `references`)")
@@ -191,7 +191,7 @@ struct Bench: AsyncParsableCommand {
             var parameters = GenerateParameters(maxTokens: maxTokens, temperature: temperature, topP: topP, topK: topK)
             profile?.apply(to: &parameters)
             // Une option explicite l'emporte sur le profil (balayage d'une variable).
-            if let prefillStep { parameters.prefillStepSize = prefillStep }
+            if let prefillStep { parameters.prefill.stepSize = prefillStep }
 
             Memory.clearCache()
             Memory.peakMemory = 0
@@ -203,7 +203,7 @@ struct Bench: AsyncParsableCommand {
                 iterator = try TokenIterator(
                     input: input, model: context.model, cache: nil,
                     processor: NoRepeatNGramLogitProcessor(ngramSize: ngram, forceHostHistory: ngramOnHost),
-                    sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
+                    sampler: parameters.sampler(), prefill: parameters.prefill,
                     maxTokens: maxTokens)
             } else {
                 iterator = try TokenIterator(input: input, model: context.model, parameters: parameters)
@@ -243,7 +243,7 @@ struct Bench: AsyncParsableCommand {
                 "cache_mlx_mb": snapshot.cacheMemory / 1_048_576,
                 "phys_footprint_mb": footprint.current,
                 "phys_footprint_peak_mb": footprint.peak,
-                "prefill_step": parameters.prefillStepSize,
+                "prefill_step": parameters.prefill.stepSize as Any,
                 "kv_bits": parameters.kvBits ?? 16,
                 "temperature": Double(temperature), "top_p": Double(topP), "top_k": topK,
                 // Empreinte des jetons generes : parite de sortie entre variantes A/B.

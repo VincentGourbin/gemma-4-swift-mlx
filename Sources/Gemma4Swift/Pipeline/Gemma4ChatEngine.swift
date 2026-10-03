@@ -430,7 +430,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             images = Array(allImages[snapshot.imageDigests.count...])
             cached = snapshot.ids.count
         } else {
-            cache = context.model.newCache(parameters: parameters)
+            cache = try context.model.newCache(parameters: parameters)
         }
 
         if !images.isEmpty {
@@ -465,7 +465,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
             iterator = try TokenIterator(
                 input: input, model: context.model, cache: cache,
                 processor: custom,
-                sampler: parameters.sampler(), prefillStepSize: parameters.prefillStepSize,
+                sampler: parameters.sampler(), prefill: parameters.prefill,
                 maxTokens: options.maxTokens)
         } else {
             iterator = try TokenIterator(input: input, model: context.model, cache: cache, parameters: parameters)

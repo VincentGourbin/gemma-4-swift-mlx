@@ -43,7 +43,7 @@ struct BenchBatch: AsyncParsableCommand {
             for b in sizes {
                 let prompt = MLXArray(ids.map { Int32($0) }).reshaped(1, -1)
                 let batch = tiled(prompt, repetitions: [b, 1])
-                let cache = context.model.newCache(parameters: nil)
+                let cache = try context.model.newCache(parameters: nil)
                 // Prefill du lot entier.
                 let prefillStart = Date()
                 var logits = context.model(batch, cache: cache)

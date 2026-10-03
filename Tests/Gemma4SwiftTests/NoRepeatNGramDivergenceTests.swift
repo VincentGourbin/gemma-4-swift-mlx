@@ -24,7 +24,7 @@ struct NoRepeatNGramDivergenceTests {
             var iterator = try TokenIterator(
                 input: LMInput(tokens: MLXArray(ids)), model: context.model, cache: nil,
                 processor: NoRepeatNGramLogitProcessor(ngramSize: 5, forceHostHistory: true),
-                sampler: ArgMaxSampler(), prefillStepSize: 512, maxTokens: 256)
+                sampler: ArgMaxSampler(), prefill: .init(stepSize: 512), maxTokens: 256)
             var out: [Int32] = []
             while out.count < 256, let t = iterator.next() { out.append(Int32(t)) }
             return (Array(ids), out)

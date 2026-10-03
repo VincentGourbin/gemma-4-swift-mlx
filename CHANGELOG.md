@@ -58,6 +58,19 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées
   avec les profils de la 1.8.0 sont donc des pertes après un pas.
 
+### Modifié
+
+- Dépendances : `mlx-swift` 0.32 (`.upToNextMinor(from: "0.32.3")`, MLX 0.32.2 embarqué) et
+  `mlx-swift-lm` 3.32 (`.upToNextMinor(from: "3.32.3")`). Rupture pour un consommateur qui
+  appelle l'API amont : `newCache(parameters:)` lève (`try`), `GenerateParameters.prefillStepSize`
+  devient `prefill.stepSize`.
+- Les trois modèles implémentent la nouvelle exigence `prepare(_:cache:state:prefill:)` ; sans elle,
+  le `prepare` par défaut de `LLMModel` aurait pris la place du nôtre et sauté images et audio sans
+  erreur. Le prefill par tranches suit désormais `PrefillParameters` : découpage `balanced` par
+  défaut (tranches égales au lieu de pas fixes, arrondis légèrement différents), `.remainder` pour
+  l'ancien découpage, rappel `progress` par tranche, annulation entre tranches.
+  `prepare(_:cache:windowSize:)` reste disponible.
+
 ## [1.8.0] - 2026-09-30
 
 ### Sécurité

@@ -872,7 +872,7 @@ struct Describe: AsyncParsableCommand {
                 topP: 0.95
             )
 
-            let cache = context.model.newCache(parameters: params)
+            let cache = try context.model.newCache(parameters: params)
 
             // Prefill
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
@@ -1124,7 +1124,7 @@ struct Describe: AsyncParsableCommand {
                 temperature: self.temperature,
                 topP: 0.95
             )
-            let cache = context.model.newCache(parameters: params)
+            let cache = try context.model.newCache(parameters: params)
 
             let prefillOutput = context.model(capturedInputIds.reshaped(1, -1), cache: cache)
             var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)

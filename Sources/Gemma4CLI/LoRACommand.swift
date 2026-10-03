@@ -578,7 +578,7 @@ extension LoRA {
                 let inputIds = MLXArray(tokenIds.map { Int32($0) })
 
                 // Prefill
-                let cache = model.newCache(parameters: nil)
+                let cache = try model.newCache(parameters: nil)
                 let prefillOutput = model(inputIds.reshaped(1, -1), cache: cache)
                 var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
 
@@ -725,7 +725,7 @@ extension LoRA {
                     }
 
                     let inputIds = MLXArray(tokenIds.map { Int32($0) })
-                    let cache = model.newCache(parameters: nil)
+                    let cache = try model.newCache(parameters: nil)
                     let prefillOutput = model(inputIds.reshaped(1, -1), cache: cache)
                     var nextToken = argMax(prefillOutput[0..., prefillOutput.dim(1) - 1, 0...], axis: -1).item(Int32.self)
 

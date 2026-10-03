@@ -65,7 +65,7 @@ public struct Gemma4ReferenceProfile: Sendable, Identifiable, Equatable {
 
     /// Applique les reglages par appel a des parametres de generation.
     public func apply(to parameters: inout GenerateParameters) {
-        parameters.prefillStepSize = prefillStepSize
+        parameters.prefill.stepSize = prefillStepSize
         parameters.kvBits = kvBits
         if kvBits != nil { parameters.kvGroupSize = 64 }
     }

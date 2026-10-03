@@ -89,14 +89,14 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
 `ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
 
-**Next bump (mlx-swift 0.32, mlx-swift-lm > 3.31.4) has a silent trap.** The protocol
-requirement becomes `prepare(_:cache:state:prefill:)` and `LLMModel` ships a default for it,
-so our three `prepare(_:cache:windowSize:)` (text, multimodal, unified) still compile but are
-**no longer called** by `TokenIterator`: images and audio would be skipped without any error.
-Each model needs a shim implementing the new requirement and forwarding
-`prefill.stepSize` as `windowSize`. The other breaks: `newCache(parameters:)` now `throws`,
-and `ChunkedPrefillParityTests` calls the old signature. The whole migration was validated in a
-throwaway worktree on 2026-09-29 (313/313 tests, see action-plans#602).
+**Since mlx-swift-lm 3.32 the `prepare` requirement is `prepare(_:cache:state:prefill:)`**, and
+`LLMModel` ships a default for it. A model that only implements the old
+`prepare(_:cache:windowSize:)` still compiles but is **no longer called** by `TokenIterator`:
+images and audio would be skipped without any error. Our three models (text, multimodal,
+unified) implement the new requirement directly; text and multimodal chunk through
+`Gemma4ChunkedPrefill`, which drives `PrefillParameters.forEachChunk` (cancellation, progress,
+`balanced` chunking by default, `unchunked` mapped to one chunk). Keep that in mind for any new
+`LanguageModel` wrapper. `newCache(parameters:)` also `throws` since 3.32.
 
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line

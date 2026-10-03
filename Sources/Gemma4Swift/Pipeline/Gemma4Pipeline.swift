@@ -569,7 +569,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 )
                             },
                             sampler: params.sampler(),
-                            prefillStepSize: params.prefillStepSize,
+                            prefill: params.prefill,
                             maxTokens: maxTokensCapture
                         )
                         await Self.streamText(
@@ -731,7 +731,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                     includeThinkingInWindow: ngramIncludesThinkingCapture
                                 ),
                                 sampler: params.sampler(),
-                                prefillStepSize: params.prefillStepSize,
+                                prefill: params.prefill,
                                 maxTokens: maxTokensCapture
                             )
                         } else {

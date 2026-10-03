@@ -56,7 +56,7 @@ struct ReferenceProfileTests {
         let profile = try #require(Gemma4ReferenceProfile.named("a4b/4bit-lean"))
         var params = GenerateParameters(maxTokens: 10)
         profile.apply(to: &params)
-        #expect(params.prefillStepSize == 512)
+        #expect(params.prefill.stepSize == 512)
         #expect(params.kvBits == 8)
     }
 
