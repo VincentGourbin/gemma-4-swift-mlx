@@ -54,6 +54,14 @@ GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-
   Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
 ```
 
+The integration tests are model-sensitive (thinking length, rewording under n-gram
+blocking): before a dependency bump or release, run the full suite with **both** E2B and
+E4B 4-bit. Two suites need their own variables and are skipped otherwise:
+`LoRAFuseIntegrationTests` (`GEMMA4_LORA_BASE_PATH` = E2B bf16, `GEMMA4_LORA_ADAPTER_PATH`,
+`GEMMA4_LORA_FUSE_OUTPUT`, a scratch directory it deletes) and
+`DiffusionQuantizationMemoryDiagnosticTests` (`GEMMA4_DIFFUSION_MODEL_PATH`, the bf16
+26B-A4B checkpoint, ~50 GB active).
+
 ## Dependency pinning
 
 `mlx-swift` and `mlx-swift-lm` are bounded with `.upToNextMinor` — both have broken
