@@ -368,7 +368,7 @@ public actor Gemma4ChatEngine: Gemma4ChatBackend {
         let store: ConversationStore? = reusesConversation ? conversation : nil
         let (events, continuation) = AsyncThrowingStream<Gemma4ChatEvent, Error>.makeStream()
         let task = Task {
-            // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+            // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
             do { try Gemma4ComputeGate.shared.beginInference() } catch {
                 continuation.finish(throwing: error)
                 return

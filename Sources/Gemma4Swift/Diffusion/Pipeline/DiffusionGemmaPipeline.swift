@@ -48,7 +48,7 @@ public enum DiffusionStopReason: Sendable, Equatable {
     /// deja commits (le canvas en cours est abandonne).
     case cancelled
     /// Refus de `Gemma4ComputeGate` : un entrainement tourne dans le processus
-    /// (deadlock mlx-swift gradient x forward). Aucun pas execute.
+    /// (entrainement et inference sont serialises). Aucun pas execute.
     case trainingInProgress
     /// Entree incoherente (ex. nombre de jetons image different de
     /// `visionSoftTokensPerImage` x nombre d'images). Aucun pas execute.
@@ -142,7 +142,7 @@ public actor DiffusionGemmaPipeline {
         onStep: ((_ canvasIdx: Int, _ step: Int, _ argmaxCanvas: MLXArray) -> Void)? = nil
     ) -> DiffusionGenerationResult {
         let promptLen = promptIds.dim(1)
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift, D-07).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate, D-07).
         do { try Gemma4ComputeGate.shared.beginInference() } catch {
             let empty = promptIds[0..., promptLen...]
             eval(empty)

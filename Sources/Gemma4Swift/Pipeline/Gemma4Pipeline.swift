@@ -384,7 +384,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         )
         currentSession = session
 
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         let beacon = RuntimeBeacon.begin(task: "generate", model: beaconModel)
@@ -461,7 +461,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -528,7 +528,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -672,7 +672,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -790,7 +790,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let session = currentSession else {
             throw Gemma4PipelineError.modelNotLoaded
         }
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         let beacon = RuntimeBeacon.begin(task: "generate", model: beaconModel)
@@ -813,7 +813,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }

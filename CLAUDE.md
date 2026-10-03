@@ -22,36 +22,29 @@ Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/WeightSanitizerTests
 
 ### Why the test wrapper
 
-A bare `xcodebuild ... test` **hangs forever** (0% CPU after ~250 tests). It is a
-lock-ordering deadlock in mlx-swift, not a slow test: `CompiledFunction.call`
-takes the per-function `NSLock` then the global `evalLock`
-(`Transforms+Compile.swift:39` and `:89`), while `vjp`/`jvp` — every
-`value_and_grad` — take the global `evalLock` first and then re-enter compiled
-functions during tracing (`Transforms.swift:31`, `:68`). One thread in a
-gradient (`DrafterTrainingTests`, `LoRATests`) plus one thread in a forward
-going through `geluApproximate` (a `compile`d function) is enough. `evalLock` is
-recursive, so single-threaded use never deadlocks — it takes two threads.
+Tests share process-global MLX state — `MLXRandom.seed`, `Memory` limits, the
+`Gemma4ComputeGate` — so swift-testing's default parallelism makes them interfere:
+a bare `xcodebuild ... test` fails ~70 expectations (`GradientCheckpointingTests`,
+`LoRATrainingLoopTests` reseeded by a neighbour, `DiffusionPipelineTests` hitting
+`trainingAlreadyRunning`). `Scripts/run-tests.sh` sets
+`SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1` (via the `TEST_RUNNER_` prefix, the
+only env vars xcodebuild forwards to the test process) and adds a watchdog.
 
-**This is not a test-only hazard.** Both locks are process-global, and the
-library exposes both sides: `Gemma4LoRATrain.train` is a nonisolated public
-static (runnable from any task) while `Gemma4Pipeline` is `@MainActor`. An app
-that fine-tunes on a background task while streaming inference can hit the same
-ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
-inference — serialize the two.
+Before mlx-swift 0.32 the bare run **hung forever**: a lock-ordering deadlock between
+`CompiledFunction.call` (per-function lock, then `evalLock`) and `vjp`/`jvp` (`evalLock`,
+then compiled functions re-entered during tracing). mlx-swift 0.32 fixes it (#461,
+`evalLock` taken outermost); verified 2026-10-03, three full parallel runs finish in
+3-7 s without a hang.
 
-`Gemma4ComputeGate.shared` enforces this for the package's own entry points: the
+`Gemma4ComputeGate.shared` was introduced for that deadlock and is kept: the
 three gradient loops (`trainLoRA`, `trainMultimodalLoRA`,
 `Gemma4DrafterTraining.trainDrafter`) take it exclusively, and every inference entry
 point of `Gemma4Pipeline` / `Gemma4MTPPipeline` fails fast with `trainingInProgress`
 while a training runs (and training fails with `inferenceInProgress` while an
-inference runs). It is non-blocking by design and cannot see a consumer's direct MLX
-calls (forward on a `ModelContainer`, custom gradients): those must serialize
-themselves. Any new gradient loop or inference entry point must take the gate.
-
-`Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
-(via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
-process). The whole suite then passes in ~1.2s. Drop the wrapper once the
-deadlock is fixed upstream.
+inference runs). Running both at once on one GPU still contends for memory and the
+global random state. It is non-blocking by design and cannot see a consumer's direct
+MLX calls (forward on a `ModelContainer`, custom gradients). Any new gradient loop or
+inference entry point must take the gate.
 
 Integration tests that need a local model are gated on an env var, forwarded by
 the wrapper:
