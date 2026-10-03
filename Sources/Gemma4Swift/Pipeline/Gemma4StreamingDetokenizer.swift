@@ -11,6 +11,7 @@ import MLXLMCommon
 /// graphemes : un scalaire qui fusionne avec le grapheme precedent (2e indicateur
 /// regional d'un drapeau 🇫🇷, sequence ZWJ 👩‍👩‍👧, accent combinant) ne fait pas
 /// grandir le compte et est perdu. Ici, la difference porte sur les scalaires.
+/// L'amont fait de meme depuis mlx-swift-lm 3.32 (#613).
 public struct Gemma4StreamingDetokenizer {
     private let tokenizer: any Tokenizer
     private var segmentTokens: [Int] = []

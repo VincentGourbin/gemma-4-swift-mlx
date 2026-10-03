@@ -191,7 +191,7 @@ public enum Gemma4DrafterTraining {
         progress: (Int, Float) -> Void = { _, _ in }
     ) throws {
         // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
-        // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+        // process (Gemma4ComputeGate). Refuse si une inference du paquet tourne.
         // A-12 : entrees validees ici (erreurs levees) plutot que par precondition/fatalError
         // dans drafterLoss, qui tourne dans valueAndGrad.
         guard config.seqLen >= 3 else {

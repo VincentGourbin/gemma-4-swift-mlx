@@ -384,7 +384,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         )
         currentSession = session
 
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         let beacon = RuntimeBeacon.begin(task: "generate", model: beaconModel)
@@ -461,7 +461,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -528,7 +528,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -569,7 +569,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                 )
                             },
                             sampler: params.sampler(),
-                            prefillStepSize: params.prefillStepSize,
+                            prefill: params.prefill,
                             maxTokens: maxTokensCapture
                         )
                         await Self.streamText(
@@ -672,7 +672,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }
@@ -731,7 +731,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
                                     includeThinkingInWindow: ngramIncludesThinkingCapture
                                 ),
                                 sampler: params.sampler(),
-                                prefillStepSize: params.prefillStepSize,
+                                prefill: params.prefill,
                                 maxTokens: maxTokensCapture
                             )
                         } else {
@@ -760,11 +760,9 @@ public final class Gemma4Pipeline: @unchecked Sendable {
 
     /// Genere a partir de `iterator` et detokenise nous-memes : jetons bruts de
     /// mlx-swift-lm (`generateTokenTask`), puis `Gemma4StreamingDetokenizer`.
-    /// Le chemin texte de l'amont passe par `NaiveStreamingDetokenizer`, qui perd les
-    /// scalaires fusionnant avec le grapheme precedent (drapeaux, sequences ZWJ,
-    /// accents combinants). Les chemins `ChatSession` (chat, chatStream par defaut,
-    /// continueChat) n'exposent pas les jetons et gardent ce defaut jusqu'a leur
-    /// remplacement (K-19) ou la correction amont.
+    /// Le `NaiveStreamingDetokenizer` amont perdait les scalaires fusionnant avec le
+    /// grapheme precedent (drapeaux, sequences ZWJ, accents combinants) jusqu'a
+    /// mlx-swift-lm 3.32 (#613) ; les chemins `ChatSession` en beneficient depuis.
     private nonisolated static func streamText(
         iterator: consuming TokenIterator,
         promptTokenCount: Int,
@@ -792,7 +790,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         guard let session = currentSession else {
             throw Gemma4PipelineError.modelNotLoaded
         }
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         let beacon = RuntimeBeacon.begin(task: "generate", model: beaconModel)
@@ -815,7 +813,7 @@ public final class Gemma4Pipeline: @unchecked Sendable {
         let beaconModel = beaconModel
         return AsyncThrowingStream { continuation in
             let task = Task { [weak self] in
-                // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+                // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
                 do { try Gemma4ComputeGate.shared.beginInference() } catch {
                     continuation.finish(throwing: error)
                     await MainActor.run { self?.state = .ready }

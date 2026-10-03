@@ -258,7 +258,7 @@ public func trainLoRA(
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
-    // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    // process (Gemma4ComputeGate). Refuse si une inference du paquet tourne.
     // Reprise d'un run deja termine : rien a faire (l'iterateur d'entrainement ne finit jamais).
     guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()
@@ -545,7 +545,7 @@ public func trainMultimodalLoRA(
     progress: (LoRATrain.Progress) -> LoRATrain.ProgressDisposition
 ) throws {
     // K-9 : entrainement exclusif — un gradient et un forward concurrents figent le
-    // process (deadlock mlx-swift). Refuse si une inference du paquet tourne.
+    // process (Gemma4ComputeGate). Refuse si une inference du paquet tourne.
     // Reprise d'un run deja termine : rien a faire (l'iterateur d'entrainement ne finit jamais).
     guard startIteration < iterations else { return }
     try Gemma4ComputeGate.shared.beginTraining()

@@ -49,14 +49,33 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Corrigé
 
-- RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rend des lignes fausses au-delà de
-  la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]`. `RoPEWrapper` replie le lot dans l'axe des
-  têtes (exact) ; touchait tout décodage par lot. Défaut connu de MLX (ml-explore/mlx#3494), corrigé
-  dans MLX 0.32 (mlx#3498) ; mlx-swift 0.31.6 embarque encore mlx-core 0.31.1.
+- RoPE en lot : `MLXFast.RoPE` (standard et à fréquences explicites) rendait des lignes fausses au-delà
+  de la première sur GPU pour une entrée contiguë `[B > 1, H, 1, D]` ; touchait tout décodage par lot.
+  Défaut connu de MLX (ml-explore/mlx#3494), corrigé par mlx#3498 dans MLX 0.32, qu'embarque désormais
+  mlx-swift 0.32 : le repli du lot d'abord ajouté à `RoPEWrapper` est retiré (`RoPEBatchTests` vérifie
+  le noyau brut).
+- Interblocage `CompiledFunction` / `evalLock` de mlx-swift (gradient sur un thread, forward sur un
+  autre) : corrigé en amont (mlx-swift 0.32, #461). `Gemma4ComputeGate` est conservée ; ses messages
+  ne parlent plus d'interblocage.
+- Détokenisation en flux des chemins `ChatSession` : le `NaiveStreamingDetokenizer` amont ne perd
+  plus les drapeaux, séquences ZWJ et accents combinants (mlx-swift-lm 3.32, #613).
 - LoRA (texte et multimodal) : la validation initiale est prise **avant** le premier pas, comme
   mlx-lm, et donne la perte du modèle de départ. Elle était prise après la première mise à jour et
   dépendait déjà du lr (31B 4 bits : 2,08 à 1e-5, 1,55 à 1e-4) ; les pertes « au pas 1 » publiées
   avec les profils de la 1.8.0 sont donc des pertes après un pas.
+
+### Modifié
+
+- Dépendances : `mlx-swift` 0.32 (`.upToNextMinor(from: "0.32.3")`, MLX 0.32.2 embarqué) et
+  `mlx-swift-lm` 3.32 (`.upToNextMinor(from: "3.32.3")`). Rupture pour un consommateur qui
+  appelle l'API amont : `newCache(parameters:)` lève (`try`), `GenerateParameters.prefillStepSize`
+  devient `prefill.stepSize`.
+- Les trois modèles implémentent la nouvelle exigence `prepare(_:cache:state:prefill:)` ; sans elle,
+  le `prepare` par défaut de `LLMModel` aurait pris la place du nôtre et sauté images et audio sans
+  erreur. Le prefill par tranches suit désormais `PrefillParameters` : découpage `balanced` par
+  défaut (tranches égales au lieu de pas fixes, arrondis légèrement différents), `.remainder` pour
+  l'ancien découpage, rappel `progress` par tranche, annulation entre tranches.
+  `prepare(_:cache:windowSize:)` reste disponible.
 
 ## [1.8.0] - 2026-09-30
 

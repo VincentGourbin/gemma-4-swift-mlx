@@ -271,7 +271,11 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
     /// les embeddings fusionnes (tours + masked_scatter) sont calcules une fois sur
     /// tout le prompt, puis le modele de langage avance par tranches d'embeddings ;
     /// le dernier jeton (texte : fin du gabarit) est rendu au `TokenIterator`.
-    public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+    /// Exigence du protocole depuis mlx-swift-lm > 3.31.4 (mlx-swift 0.32) : sans elle, le
+    /// `prepare` par defaut de `LLMModel` prendrait la place du notre (et sauterait les medias).
+    public func prepare(
+        _ input: LMInput, cache: [KVCache], state: LMOutput.State?, prefill: PrefillParameters
+    ) throws -> PrepareResult {
         // Sans tour audio (chargement `audio: false`), l'audio en attente serait ignore
         // en silence par `prepareMultimodalEmbeds` : refuser plutot que repondre sans.
         if pendingAudioFeatures != nil && audioTower == nil {
@@ -287,11 +291,10 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
         }
 
         let cacheArray: [KVCache?] = cache.map { $0 as KVCache? }
-        let step = windowSize ?? 512
         if hasPendingMedia { try restoreEncodersIfNeeded() }
         let (inputsEmbeds, perLayerInputs) = prepareMultimodalEmbeds(promptTokens[.newAxis])
         if let inputsEmbeds {
-            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+            try Gemma4ChunkedPrefill.run(count: promptCount, prefill: prefill, cache: cache) { range in
                 _ = languageModel(
                     inputsEmbeds: inputsEmbeds[0..., range],
                     cache: cacheArray,
@@ -304,11 +307,16 @@ public class Gemma4MultimodalLLMModel: Module, LLMModel, LoRAModel {
                 releaseEncoders()
             }
         } else {
-            Gemma4ChunkedPrefill.run(count: promptCount, step: step, cache: cache) { range in
+            try Gemma4ChunkedPrefill.run(count: promptCount, prefill: prefill, cache: cache) { range in
                 _ = languageModel(inputs: promptTokens[range][.newAxis], cache: cacheArray)
             }
         }
         return .tokens(input.text[(promptCount - 1)...])
+    }
+
+    /// Ancienne signature (pas seul), gardee pour les appelants directs.
+    public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
+        try prepare(input, cache: cache, state: nil, prefill: .init(stepSize: windowSize))
     }
 
     // MARK: - Residence par etape (K-43)

@@ -39,10 +39,10 @@ struct StreamingDetokenizerTests {
     }
 
     /// Bug amont (mlx-swift-lm, `NaiveStreamingDetokenizer.next()` : difference par
-    /// `String.count`, donc par graphemes). Quand il sera corrige, ce test le signalera
-    /// (« known issue not recorded ») : `chatStream` en beneficiera alors aussi.
-    @Test("NaiveStreamingDetokenizer amont perd les scalaires qui fusionnent en grapheme")
-    func testUpstreamDetokenizerKnownIssue() async throws {
+    /// `String.count`, donc par graphemes), corrige en 3.32 (mlx-swift-lm#613, prefixe
+    /// commun par scalaires). Garde-fou de non-regression amont.
+    @Test("NaiveStreamingDetokenizer amont garde les scalaires qui fusionnent en grapheme")
+    func testUpstreamDetokenizerKeepsScalars() async throws {
         let tokenizer = try await tokenizer()
         let ids = tokenizer.encode(text: Self.text, addSpecialTokens: false)
         var upstream = NaiveStreamingDetokenizer(tokenizer: tokenizer)
@@ -51,9 +51,7 @@ struct StreamingDetokenizerTests {
             upstream.append(token: id)
             if let piece = upstream.next() { streamed += piece }
         }
-        withKnownIssue("mlx-swift-lm NaiveStreamingDetokenizer : difference par graphemes") {
-            #expect(streamed == tokenizer.decode(tokenIds: ids))
-        }
+        #expect(streamed == tokenizer.decode(tokenIds: ids))
     }
 
     /// Bout en bout : les chemins du pipeline qui generent via TokenIterator

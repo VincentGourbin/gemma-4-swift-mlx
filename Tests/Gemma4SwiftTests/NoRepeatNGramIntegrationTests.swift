@@ -104,10 +104,18 @@ struct NoRepeatNGramIntegrationTests {
             temperature: 0.0, maxTokens: 200, noRepeatNGramSize: 5))
 
         #expect(!blocked.isEmpty)
-        // Le baseline greedy repete la phrase ; avec n=5 aucun 5-gramme ne peut
-        // reapparaitre, donc le plus long n-gramme repete est <= 4.
-        #expect(longestRepeatedWordNGram(baseline) >= 5)
-        #expect(longestRepeatedWordNGram(blocked) <= 4)
+        // Le baseline greedy repete la phrase. Avec n=5, aucun 5-gramme de *jetons* ne
+        // reapparait : la ligne exacte (une dizaine de jetons, meme contexte apres le
+        // saut de ligne) ne peut donc revenir. Les 5-grammes de *mots*, eux, peuvent se
+        // repeter sous d'autres jetons ("le" en debut de ligne ou apres un espace,
+        // "Le") : E4B le fait, d'ou une mesure sur la phrase entiere.
+        let sentence = "le chat dort sur le tapis rouge."
+        func lines(_ text: String) -> Int {
+            text.split(whereSeparator: \.isNewline)
+                .filter { $0.trimmingCharacters(in: .whitespaces) == sentence }.count
+        }
+        #expect(lines(baseline) >= 2)
+        #expect(lines(blocked) <= 1)
     }
 
     @Test("chatStreamMultimodal greedy : n=5 respecte le contrat, sortie non vide",
@@ -173,7 +181,10 @@ struct NoRepeatNGramIntegrationTests {
         // canal de pensee de la fenetre restaure la citation.
         let quote = "From 00:08.000 to 00:14.000, the camera pans left."
         let system = "Tu obeis litteralement, sans commentaire ni reformulation."
-        let prompt = "Recopie exactement la ligne suivante, telle quelle : \(quote)"
+        // La consigne de verification fait raisonner E2B, qui sinon repond directement
+        // (pas de canal de pensee, scenario absent) ; E4B raisonne dans les deux cas.
+        let prompt = "Recopie exactement la ligne suivante, telle quelle : \(quote)\n"
+            + "Avant de repondre, verifie dans ta reflexion chaque caractere de la ligne."
         let thinking: [String: any Sendable] = ["enable_thinking": true]
 
         func answer(includesThinking: Bool) async throws -> String {

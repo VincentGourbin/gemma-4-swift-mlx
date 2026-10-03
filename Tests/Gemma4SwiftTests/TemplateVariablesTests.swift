@@ -168,10 +168,10 @@ struct TemplateVariablesIntegrationTests {
         let pixels = try Gemma4ImageProcessor.processImage(try syntheticImage())
         let thinking = try await collect(pipeline.chatStreamMultimodal(
             prompt: "Combien de formes vois-tu ? Reponds brievement.",
-            // Le raisonnement est verbeux : ~350 tokens ici. Sous ~300, la
-            // generation est coupee avant <channel|> et le test mesurerait la
-            // troncature, pas la survie des delimiteurs.
-            pixelValues: pixels, temperature: 0.0, maxTokens: 400,
+            // Le raisonnement est verbeux : ~350 tokens sur E2B, plus de 400 sur
+            // E4B. Trop court, la generation est coupee avant <channel|> et le
+            // test mesurerait la troncature, pas la survie des delimiteurs.
+            pixelValues: pixels, temperature: 0.0, maxTokens: 1000,
             templateVariables: ["enable_thinking": true]))
 
         // C'est la garantie demandee : les delimiteurs arrivent tels quels dans

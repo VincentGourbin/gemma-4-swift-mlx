@@ -324,6 +324,14 @@ public class Gemma4UnifiedMultimodalLLMModel: Module, LLMModel, LoRAModel {
         )
     }
 
+    /// Exigence du protocole depuis mlx-swift-lm > 3.31.4 (mlx-swift 0.32) : sans elle, le
+    /// `prepare` par defaut de `LLMModel` prendrait la place du notre (et sauterait les medias).
+    public func prepare(
+        _ input: LMInput, cache: [KVCache], state: LMOutput.State?, prefill: PrefillParameters
+    ) throws -> PrepareResult {
+        try prepare(input, cache: cache, windowSize: prefill.stepSize)
+    }
+
     public func prepare(_ input: LMInput, cache: [KVCache], windowSize: Int? = nil) throws -> PrepareResult {
         let promptTokens = input.text.tokens
         guard promptTokens.shape[0] > 0 else {

@@ -51,7 +51,7 @@ struct ChunkedPrefillParityTests {
         _ model: any LanguageModel, tokens: MLXArray, cache: [KVCache], step: Int
     ) throws -> (last: MLXArray, next: MLXArray, remaining: Int) {
         guard case .tokens(let rest) = try model.prepare(
-            LMInput(tokens: tokens), cache: cache, windowSize: step)
+            LMInput(tokens: tokens), cache: cache, state: nil, prefill: .init(stepSize: step))
         else { throw CancellationError() }
         let last = model(rest.tokens[.newAxis], cache: cache)[0..., -1, 0...]
         let next = model(MLXArray([Int32(7)])[.newAxis], cache: cache)[0..., -1, 0...]
@@ -118,10 +118,10 @@ struct ChunkedPrefillParityTests {
                 systemPrompt: "Tu es un assistant utile.", tokenizer: context.tokenizer)
             let tokens = MLXArray(ids.map { Int32($0) })
 
-            let single = context.model(tokens[.newAxis], cache: context.model.newCache(parameters: nil))[0..., -1, 0...]
-            let cache = context.model.newCache(parameters: nil)
+            let single = context.model(tokens[.newAxis], cache: try context.model.newCache(parameters: nil))[0..., -1, 0...]
+            let cache = try context.model.newCache(parameters: nil)
             guard case .tokens(let rest) = try context.model.prepare(
-                LMInput(tokens: tokens), cache: cache, windowSize: 512) else { return "prepare: logits" }
+                LMInput(tokens: tokens), cache: cache, state: nil, prefill: .init(stepSize: 512)) else { return "prepare: logits" }
             let chunked = context.model(rest.tokens[.newAxis], cache: cache)[0..., -1, 0...]
             let a = single.asType(.float32), b = chunked.asType(.float32)
             let rel = (sqrt(sum(square(a - b))) / sqrt(sum(square(a)))).item(Float.self)

@@ -602,8 +602,9 @@ identiques), selon la composition du lot.
 « La mer / La mer ») : `MLXFast.RoPE` sur une entrée contiguë `[B > 1, H, 1, D]` calcule faux les lignes au-delà
 de la première (écart 5,5-6 entre deux lignes identiques ; `RoPEBatchTests`). Contourné dans `RoPEWrapper`.
 Reproduit en MLX Python 0.31.2 sur GPU (correct sur CPU) : défaut connu, [ml-explore/mlx#3494](https://github.com/ml-explore/mlx/issues/3494),
-corrigé par mlx#3498 (inclus depuis MLX 0.32.0, plus reproduit en MLX 0.32.3). mlx-swift 0.31.6 embarque mlx-core 0.31.1 : le contournement
-reste nécessaire jusqu'à la montée vers mlx-swift 0.32 (plan action-plans#602).
+corrigé par mlx#3498 (inclus depuis MLX 0.32.0, plus reproduit en MLX 0.32.3). mlx-swift 0.31.6 embarquait mlx-core 0.31.1 ;
+depuis la montée vers mlx-swift 0.32.3 (MLX 0.32.2), l'écart brut est nul et le contournement est retiré. Le lot
+redonne exactement les mêmes jetons sans repli (B=2 identique au seul, B=6 diverge au même 12e jeton).
 
 ## DiffusionGemma — leviers K-D13 et variante de pas K-D15 — 2026-10-02
 
@@ -634,6 +635,36 @@ les temps de K-D13 (b) et (d) sont perturbés, les mémoires, scores et nombres 
 ScreenSpot : `DiffusionGemmaPipeline.configureStepping(confidenceThreshold: 0.02)`, ou
 `--confidence-threshold 0.02` sur `bench-diffusion` / `eval-screenspot`. Non mesurée sur texte libre (d1) ni
 sur BFCL.
+
+## Montée mlx-swift 0.32.3 / mlx-swift-lm 3.32.3 — A/B/B/A — 2026-10-03
+
+E2B 4 bits, profil `e2b/4bit-fast`, M3 Max, cooldown 20 s, A = `main` 2adfbd60 (mlx-swift 0.31.6,
+mlx-swift-lm 3.31.4), B = branche `deps/mlx-swift-0.32` (MLX 0.32.2 embarqué). Image : sonde synthétique
+512×512 (formes, texte « 42 »), la même des deux côtés. Données : `benchmarks/mlx032-ab-20261003.jsonl`
+(les champs `dep_*` des lignes A ont été corrigés à la main : le bench les lit dans le `Package.resolved`
+du répertoire courant).
+
+| point | TTFT ms A | TTFT ms B | décodage tok/s A | B | empreinte pic Mo A | B | sortie |
+|---|---|---|---|---|---|---|---|
+| texte 128 | 150 / 78 | 102 / 72 | 105,2 / 132,5 | 128,5 / 128,5 | 2 903 | 3 720-3 732 | **différente** |
+| texte 1 024 | 372 / 203 | 533 / 225 | 117,7 / 124,6 | 125,0 / 123,6 | 3 388 | 3 720-3 732 | identique |
+| texte 4 096 | 830 / 693 | 703 / 682 | 115,9 / 122,5 | 119,8 / 121,1 | 3 733-3 791 | 3 916-3 943 | identique |
+| image 298 | 237 / 232 | 239 / 246 | 127,0 / 127,5 | 125,6 / 126,0 | 4 705-4 722 | 4 840-4 855 | identique |
+
+La première passe A (machine froide après le build) est bruitée ; à comparer, la seconde de chaque côté.
+
+- **Décodage** : à ±3 % (128 : 132,5 contre 128,5 ; 1 024 et 4 096 dans le bruit).
+- **TTFT image** : plus de régression (232-246 ms des deux côtés). L'essai du 2026-09-29 (mlx-swift-lm
+  `main` c043fb3b) mesurait +60 % ; la release 3.32.3 ne le reproduit pas.
+- **Mémoire** : MLX active identique (2 491-2 518 Mo texte, 3 404 image), pic MLX +70 à +100 Mo. Le cache
+  de l'allocateur MLX reste quasi vide en 0.32 (5-22 Mo contre 110-985 Mo) mais l'empreinte du processus
+  est plate à ~3,72 Go dès le plus petit prompt : surcoût fixe de **+820 Mo à 128 jetons**, +340 à 1 024,
+  +150 à 4 096, +130 sur l'image. Cause non isolée (MLX 0.32 a notamment découpé le `MTLResidencySet`,
+  ml-explore/mlx#4211) ; à surveiller pour les cibles iOS.
+- **Sorties** : identiques à 1 024, 4 096 et sur l'image ; à 128 jetons, la sortie gloutonne diffère
+  (déjà observé le 2026-09-29), arrondis du noyau.
+- Image décrite correctement (`describe`, cercle rouge, carré jaune, fond bleu, « 42 ») : le nouveau
+  `prepare` est bien appelé.
 
 ## Leviers K-15 à K-18 — 2026-09-29 (E2B 4 bits, M3 Max, A/B/B/A, cooldown 60 s)
 

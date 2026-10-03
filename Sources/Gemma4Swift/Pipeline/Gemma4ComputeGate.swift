@@ -1,15 +1,13 @@
-// Garde de processus entre inference et entrainement (deadlock ABBA de mlx-swift)
+// Garde de processus entre inference et entrainement
 
 import Foundation
 
 /// Empeche un entrainement et une inference du paquet de tourner en meme temps.
 ///
-/// Pourquoi : mlx-swift a un deadlock par ordre de verrous. `CompiledFunction.call`
-/// prend le verrou de la fonction compilee puis le `evalLock` global, alors que
-/// `vjp` / `jvp` (tout `valueAndGrad`) prennent le `evalLock` puis rappellent des
-/// fonctions compilees (`geluApproximate` dans chaque MLP Gemma 4). Un thread dans
-/// un gradient et un autre dans un forward suffisent a figer le process pour
-/// toujours, sans erreur (voir CLAUDE.md).
+/// Pourquoi : jusqu'a mlx-swift 0.31, un gradient et un forward sur deux threads
+/// figeaient le process (deadlock ABBA entre `CompiledFunction.call` et `vjp`/`jvp`,
+/// corrige en mlx-swift 0.32, #461). La garde reste : les deux se disputeraient la
+/// memoire du GPU et l'etat global de MLX (generateur aleatoire, limites `Memory`).
 ///
 /// Regles :
 /// - les inferences peuvent tourner entre elles en parallele (pas de gradient) ;
@@ -34,9 +32,9 @@ public final class Gemma4ComputeGate: @unchecked Sendable {
         public var errorDescription: String? {
             switch self {
             case .trainingInProgress:
-                return "Un entrainement est en cours : inference refusee (deadlock mlx-swift entre gradient et forward)."
+                return "Un entrainement est en cours : inference refusee (entrainement et inference sont serialises)."
             case .inferenceInProgress(let count):
-                return "\(count) inference(s) en cours : entrainement refuse (deadlock mlx-swift entre gradient et forward)."
+                return "\(count) inference(s) en cours : entrainement refuse (entrainement et inference sont serialises)."
             case .trainingAlreadyRunning:
                 return "Un autre entrainement est deja en cours."
             }

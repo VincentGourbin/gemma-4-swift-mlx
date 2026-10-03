@@ -22,36 +22,29 @@ Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/WeightSanitizerTests
 
 ### Why the test wrapper
 
-A bare `xcodebuild ... test` **hangs forever** (0% CPU after ~250 tests). It is a
-lock-ordering deadlock in mlx-swift, not a slow test: `CompiledFunction.call`
-takes the per-function `NSLock` then the global `evalLock`
-(`Transforms+Compile.swift:39` and `:89`), while `vjp`/`jvp` — every
-`value_and_grad` — take the global `evalLock` first and then re-enter compiled
-functions during tracing (`Transforms.swift:31`, `:68`). One thread in a
-gradient (`DrafterTrainingTests`, `LoRATests`) plus one thread in a forward
-going through `geluApproximate` (a `compile`d function) is enough. `evalLock` is
-recursive, so single-threaded use never deadlocks — it takes two threads.
+Tests share process-global MLX state — `MLXRandom.seed`, `Memory` limits, the
+`Gemma4ComputeGate` — so swift-testing's default parallelism makes them interfere:
+a bare `xcodebuild ... test` fails ~70 expectations (`GradientCheckpointingTests`,
+`LoRATrainingLoopTests` reseeded by a neighbour, `DiffusionPipelineTests` hitting
+`trainingAlreadyRunning`). `Scripts/run-tests.sh` sets
+`SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1` (via the `TEST_RUNNER_` prefix, the
+only env vars xcodebuild forwards to the test process) and adds a watchdog.
 
-**This is not a test-only hazard.** Both locks are process-global, and the
-library exposes both sides: `Gemma4LoRATrain.train` is a nonisolated public
-static (runnable from any task) while `Gemma4Pipeline` is `@MainActor`. An app
-that fine-tunes on a background task while streaming inference can hit the same
-ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
-inference — serialize the two.
+Before mlx-swift 0.32 the bare run **hung forever**: a lock-ordering deadlock between
+`CompiledFunction.call` (per-function lock, then `evalLock`) and `vjp`/`jvp` (`evalLock`,
+then compiled functions re-entered during tracing). mlx-swift 0.32 fixes it (#461,
+`evalLock` taken outermost); verified 2026-10-03, three full parallel runs finish in
+3-7 s without a hang.
 
-`Gemma4ComputeGate.shared` enforces this for the package's own entry points: the
+`Gemma4ComputeGate.shared` was introduced for that deadlock and is kept: the
 three gradient loops (`trainLoRA`, `trainMultimodalLoRA`,
 `Gemma4DrafterTraining.trainDrafter`) take it exclusively, and every inference entry
 point of `Gemma4Pipeline` / `Gemma4MTPPipeline` fails fast with `trainingInProgress`
 while a training runs (and training fails with `inferenceInProgress` while an
-inference runs). It is non-blocking by design and cannot see a consumer's direct MLX
-calls (forward on a `ModelContainer`, custom gradients): those must serialize
-themselves. Any new gradient loop or inference entry point must take the gate.
-
-`Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
-(via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
-process). The whole suite then passes in ~1.2s. Drop the wrapper once the
-deadlock is fixed upstream.
+inference runs). Running both at once on one GPU still contends for memory and the
+global random state. It is non-blocking by design and cannot see a consumer's direct
+MLX calls (forward on a `ModelContainer`, custom gradients). Any new gradient loop or
+inference entry point must take the gate.
 
 Integration tests that need a local model are gated on an env var, forwarded by
 the wrapper:
@@ -60,6 +53,14 @@ the wrapper:
 GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit \
   Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
 ```
+
+The integration tests are model-sensitive (thinking length, rewording under n-gram
+blocking): before a dependency bump or release, run the full suite with **both** E2B and
+E4B 4-bit. Two suites need their own variables and are skipped otherwise:
+`LoRAFuseIntegrationTests` (`GEMMA4_LORA_BASE_PATH` = E2B bf16, `GEMMA4_LORA_ADAPTER_PATH`,
+`GEMMA4_LORA_FUSE_OUTPUT`, a scratch directory it deletes) and
+`DiffusionQuantizationMemoryDiagnosticTests` (`GEMMA4_DIFFUSION_MODEL_PATH`, the bf16
+26B-A4B checkpoint, ~50 GB active).
 
 ## Dependency pinning
 
@@ -89,14 +90,14 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
 `ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
 
-**Next bump (mlx-swift 0.32, mlx-swift-lm > 3.31.4) has a silent trap.** The protocol
-requirement becomes `prepare(_:cache:state:prefill:)` and `LLMModel` ships a default for it,
-so our three `prepare(_:cache:windowSize:)` (text, multimodal, unified) still compile but are
-**no longer called** by `TokenIterator`: images and audio would be skipped without any error.
-Each model needs a shim implementing the new requirement and forwarding
-`prefill.stepSize` as `windowSize`. The other breaks: `newCache(parameters:)` now `throws`,
-and `ChunkedPrefillParityTests` calls the old signature. The whole migration was validated in a
-throwaway worktree on 2026-09-29 (313/313 tests, see action-plans#602).
+**Since mlx-swift-lm 3.32 the `prepare` requirement is `prepare(_:cache:state:prefill:)`**, and
+`LLMModel` ships a default for it. A model that only implements the old
+`prepare(_:cache:windowSize:)` still compiles but is **no longer called** by `TokenIterator`:
+images and audio would be skipped without any error. Our three models (text, multimodal,
+unified) implement the new requirement directly; text and multimodal chunk through
+`Gemma4ChunkedPrefill`, which drives `PrefillParameters.forEachChunk` (cancellation, progress,
+`balanced` chunking by default, `unchunked` mapped to one chunk). Keep that in mind for any new
+`LanguageModel` wrapper. `newCache(parameters:)` also `throws` since 3.32.
 
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line

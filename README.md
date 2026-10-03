@@ -30,7 +30,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 
 - macOS 15+ (Sequoia) — `Package.swift` : `.macOS(.v15)`
 - Apple Silicon (M1/M2/M3/M4)
-- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.31.6 declares swift-tools-version 6.3; CI builds with
+- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.32 declares swift-tools-version 6.3; CI builds with
   Xcode 26.6, development uses Xcode 27)
 
 ## Quick Start
@@ -274,12 +274,12 @@ TTFT and memory at 128 / 1k / 4k tokens, `lean` profiles and images: [docs/Refer
 
 Train LoRA, DoRA, or full SFT adapters entirely on-device. Compatible with [mlx-lm](https://github.com/ml-explore/mlx-swift-lm) Python adapters — train in one, infer in the other.
 
-> **Do not run training concurrently with inference.** `mlx-swift` takes its
-> per-compiled-function lock and its global `evalLock` in opposite orders in
-> `CompiledFunction.call` versus `vjp`/`jvp`, so a gradient step on one thread and
-> a forward pass on another can deadlock the process (both locks are global —
-> `Gemma4LoRATrain.train` is callable from any task, `Gemma4Pipeline` is
-> `@MainActor`). Serialize the two until this is fixed upstream.
+> **Training and inference are serialized.** The package's training loops and
+> inference entry points share a process-wide gate (`Gemma4ComputeGate`): one fails
+> fast while the other runs. Before mlx-swift 0.32 running both at once could
+> deadlock the process; since 0.32 it no longer does, but they would still contend
+> for GPU memory and MLX's global state. Direct MLX calls you make yourself are not
+> covered: serialize them too.
 
 ### Supported modes
 

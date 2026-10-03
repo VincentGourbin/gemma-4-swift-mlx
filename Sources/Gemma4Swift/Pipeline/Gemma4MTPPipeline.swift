@@ -113,7 +113,7 @@ public actor Gemma4MTPPipeline {
         continuation: AsyncThrowingStream<String, Error>.Continuation
     ) async throws {
         precondition(blockSize >= 2, "blockSize doit etre >= 2 pour faire de la speculation")
-        // K-9 : aucune inference pendant un entrainement (deadlock mlx-swift).
+        // K-9 : aucune inference pendant un entrainement (Gemma4ComputeGate).
         try Gemma4ComputeGate.shared.beginInference()
         defer { Gemma4ComputeGate.shared.endInference() }
         let beacon = RuntimeBeacon.begin(task: "generate", model: "mtp")
