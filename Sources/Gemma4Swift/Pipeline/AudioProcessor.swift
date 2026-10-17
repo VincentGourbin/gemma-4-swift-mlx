@@ -152,7 +152,8 @@ public enum Gemma4AudioProcessor {
         let padSize = fl / 2 // 160
         let paddedPcm = [Float](repeating: 0, count: padSize) + pcm
 
-        let numFrames = max(1, (paddedPcm.count - fl) / hl + 1)
+        // Fenetres de fl + 1 echantillons (ref `_unfold(size=frame_length + 1)`), dont on garde fl.
+        let numFrames = max(1, (paddedPcm.count - (fl + 1)) / hl + 1)
         let numBins = fftLen / 2 + 1
 
         // Periodic Hann window (ref: torch.hann_window(periodic=True) → N au lieu de N-1)
@@ -194,8 +195,8 @@ public enum Gemma4AudioProcessor {
                 for k in 0 ..< min(magnitudes.count, melFilters[m].count) {
                     energy += magnitudes[k] * melFilters[m][k]
                 }
-                // Log mel avec floor (ref: np.log(mel_spec + mel_floor))
-                melOutput[frame * numMelFilters + m] = log(max(energy, melFloor))
+                // Log mel avec floor additif (ref: np.log(mel_spec + mel_floor))
+                melOutput[frame * numMelFilters + m] = log(energy + melFloor)
             }
         }
 
@@ -241,46 +242,33 @@ public enum Gemma4AudioProcessor {
         return magnitudes
     }
 
-    /// Cree un banc de filtres mel triangulaires (HTK scale)
+    /// Banc de filtres mel triangulaires, echelle HTK, sans normalisation.
+    ///
+    /// Port de `audio_utils.mel_filter_bank(norm=None, mel_scale="htk")` : triangles
+    /// continus sur les frequences des bins (`linspace(0, sr / 2, numBins)`). Arrondir les
+    /// bornes a des indices de bin annule les filtres plus etroits qu'un bin — avec 128
+    /// filtres sur 257 bins, la moitie des bandes basses tombait au plancher.
     static func createMelFilterBank(numFilters: Int, numBins: Int, sampleRate: Int, minFreq: Float, maxFreq: Float) -> [[Float]] {
-        func hzToMel(_ hz: Float) -> Float { 2595.0 * log10(1.0 + hz / 700.0) }
-        func melToHz(_ mel: Float) -> Float { 700.0 * (pow(10.0, mel / 2595.0) - 1.0) }
+        func hzToMel(_ hz: Double) -> Double { 2595.0 * log10(1.0 + hz / 700.0) }
+        func melToHz(_ mel: Double) -> Double { 700.0 * (pow(10.0, mel / 2595.0) - 1.0) }
 
-        let minMel = hzToMel(minFreq)
-        let maxMel = hzToMel(maxFreq)
-
-        // Points mel uniformement espaces
-        var melPoints = [Float](repeating: 0, count: numFilters + 2)
-        for i in 0 ..< numFilters + 2 {
-            melPoints[i] = minMel + Float(i) * (maxMel - minMel) / Float(numFilters + 1)
+        let minMel = hzToMel(Double(minFreq))
+        let maxMel = hzToMel(Double(maxFreq))
+        let edges = (0 ..< numFilters + 2).map {
+            melToHz(minMel + Double($0) * (maxMel - minMel) / Double(numFilters + 1))
         }
+        let nyquist = Double(sampleRate / 2)
+        let fftFreqs = (0 ..< numBins).map { Double($0) * nyquist / Double(numBins - 1) }
 
-        // Convertir en indices de bins FFT
-        let fftLen = (numBins - 1) * 2
-        let binPoints = melPoints.map { mel -> Int in
-            let hz = melToHz(mel)
-            return Int(round(hz * Float(fftLen) / Float(sampleRate)))
-        }
-
-        // Filtres triangulaires
         var filters = [[Float]](repeating: [Float](repeating: 0, count: numBins), count: numFilters)
         for m in 0 ..< numFilters {
-            let left = binPoints[m]
-            let center = binPoints[m + 1]
-            let right = binPoints[m + 2]
-
-            for k in left ..< min(center, numBins) {
-                if center > left {
-                    filters[m][k] = Float(k - left) / Float(center - left)
-                }
-            }
-            for k in center ..< min(right, numBins) {
-                if right > center {
-                    filters[m][k] = Float(right - k) / Float(right - center)
-                }
+            let (lower, center, upper) = (edges[m], edges[m + 1], edges[m + 2])
+            for (k, f) in fftFreqs.enumerated() {
+                let rising = (f - lower) / (center - lower)
+                let falling = (upper - f) / (upper - center)
+                filters[m][k] = Float(max(0, min(rising, falling)))
             }
         }
-
         return filters
     }
 }
