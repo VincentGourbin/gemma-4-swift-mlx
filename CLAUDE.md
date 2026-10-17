@@ -164,6 +164,15 @@ Quirks:
 - For kv-shared inference path with cache, queries get RoPE at `cache.offset - L` (pre-write offset), not `cache.offset` (post-write).
 - During training, `MaskedEmbedder` is bypassed via `useFullLMHead = true` because `putAlong` (scatter) has no VJP in MLX.
 
+### Embeddings (EmbeddingGemma 2)
+
+`Embedding/Gemma4Embedder.swift` wraps upstream's `MLXLMCommon.EmbeddingGemma2` (bidirectional encoder,
+Gemma 4 vision/audio towers, mean pooling → 512→768 projection → L2) with **this package's** preprocessing,
+so `MLXVLM` stays unlinked. Images use `Resampling.pillowBicubic` (Core Graphics costs ~0.005 cosine);
+video samples `t = i / fps` like transformers, not our generation path's spread. Parity is checked against
+sentence-transformers fp32 (`Fixtures/embeddinggemma2-reference.json`, `EmbedderIntegrationTests`, gated on
+`GEMMA4_EMBEDDING_MODEL_PATH`). Avoid the mlx-community 4-bit checkpoint (it quantizes `embed_tokens`).
+
 ## Key Conventions
 
 - All neural network types subclass `Module` from MLXNN with `@ModuleInfo` property wrappers for parameter tracking

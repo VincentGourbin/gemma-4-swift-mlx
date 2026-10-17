@@ -51,8 +51,19 @@ public enum Gemma4CGImageLoader {
     /// echapper un pointeur temporaire hors de l'appel qui l'a cree, ce que la
     /// doc Swift (`temporary-pointers`) classe en comportement indefini — le
     /// contexte conserve le pointeur et ecrit dedans au `draw` suivant.
-    public static func rgbTensor(from image: CGImage, width: Int, height: Int) throws -> MLXArray {
+    ///
+    /// - Parameter preservingColorSpace: rendre dans l'espace couleur de l'image (s'il est
+    ///   RGB) plutot que DeviceRGB : pas de conversion de profil, donc les octets que lit
+    ///   PIL (`Image.convert("RGB")` ignore le profil ICC). Utilise pour la parite avec
+    ///   les processeurs HF.
+    public static func rgbTensor(
+        from image: CGImage, width: Int, height: Int, preservingColorSpace: Bool = false
+    ) throws -> MLXArray {
         let bytesPerRow = 4 * width
+        var space = CGColorSpaceCreateDeviceRGB()
+        if preservingColorSpace, let own = image.colorSpace, own.model == .rgb {
+            space = own
+        }
         var pixelData = [UInt8](repeating: 0, count: height * bytesPerRow)
 
         let rgba: MLXArray = try pixelData.withUnsafeMutableBytes { raw in
@@ -61,7 +72,7 @@ public enum Gemma4CGImageLoader {
                     data: base,
                     width: width, height: height,
                     bitsPerComponent: 8, bytesPerRow: bytesPerRow,
-                    space: CGColorSpaceCreateDeviceRGB(),
+                    space: space,
                     bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
                   )
             else {
