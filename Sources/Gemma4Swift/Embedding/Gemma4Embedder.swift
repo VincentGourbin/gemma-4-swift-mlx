@@ -13,6 +13,11 @@ import MLXLMCommon
 
 /// Embeddings EmbeddingGemma 2. Charger une fois, reutiliser pour tous les appels.
 ///
+/// - Important: l'embedder ne touche pas a `Memory.cacheLimit` (reglage global du process).
+///   Sans plafond, le cache de l'allocateur MLX garde chaque buffer : 13,3 Go d'empreinte apres
+///   une serie texte + image + audio + video de 32 s, contre 3,5 Go a 512 Mo pour un surcout
+///   <= 11 % (BENCHMARKS.md, 2026-10-17). Fixer le plafond dans l'app.
+///
 /// ```swift
 /// let embedder = try await Gemma4Embedder.load(from: directory)
 /// let query = try await embedder.embed([.text("Eteins la lumiere")], task: .classification)
@@ -96,6 +101,8 @@ public actor Gemma4Embedder {
 
     public nonisolated let embeddingDimension: Int
     public nonisolated let encoders: Set<Encoder>
+    /// Longueur (jetons, `<bos>`/`<eos>` et soft tokens compris) de la derniere sequence embarquee.
+    public private(set) var lastTokenCount = 0
 
     /// Jetons speciaux et encodeurs presents, lus dans `config.json` (les sous-configurations
     /// de `EmbeddingGemma2Configuration` sont `package` en amont).
@@ -202,6 +209,7 @@ public actor Gemma4Embedder {
         defer { Gemma4ComputeGate.shared.endInference() }
 
         let (ids, softTokens) = try await sequence(for: Self.prompted(parts, task: task))
+        lastTokenCount = ids.count
         let vector = model.embed(
             inputIds: MLXArray(ids.map(Int32.init), [1, ids.count]), attentionMask: nil,
             softTokens: softTokens)

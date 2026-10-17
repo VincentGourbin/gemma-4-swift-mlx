@@ -751,3 +751,66 @@ Réponses concordantes à 195/200 : découper le calcul (préfixe puis suite) ch
 
 Pertes identiques ; porte « pic −30 %, temps ≤ +35 % » tenue, au bord pour le temps : option à activer quand la mémoire manque (Mac 32 Go, gros modèles), pas par défaut. Lignes : `benchmarks/lora-k32-{gc,base}-20260929.jsonl`.
 
+
+## EmbeddingGemma 2 — `Gemma4Embedder` (`bench-embed`) — 2026-10-17
+
+M3 Max 96 Go, macOS 27.0.1, sur secteur, machine au repos ; mlx-swift 0.32.3, mlx-swift-lm `main` 48114eed.
+Checkpoints : `google/embeddinggemma-2` (bf16), `mlx-community/embeddinggemma-2-{8bit,4bit}`. Trois configurations,
+toutes passées deux fois (A/B puis B/A, cooldown 20 s) : multimodal sans plafond de cache MLX, multimodal avec
+`Memory.cacheLimit` 512 Mo, texte seul avec 512 Mo. Par point : 2 passes de chauffe, 10 mesurées, tâche
+`classification`, 768 dims (la troncature Matryoshka ne change pas le calcul). Données :
+`benchmarks/embed-20261017.jsonl`.
+
+Médias (générés, non versionnés) : `photo.jpg` = `docs/examples/vision-image-description/input_sample.jpg`
+(1920×1280, 264 soft tokens) ; audio `say` 16 kHz mono bouclé avec `ffmpeg -stream_loop` à 2, 10 et 30 s ;
+vidéo 640×426 de 4 s (les deux images d'exemple) bouclée à 16 et 32 s.
+
+```bash
+gemma4-cli bench-embed --model-path …/embeddinggemma-2 --media-dir … --encoders vision,audio \
+  --cache-limit-mb 512 --warmup 2 --repeat 10 --output benchmarks/embed-….jsonl
+```
+
+Latence à chaud, médiane de la passe 2 en ms (cache plafonné à 512 Mo) :
+
+| point | jetons | bf16 | 8 bits | 4 bits |
+|---|---|---|---|---|
+| texte court (commande) | 17 | 8,4 | 7,0 | 6,9 |
+| texte | 129 | 14,6 | 13,5 | 13,6 |
+| texte | 519 | 41,6 | 37,4 | 37,0 |
+| texte | 2 049 | 208 | 206 | 205 |
+| texte | 8 004 | 1 064 | 1 014 | 1 022 |
+| image (budget 280) | 264 | 208 | 191 | 193 |
+| audio 2 s | 53 | 38 | 37 | 37 |
+| audio 10 s | 254 | 94 | 87 | 87 |
+| audio 30 s | 754 | 233 | 223 | 225 |
+| vidéo 4 s (4 frames) | 514 | 355 | 331 | 329 |
+| vidéo 16 s | 2 050 | 1 495 | 1 388 | 1 386 |
+| vidéo 32 s (32 frames) | 4 098 | 3 107 | 2 951 | 2 931 |
+| texte + image + audio 10 s | 531 | 283 | 273 | 269 |
+| débit, 64 commandes courtes | 17 | 8,4 / item (119/s) | 6,8 (147/s) | 6,8 (147/s) |
+
+Mémoire :
+
+| | bf16 | 8 bits | 4 bits |
+|---|---|---|---|
+| chargement (s) | 1,2-1,3 | 1,2-1,3 | 1,2-1,3 |
+| MLX actif après chargement (texte seul résident) | 516 Mo | 274 Mo | 145 Mo |
+| empreinte processus après chargement | 660 Mo | 420-435 Mo | 285-305 Mo |
+| empreinte pic, série complète, cache 512 Mo | 3,5 Go | — | — |
+| empreinte pic, série complète, **sans plafond** | **13,3 Go** | — | — |
+
+- **Plafonner le cache MLX** : sans `Memory.cacheLimit`, l'allocateur garde tout (11,6 Go de cache après la vidéo
+  de 32 s) et l'empreinte monte à 13,3 Go pour un modèle de 1,4 Go. À 512 Mo, le pic tombe à 3,5 Go pour un
+  surcoût nul sur les commandes courtes et de +5 à +11 % sur 8 000 jetons et la vidéo 32 s. L'embedder ne
+  touche pas à ce réglage global (il appartient à l'app) : à fixer dans le consommateur.
+- **La quantification n'accélère presque pas** : le texte court passe de 8,4 à 7 ms, les longues séquences sont
+  dans le bruit (calcul d'attention, pas de lecture de poids). Le 8 bits garde la qualité du bf16 (cos ≥ 0,9994
+  contre la référence) et la moitié de sa mémoire ; le 4 bits ne gagne que 130 Mo de plus pour une perte de
+  qualité nette (0,97-0,99). **Recommandation : 8 bits.**
+- **Routage** : une commande courte coûte ~7 ms (147/s séquentiel), une commande vocale de 2 s ~37 ms, une
+  image ~190 ms. Le premier usage d'un encodeur charge ses poids : +45 à +70 ms sur la première image (251 ms
+  à froid), +80 ms sur le premier audio.
+- **Vidéo** : ~95 ms par frame à 140 soft tokens, dominée par la tour vision.
+- Bruit : la passe 1 du 8 bits sans plafond et la passe 1 du texte seul bf16 ont chacune un point aberrant
+  (×2 à ×2,6 sur 2 048-8 000 jetons), absent de la passe 2 ; bf16 passe 2 est 10-20 % plus lente que passe 1
+  sur les longues séquences (série plus chaude). Les tableaux citent la passe 2.

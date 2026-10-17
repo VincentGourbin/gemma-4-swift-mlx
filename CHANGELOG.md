@@ -17,7 +17,10 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   optionnels et chargés au premier usage). Modèle `MLXLMCommon.EmbeddingGemma2`, prétraitement du paquet
   (MLXVLM toujours non lié). Parité contre sentence-transformers fp32 : texte ≥ 0,9997, audio 0,99998,
   image PNG 0,9997 (JPEG 0,998, décodeur), vidéo 0,9986. Checkpoints conseillés : bf16 ou 8 bits
-  (4 bits mlx-community : 0,97-0,99). CLI : `gemma4-cli embed` (entrée unique ou lot JSON).
+  (4 bits mlx-community : 0,97-0,99). CLI : `gemma4-cli embed` (entrée unique ou lot JSON) et
+  `gemma4-cli bench-embed`. M3 Max, 8 bits : commande courte 7 ms, audio 2 s 37 ms, image 190 ms,
+  texte 8 000 jetons 1 s ; 274 Mo résidents en texte seul. Plafonner `Memory.cacheLimit` côté app
+  (512 Mo : empreinte pic 3,5 Go contre 13,3 Go sans plafond, surcoût ≤ 11 %).
 - `Gemma4ImageProcessor.Resampling.pillowBicubic` (bicubique antialiasé de Pillow, sans conversion de
   profil couleur) ; `Gemma4CGImageLoader.rgbTensor(preservingColorSpace:)`. Défaut inchangé (CoreGraphics).
 
