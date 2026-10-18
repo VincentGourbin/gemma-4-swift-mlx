@@ -21,6 +21,11 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
   `gemma4-cli bench-embed`. M3 Max, 8 bits : commande courte 7 ms, audio 2 s 37 ms, image 190 ms,
   texte 8 000 jetons 1 s ; 274 Mo résidents en texte seul. Plafonner `Memory.cacheLimit` côté app
   (512 Mo : empreinte pic 3,5 Go contre 13,3 Go sans plafond, surcoût ≤ 11 %).
+- Banc de routage d'intentions (`Scripts/quality/routing-bench.py`, `gemma4-cli eval-route`) :
+  CLINC150, MASSIVE fr-FR et Speech-MASSIVE fr-FR, embedder contre E2B/E4B et cascade. Embedder 8 bits +
+  régression logistique : CLINC 95,7 % dans le périmètre, MASSIVE fr 86,3 %, 6,6 ms ; E4B few-shot
+  89,9 % / 79,2 % à 130-140 ms. Voix : transcription E2B puis routage texte 78,8 % en 0,3 s, contre 63,9 %
+  pour l'embedding audio direct. Détails dans `BENCHMARKS.md`.
 - `Gemma4ImageProcessor.Resampling.pillowBicubic` (bicubique antialiasé de Pillow, sans conversion de
   profil couleur) ; `Gemma4CGImageLoader.rgbTensor(preservingColorSpace:)`. Défaut inchangé (CoreGraphics).
 

@@ -814,3 +814,68 @@ Mémoire :
 - Bruit : la passe 1 du 8 bits sans plafond et la passe 1 du texte seul bf16 ont chacune un point aberrant
   (×2 à ×2,6 sur 2 048-8 000 jetons), absent de la passe 2 ; bf16 passe 2 est 10-20 % plus lente que passe 1
   sur les longues séquences (série plus chaude). Les tableaux citent la passe 2.
+
+## Routage d'intentions : EmbeddingGemma 2 contre Gemma 4 E2B/E4B — 2026-10-18
+
+But : situer un routeur d'actions par embeddings (déterministe, quelques ms) face à un petit LLM qui
+classe par génération, sur des jeux publics. Script `Scripts/quality/routing-bench.py`, commande
+`gemma4-cli eval-route` (LLM, sortie brute greedy, préfixe commun prefillé une fois en texte),
+données brutes `benchmarks/routing-20261018.jsonl`. M3 Max, commit de la branche `feature/embeddinggemma2`.
+
+- **Jeux** : CLINC150 « plus » (en, 150 intentions, 1 000 requêtes hors périmètre au test, 100 au train),
+  MASSIVE 1.1 fr-FR (60 intentions), Speech-MASSIVE fr-FR (les 2 033 requêtes du dev MASSIVE,
+  enregistrées ; CC BY-NC-SA, données non versionnées).
+- **Embeddings** : préfixe `task: classification | query: `, exemples tirés du train (5, 10 par intention,
+  ou tout le train), plus proche voisin, centroïde ou régression logistique (`C = 10`) ; pour CLINC,
+  rejet par seuil calibré sur la validation, et variante `logreg+neg` avec une classe de rejet apprise
+  sur les 100 hors périmètre du train. Évalué sur tout le test.
+- **LLM** (4 bits mlx-community) : liste des intentions seule (`full`), liste + 2 exemples par intention
+  (`shots2`, préfixe de 2 200 à 5 000 jetons), ou 5 candidates de l'embedder (`top5`). Échantillon fixe :
+  CLINC 1 100 (200 hors périmètre), MASSIVE 1 000, Speech 500.
+- **Cascade** : l'embedder décide, le LLM `top5` reprend les requêtes à marge (top1 − top2) < m.
+
+### Texte (dans le périmètre / rappel hors périmètre / global, %)
+
+| Routeur | CLINC150 | MASSIVE fr | latence médiane |
+|---|---|---|---|
+| Embedder 8 bits, 5 ex./intention, logreg+neg | 79,5 / 92,5 / 81,8 | 79,5 | 6,6 ms |
+| Embedder 8 bits, 10 ex./intention, logreg+neg | 89,6 / 84,8 / 88,7 | 81,9 | 6,6 ms |
+| Embedder 8 bits, train complet, logreg+neg | **95,7 / 66,0 / 90,3** | **86,3** | 6,6 ms |
+| E2B, liste seule | 73,7 / 8,0 / 61,7 | 62,5 | 62 ms |
+| E2B, liste + 2 ex. | 84,3 / 39,0 / 76,1 | 68,4 | 69-86 ms |
+| E4B, liste seule | 72,6 / 88,0 / 75,4 | 72,1 | 108-138 ms |
+| E4B, liste + 2 ex. | 89,9 / 84,0 / 88,8 | 79,2 | 130-139 ms |
+| Cascade embedder + E4B top5, m = 0,4 (22 % / 14 % des requêtes au LLM) | 95,6 / 70,0 / 90,9 | 87,2 | 7 ms (moy. 39-45 ms) |
+
+- L'embedder gelé + régression logistique bat les deux LLM partout en exactitude dans le périmètre, à
+  ~15-20× moins de latence. Dès 10 exemples par intention il rejoint E4B few-shot.
+- Le hors-périmètre est le point fort du LLM : E4B en rattrape 84-88 %, l'embedder 66 % (train complet)
+  à 92 % (5 ex., mais au prix du périmètre). La cascade gagne +0,4 à +0,6 pt, guère plus.
+- E4B répond « oops »/« ooc » au lieu de `oos` dans 23 % des cas (liste seule) : lus comme un rejet ici,
+  mais c'est l'argument pour un décodage contraint aux étiquettes en production.
+- bf16, 8 bits et 4 bits de l'embedder sont à ±1 pt sur toutes les configurations (latence 8,4 / 6,6 /
+  6,6 ms) : le 4 bits, moins fidèle en cosinus (0,97-0,99), ne coûte rien en routage.
+
+### Voix (Speech-MASSIVE fr, exactitude %)
+
+| Routeur | exactitude | latence médiane |
+|---|---|---|
+| Référence : embedder sur le **texte** des requêtes, train complet | 86,0 | 8 ms |
+| Embedder sur l'audio, exemples texte (train complet, préfixe de tâche) | 63,9 | 51 ms |
+| Embedder sur l'audio, 10 ex. texte + 5 clips par intention (logreg) | 63,7 | 51 ms |
+| E2B sur l'audio, liste seule / + 2 ex. | 62,2 / 66,8 | 0,5 s / 2,5 s |
+| E4B sur l'audio, liste seule / + 2 ex. | 70,2 / 75,8 | 1,0 s / 4,5 s |
+| Cascade embedder audio + E4B top5, m = 0,6 | 71,0 | 0,41 s |
+| **E2B transcrit, embedder route le texte** (train complet) | **78,8** | 0,30 s |
+| E4B transcrit, embedder route le texte | 80,8 | 0,61 s |
+
+- L'audio et le texte ne sont pas alignés finement dans l'espace d'EmbeddingGemma 2 : −22 pts face au
+  texte, et des clips d'exemple n'y changent presque rien (+0 à +5 pts).
+- Le meilleur compromis voix est la transcription E2B (43 % de transcriptions exactes mot pour mot)
+  suivie du routage texte : +15 pts sur l'embedding audio direct, 0,3 s.
+- Sans préfixe de tâche, l'audio perd 6 pts (57,1 contre 63,9) : `[.text("task: classification | query: "), .audio(url)]`.
+
+Limites : latences mesurées en série (une compilation Swift tierce a tourné pendant le premier lot
+d'embeddings 8 bits ; médianes cohérentes avec `bench-embed`) ; l'audio LLM est prefillé en entier
+(instruction comprise) à chaque requête ; seuils et marges calibrés sur la validation CLINC et un tirage
+du train MASSIVE, jamais sur le test.
