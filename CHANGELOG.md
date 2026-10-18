@@ -10,6 +10,38 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ## [Non publié]
 
+### Ajouté
+
+- Embeddings EmbeddingGemma 2 : `Gemma4Embedder` (texte, image, audio, vidéo et entrées entrelacées dans
+  un espace de 768 dims ; préfixes de tâche, troncature Matryoshka 128/256/512, encodeurs vision/audio
+  optionnels et chargés au premier usage). Modèle `MLXLMCommon.EmbeddingGemma2`, prétraitement du paquet
+  (MLXVLM toujours non lié). Parité contre sentence-transformers fp32 : texte ≥ 0,9997, audio 0,99998,
+  image PNG 0,9997 (JPEG 0,998, décodeur), vidéo 0,9986. Checkpoints conseillés : bf16 ou 8 bits
+  (4 bits mlx-community : 0,97-0,99). CLI : `gemma4-cli embed` (entrée unique ou lot JSON) et
+  `gemma4-cli bench-embed`. M3 Max, 8 bits : commande courte 7 ms, audio 2 s 37 ms, image 190 ms,
+  texte 8 000 jetons 1 s ; 274 Mo résidents en texte seul. Plafonner `Memory.cacheLimit` côté app
+  (512 Mo : empreinte pic 3,5 Go contre 13,3 Go sans plafond, surcoût ≤ 11 %).
+- Banc de routage d'intentions (`Scripts/quality/routing-bench.py`, `gemma4-cli eval-route`) :
+  CLINC150, MASSIVE fr-FR et Speech-MASSIVE fr-FR, embedder contre E2B/E4B et cascade. Embedder 8 bits +
+  régression logistique : CLINC 95,7 % dans le périmètre, MASSIVE fr 86,3 %, 6,6 ms ; E4B few-shot
+  89,9 % / 79,2 % à 130-140 ms. Voix : transcription E2B puis routage texte 78,8 % en 0,3 s, contre 63,9 %
+  pour l'embedding audio direct. Détails dans `BENCHMARKS.md`.
+- `Gemma4ImageProcessor.Resampling.pillowBicubic` (bicubique antialiasé de Pillow, sans conversion de
+  profil couleur) ; `Gemma4CGImageLoader.rgbTensor(preservingColorSpace:)`. Défaut inchangé (CoreGraphics).
+
+### Corrigé
+
+- Audio E2B/E4B : le banc de filtres mel arrondissait ses bornes aux bins FFT, ce qui annulait la moitié
+  des bandes basses, et le plancher du log était `max` au lieu d'additif. Aligné sur
+  `Gemma4AudioFeatureExtractor` (écart des log-mel 1e-3). Transcriptions E2B 4 bits de quatre commandes
+  vocales : fausses avant, exactes après.
+
+### Dépendances
+
+- mlx-swift-lm épinglé sur la révision `48114ee` de `main` (EmbeddingGemma 2, ml-explore/mlx-swift-lm#684) :
+  **à remplacer par le prochain tag avant toute publication** (une dépendance `revision:` rend le paquet
+  inconsommable par un projet qui dépend d'un tag).
+
 ## [1.9.0] - 2026-10-03
 
 ### Ajouté

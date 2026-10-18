@@ -1,0 +1,77 @@
+== 08:14:33 embed 8bit emb-00.json
+== 08:15:23 embed 8bit emb-01.json
+== 08:15:56 embed 8bit emb-02.json
+== 08:16:27 embed 8bit emb-03.json
+== 08:16:59 embed 8bit emb-04.json
+== 08:17:28 embed 8bit emb-05.json
+== 08:17:57 embed 8bit emb-06.json
+== 08:18:26 embed 8bit emb-07.json
+== 08:18:55 embed 8bit emb-08.json
+== 08:19:24 embed 8bit emb-09.json
+== 08:19:53 embed 8bit emb-10.json
+== 08:22:10 embed 8bit emb-11.json
+clinc 1100 items
+massive 1000 items
+speech 500 items
+== 08:24:57 llm e2b clinc-full
+ECHEC llm e2b clinc-full
+== 08:26:24 llm e2b clinc-top5
+ECHEC llm e2b clinc-top5
+== 08:28:19 llm e2b massive-full
+ECHEC llm e2b massive-full
+== 08:29:37 llm e2b massive-top5
+ECHEC llm e2b massive-top5
+== 08:31:43 llm e2b speech-full
+ECHEC llm e2b speech-full
+== 08:36:27 llm e2b speech-top5
+ECHEC llm e2b speech-top5
+== 08:38:48 llm e4b clinc-full
+ECHEC llm e4b clinc-full
+== 08:41:10 llm e4b clinc-top5
+ECHEC llm e4b clinc-top5
+== 08:44:44 llm e4b massive-full
+ECHEC llm e4b massive-full
+== 08:47:21 llm e4b massive-top5
+ECHEC llm e4b massive-top5
+== 08:51:27 llm e4b speech-full
+ECHEC llm e4b speech-full
+== 09:00:09 llm e4b speech-top5
+ECHEC llm e4b speech-top5
+== 09:04:00 embed bf16 emb-00.json
+== 09:04:35 embed bf16 emb-01.json
+== 09:05:10 embed bf16 emb-02.json
+== 09:05:43 embed bf16 emb-03.json
+== 09:06:16 embed bf16 emb-04.json
+== 09:06:49 embed bf16 emb-05.json
+== 09:07:22 embed bf16 emb-06.json
+== 09:07:55 embed bf16 emb-07.json
+== 09:08:28 embed bf16 emb-08.json
+== 09:09:01 embed bf16 emb-09.json
+== 09:09:34 embed bf16 emb-10.json
+== 09:11:56 embed bf16 emb-11.json
+== 09:13:40 embed 4bit emb-00.json
+== 09:14:09 embed 4bit emb-01.json
+== 09:14:37 embed 4bit emb-02.json
+== 09:15:06 embed 4bit emb-03.json
+== 09:15:34 embed 4bit emb-04.json
+== 09:16:03 embed 4bit emb-05.json
+== 09:16:31 embed 4bit emb-06.json
+== 09:17:00 embed 4bit emb-07.json
+== 09:17:28 embed 4bit emb-08.json
+== 09:17:57 embed 4bit emb-09.json
+== 09:18:25 embed 4bit emb-10.json
+== 09:20:40 embed 4bit emb-11.json
+FIN 09:22:23
+== 09:22:44 llm e2b clinc-shots2
+   code 0 lignes     1101
+== 09:24:42 llm e2b massive-shots2
+   code 0 lignes     1001
+== 09:26:07 llm e2b speech-shots2
+   code 0 lignes      501
+== 09:47:21 llm e4b clinc-shots2
+   code 0 lignes     1101
+== 09:50:20 llm e4b massive-shots2
+   code 0 lignes     1001
+== 09:52:48 llm e4b speech-shots2
+   code 0 lignes      501
+FIN2 10:30:53

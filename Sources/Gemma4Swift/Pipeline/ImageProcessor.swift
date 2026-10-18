@@ -19,6 +19,16 @@ public enum Gemma4ImageProcessor {
     /// Taille du kernel de pooling : 3x3 patches par soft token.
     public static let defaultPoolingKernelSize = 3
 
+    /// Reechantillonnage vers la taille cible.
+    public enum Resampling: Sendable {
+        /// Resize CoreGraphics haute qualite (defaut historique, chemin E2B/E4B valide).
+        case coreGraphics
+        /// Bicubique antialiase de Pillow (a = -0.5), arrondi sur 8 bits comme la sortie
+        /// `uint8` de la reference HF. Mesure sur EmbeddingGemma 2 : cos 0,994 avec
+        /// CoreGraphics, contre la reference ; voir ``pillowBicubicWeights(input:output:)``.
+        case pillowBicubic
+    }
+
     /// Charge et preprocesse une image depuis un fichier
     /// - Parameters:
     ///   - url: chemin de l'image
@@ -34,10 +44,13 @@ public enum Gemma4ImageProcessor {
         url: URL,
         maxSoftTokens: Int = defaultMaxSoftTokens,
         patchSize: Int = defaultPatchSize,
-        poolingKernelSize: Int = defaultPoolingKernelSize
+        poolingKernelSize: Int = defaultPoolingKernelSize,
+        resampling: Resampling = .coreGraphics
     ) throws -> MLXArray {
         let cgImage = try Gemma4CGImageLoader.load(from: url)
-        return try processImage(cgImage, maxSoftTokens: maxSoftTokens, patchSize: patchSize, poolingKernelSize: poolingKernelSize)
+        return try processImage(
+            cgImage, maxSoftTokens: maxSoftTokens, patchSize: patchSize,
+            poolingKernelSize: poolingKernelSize, resampling: resampling)
     }
 
     /// Preprocesse un CGImage
@@ -47,7 +60,8 @@ public enum Gemma4ImageProcessor {
         _ image: CGImage,
         maxSoftTokens: Int = defaultMaxSoftTokens,
         patchSize: Int = defaultPatchSize,
-        poolingKernelSize: Int = defaultPoolingKernelSize
+        poolingKernelSize: Int = defaultPoolingKernelSize,
+        resampling: Resampling = .coreGraphics
     ) throws -> MLXArray {
         let (bestW, bestH) = try targetSize(
             for: image,
@@ -55,6 +69,18 @@ public enum Gemma4ImageProcessor {
             patchSize: patchSize,
             poolingKernelSize: poolingKernelSize
         )
+
+        if resampling == .pillowBicubic {
+            // Decodage a la taille native, puis resize separable en deux produits matriciels.
+            let native = try Gemma4CGImageLoader.rgbTensor(
+                from: image, width: image.width, height: image.height, preservingColorSpace: true)
+            let chw = native.transposed(2, 0, 1).asType(.float32) / MLXArray(Float(255.0))
+            let rows = pillowBicubicWeights(input: image.height, output: bestH)
+            let columns = pillowBicubicWeights(input: image.width, output: bestW)
+            let resized = matmul(matmul(rows, chw), columns.transposed())
+            let quantized = round(clip(resized * 255, min: 0, max: 255)) / 255
+            return quantized.expandedDimensions(axis: 0) // [1, 3, H, W]
+        }
 
         // Buffer RGB [H, W, 3] UInt8 (decode + resize haute qualite).
         let rgb = try Gemma4CGImageLoader.rgbTensor(from: image, width: bestW, height: bestH)
@@ -130,6 +156,34 @@ public enum Gemma4ImageProcessor {
         }
 
         return (bestW, bestH)
+    }
+
+    /// Poids `[output, input]` du filtre bicubique antialiase (a = -0.5) de Pillow et
+    /// torchvision : a la reduction, le support s'etire du facteur d'echelle.
+    /// Port de `EmbeddingGemma2ImageProcessor.bicubicWeights` (mlx-swift-lm, MLXVLM).
+    static func pillowBicubicWeights(input: Int, output: Int) -> MLXArray {
+        func cubic(_ x: Double) -> Double {
+            let a = -0.5
+            let x = abs(x)
+            if x < 1 { return ((a + 2) * x - (a + 3)) * x * x + 1 }
+            if x < 2 { return (((x - 5) * x + 8) * x - 4) * a }
+            return 0
+        }
+        let scale = Double(input) / Double(output)
+        let filterScale = max(scale, 1)
+        let support = 2 * filterScale
+        var weights = [Float](repeating: 0, count: output * input)
+        for row in 0 ..< output {
+            let center = (Double(row) + 0.5) * scale
+            let first = max(Int(center - support + 0.5), 0)
+            let last = min(Int(center + support + 0.5), input)
+            let taps = (first ..< last).map { cubic((Double($0) - center + 0.5) / filterScale) }
+            let total = taps.reduce(0, +)
+            for (offset, tap) in taps.enumerated() where total != 0 {
+                weights[row * input + first + offset] = Float(tap / total)
+            }
+        }
+        return MLXArray(weights, [output, input])
     }
 
     /// Variante asynchrone de ``processImage(url:maxSoftTokens:patchSize:poolingKernelSize:)``

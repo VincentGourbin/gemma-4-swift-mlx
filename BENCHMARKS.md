@@ -751,3 +751,131 @@ Réponses concordantes à 195/200 : découper le calcul (préfixe puis suite) ch
 
 Pertes identiques ; porte « pic −30 %, temps ≤ +35 % » tenue, au bord pour le temps : option à activer quand la mémoire manque (Mac 32 Go, gros modèles), pas par défaut. Lignes : `benchmarks/lora-k32-{gc,base}-20260929.jsonl`.
 
+
+## EmbeddingGemma 2 — `Gemma4Embedder` (`bench-embed`) — 2026-10-17
+
+M3 Max 96 Go, macOS 27.0.1, sur secteur, machine au repos ; mlx-swift 0.32.3, mlx-swift-lm `main` 48114eed.
+Checkpoints : `google/embeddinggemma-2` (bf16), `mlx-community/embeddinggemma-2-{8bit,4bit}`. Trois configurations,
+toutes passées deux fois (A/B puis B/A, cooldown 20 s) : multimodal sans plafond de cache MLX, multimodal avec
+`Memory.cacheLimit` 512 Mo, texte seul avec 512 Mo. Par point : 2 passes de chauffe, 10 mesurées, tâche
+`classification`, 768 dims (la troncature Matryoshka ne change pas le calcul). Données :
+`benchmarks/embed-20261017.jsonl`.
+
+Médias (générés, non versionnés) : `photo.jpg` = `docs/examples/vision-image-description/input_sample.jpg`
+(1920×1280, 264 soft tokens) ; audio `say` 16 kHz mono bouclé avec `ffmpeg -stream_loop` à 2, 10 et 30 s ;
+vidéo 640×426 de 4 s (les deux images d'exemple) bouclée à 16 et 32 s.
+
+```bash
+gemma4-cli bench-embed --model-path …/embeddinggemma-2 --media-dir … --encoders vision,audio \
+  --cache-limit-mb 512 --warmup 2 --repeat 10 --output benchmarks/embed-….jsonl
+```
+
+Latence à chaud, médiane de la passe 2 en ms (cache plafonné à 512 Mo) :
+
+| point | jetons | bf16 | 8 bits | 4 bits |
+|---|---|---|---|---|
+| texte court (commande) | 17 | 8,4 | 7,0 | 6,9 |
+| texte | 129 | 14,6 | 13,5 | 13,6 |
+| texte | 519 | 41,6 | 37,4 | 37,0 |
+| texte | 2 049 | 208 | 206 | 205 |
+| texte | 8 004 | 1 064 | 1 014 | 1 022 |
+| image (budget 280) | 264 | 208 | 191 | 193 |
+| audio 2 s | 53 | 38 | 37 | 37 |
+| audio 10 s | 254 | 94 | 87 | 87 |
+| audio 30 s | 754 | 233 | 223 | 225 |
+| vidéo 4 s (4 frames) | 514 | 355 | 331 | 329 |
+| vidéo 16 s | 2 050 | 1 495 | 1 388 | 1 386 |
+| vidéo 32 s (32 frames) | 4 098 | 3 107 | 2 951 | 2 931 |
+| texte + image + audio 10 s | 531 | 283 | 273 | 269 |
+| débit, 64 commandes courtes | 17 | 8,4 / item (119/s) | 6,8 (147/s) | 6,8 (147/s) |
+
+Mémoire :
+
+| | bf16 | 8 bits | 4 bits |
+|---|---|---|---|
+| chargement (s) | 1,2-1,3 | 1,2-1,3 | 1,2-1,3 |
+| MLX actif après chargement (texte seul résident) | 516 Mo | 274 Mo | 145 Mo |
+| empreinte processus après chargement | 660 Mo | 420-435 Mo | 285-305 Mo |
+| empreinte pic, série complète, cache 512 Mo | 3,5 Go | — | — |
+| empreinte pic, série complète, **sans plafond** | **13,3 Go** | — | — |
+
+- **Plafonner le cache MLX** : sans `Memory.cacheLimit`, l'allocateur garde tout (11,6 Go de cache après la vidéo
+  de 32 s) et l'empreinte monte à 13,3 Go pour un modèle de 1,4 Go. À 512 Mo, le pic tombe à 3,5 Go pour un
+  surcoût nul sur les commandes courtes et de +5 à +11 % sur 8 000 jetons et la vidéo 32 s. L'embedder ne
+  touche pas à ce réglage global (il appartient à l'app) : à fixer dans le consommateur.
+- **La quantification n'accélère presque pas** : le texte court passe de 8,4 à 7 ms, les longues séquences sont
+  dans le bruit (calcul d'attention, pas de lecture de poids). Le 8 bits garde la qualité du bf16 (cos ≥ 0,9994
+  contre la référence) et la moitié de sa mémoire ; le 4 bits ne gagne que 130 Mo de plus pour une perte de
+  qualité nette (0,97-0,99). **Recommandation : 8 bits.**
+- **Routage** : une commande courte coûte ~7 ms (147/s séquentiel), une commande vocale de 2 s ~37 ms, une
+  image ~190 ms. Le premier usage d'un encodeur charge ses poids : +45 à +70 ms sur la première image (251 ms
+  à froid), +80 ms sur le premier audio.
+- **Vidéo** : ~95 ms par frame à 140 soft tokens, dominée par la tour vision.
+- Bruit : la passe 1 du 8 bits sans plafond et la passe 1 du texte seul bf16 ont chacune un point aberrant
+  (×2 à ×2,6 sur 2 048-8 000 jetons), absent de la passe 2 ; bf16 passe 2 est 10-20 % plus lente que passe 1
+  sur les longues séquences (série plus chaude). Les tableaux citent la passe 2.
+
+## Routage d'intentions : EmbeddingGemma 2 contre Gemma 4 E2B/E4B — 2026-10-18
+
+But : situer un routeur d'actions par embeddings (déterministe, quelques ms) face à un petit LLM qui
+classe par génération, sur des jeux publics. Script `Scripts/quality/routing-bench.py`, commande
+`gemma4-cli eval-route` (LLM, sortie brute greedy, préfixe commun prefillé une fois en texte),
+données brutes `benchmarks/routing-20261018.jsonl`. M3 Max, commit de la branche `feature/embeddinggemma2`.
+
+- **Jeux** : CLINC150 « plus » (en, 150 intentions, 1 000 requêtes hors périmètre au test, 100 au train),
+  MASSIVE 1.1 fr-FR (60 intentions), Speech-MASSIVE fr-FR (les 2 033 requêtes du dev MASSIVE,
+  enregistrées ; CC BY-NC-SA, données non versionnées).
+- **Embeddings** : préfixe `task: classification | query: `, exemples tirés du train (5, 10 par intention,
+  ou tout le train), plus proche voisin, centroïde ou régression logistique (`C = 10`) ; pour CLINC,
+  rejet par seuil calibré sur la validation, et variante `logreg+neg` avec une classe de rejet apprise
+  sur les 100 hors périmètre du train. Évalué sur tout le test.
+- **LLM** (4 bits mlx-community) : liste des intentions seule (`full`), liste + 2 exemples par intention
+  (`shots2`, préfixe de 2 200 à 5 000 jetons), ou 5 candidates de l'embedder (`top5`). Échantillon fixe :
+  CLINC 1 100 (200 hors périmètre), MASSIVE 1 000, Speech 500.
+- **Cascade** : l'embedder décide, le LLM `top5` reprend les requêtes à marge (top1 − top2) < m.
+
+### Texte (dans le périmètre / rappel hors périmètre / global, %)
+
+| Routeur | CLINC150 | MASSIVE fr | latence médiane |
+|---|---|---|---|
+| Embedder 8 bits, 5 ex./intention, logreg+neg | 79,5 / 92,5 / 81,8 | 79,5 | 6,6 ms |
+| Embedder 8 bits, 10 ex./intention, logreg+neg | 89,6 / 84,8 / 88,7 | 81,9 | 6,6 ms |
+| Embedder 8 bits, train complet, logreg+neg | **95,7 / 66,0 / 90,3** | **86,3** | 6,6 ms |
+| E2B, liste seule | 73,7 / 8,0 / 61,7 | 62,5 | 62 ms |
+| E2B, liste + 2 ex. | 84,3 / 39,0 / 76,1 | 68,4 | 69-86 ms |
+| E4B, liste seule | 72,6 / 88,0 / 75,4 | 72,1 | 108-138 ms |
+| E4B, liste + 2 ex. | 89,9 / 84,0 / 88,8 | 79,2 | 130-139 ms |
+| Cascade embedder + E4B top5, m = 0,4 (22 % / 14 % des requêtes au LLM) | 95,6 / 70,0 / 90,9 | 87,2 | 7 ms (moy. 39-45 ms) |
+
+- L'embedder gelé + régression logistique bat les deux LLM partout en exactitude dans le périmètre, à
+  ~15-20× moins de latence. Dès 10 exemples par intention il rejoint E4B few-shot.
+- Le hors-périmètre est le point fort du LLM : E4B en rattrape 84-88 %, l'embedder 66 % (train complet)
+  à 92 % (5 ex., mais au prix du périmètre). La cascade gagne +0,4 à +0,6 pt, guère plus.
+- E4B répond « oops »/« ooc » au lieu de `oos` dans 23 % des cas (liste seule) : lus comme un rejet ici,
+  mais c'est l'argument pour un décodage contraint aux étiquettes en production.
+- bf16, 8 bits et 4 bits de l'embedder sont à ±1 pt sur toutes les configurations (latence 8,4 / 6,6 /
+  6,6 ms) : le 4 bits, moins fidèle en cosinus (0,97-0,99), ne coûte rien en routage.
+
+### Voix (Speech-MASSIVE fr, exactitude %)
+
+| Routeur | exactitude | latence médiane |
+|---|---|---|
+| Référence : embedder sur le **texte** des requêtes, train complet | 86,0 | 8 ms |
+| Embedder sur l'audio, exemples texte (train complet, préfixe de tâche) | 63,9 | 51 ms |
+| Embedder sur l'audio, 10 ex. texte + 5 clips par intention (logreg) | 63,7 | 51 ms |
+| E2B sur l'audio, liste seule / + 2 ex. | 62,2 / 66,8 | 0,5 s / 2,5 s |
+| E4B sur l'audio, liste seule / + 2 ex. | 70,2 / 75,8 | 1,0 s / 4,5 s |
+| Cascade embedder audio + E4B top5, m = 0,6 | 71,0 | 0,41 s |
+| **E2B transcrit, embedder route le texte** (train complet) | **78,8** | 0,30 s |
+| E4B transcrit, embedder route le texte | 80,8 | 0,61 s |
+
+- L'audio et le texte ne sont pas alignés finement dans l'espace d'EmbeddingGemma 2 : −22 pts face au
+  texte, et des clips d'exemple n'y changent presque rien (+0 à +5 pts).
+- Le meilleur compromis voix est la transcription E2B (43 % de transcriptions exactes mot pour mot)
+  suivie du routage texte : +15 pts sur l'embedding audio direct, 0,3 s.
+- Sans préfixe de tâche, l'audio perd 6 pts (57,1 contre 63,9) : `[.text("task: classification | query: "), .audio(url)]`.
+
+Limites : latences mesurées en série (une compilation Swift tierce a tourné pendant le premier lot
+d'embeddings 8 bits ; médianes cohérentes avec `bench-embed`) ; l'audio LLM est prefillé en entier
+(instruction comprise) à chaque requête ; seuils et marges calibrés sur la validation CLINC et un tirage
+du train MASSIVE, jamais sur le test.

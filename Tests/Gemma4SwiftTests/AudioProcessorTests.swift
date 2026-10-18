@@ -81,4 +81,22 @@ final class AudioProcessorTests: XCTestCase {
         XCTAssertEqual(filterBank.count, 128)
         XCTAssertTrue(filterBank.allSatisfy { $0.count == 257 })
     }
+
+    func testMelFilterBankMatchesTransformersReference() {
+        // Valeurs de transformers `mel_filter_bank(257, 128, 0, 8000, 16000, norm=None,
+        // mel_scale="htk")`, indexees [filtre][bin]. Les filtres basses frequences sont plus
+        // etroits qu'un bin : seul le filtre 0 y est vide. Arrondir les bornes aux bins
+        // en annulait la moitie (embeddings audio EmbeddingGemma 2 a cos 0,82 de la reference).
+        let bank = Gemma4AudioProcessor.createMelFilterBank(
+            numFilters: 128, numBins: 257, sampleRate: 16000, minFreq: 0, maxFreq: 8000)
+        let reference: [(filter: Int, bin: Int, value: Float)] = [
+            (1, 1, 0.766_007_7), (2, 1, 0.233_992_3), (5, 3, 0.568_353_5),
+            (40, 28, 0.490_503_3), (127, 251, 0.928_379_0),
+        ]
+        for (filter, bin, value) in reference {
+            XCTAssertEqual(bank[filter][bin], value, accuracy: 1e-5, "filtre \(filter), bin \(bin)")
+        }
+        let empty = bank.indices.filter { bank[$0].allSatisfy { $0 == 0 } }
+        XCTAssertEqual(empty, [0])
+    }
 }

@@ -14,7 +14,8 @@ let package = Package(
         // casse des APIs sur des bumps mineurs. Toute montee de version est deliberee.
         .package(url: "https://github.com/ml-explore/mlx-swift", .upToNextMinor(from: "0.32.3")),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
-        .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.32.3")),
+        // EXPERIMENTAL: main amont pour EmbeddingGemma 2 (PR #684), a remplacer par le prochain tag.
+        .package(url: "https://github.com/ml-explore/mlx-swift-lm", revision: "48114eedf3c3d4a682a6b1d644cc5af5c2945d10"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.0"),
         // 1.5.1 : code a base de `Process` (xctrace) sous #if os(macOS), compile pour iOS.
         .package(url: "https://github.com/VincentGourbin/swift-mlx-profiler", from: "1.5.1"),
