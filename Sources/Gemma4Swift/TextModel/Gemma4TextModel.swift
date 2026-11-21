@@ -351,9 +351,14 @@ public class Gemma4TextModel: Module {
         inputs += parameters.map(\.1)
         let hasPerLayerInput = perLayerInput != nil
         let hasShared = sharedKV != nil
-        var offsetOut = 0
+        // mlx-swift 0.33 exige des closures @Sendable pour CustomFunction (#481). Elles sont
+        // executees de facon synchrone pendant `function(inputs)` puis pendant le VJP, sur ce
+        // meme fil : les captures non-Sendable (Module, masque, compteur) ne traversent rien.
+        nonisolated(unsafe) var offsetOut = 0
+        nonisolated(unsafe) let layer = layer
+        nonisolated(unsafe) let mask = mask
 
-        let forward: ([MLXArray]) -> [MLXArray] = { a in
+        let forward: @Sendable ([MLXArray]) -> [MLXArray] = { a in
             var index = 1
             let pli = hasPerLayerInput ? a[index] : nil
             if hasPerLayerInput { index += 1 }
