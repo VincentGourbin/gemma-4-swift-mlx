@@ -10,6 +10,8 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ## [Non publié]
 
+## [1.10.0] - 2026-11-21
+
 ### Ajouté
 
 - Embeddings EmbeddingGemma 2 : `Gemma4Embedder` (texte, image, audio, vidéo et entrées entrelacées dans
@@ -545,7 +547,8 @@ paquet par version (`from: "1.0.0"`) au lieu de `branch: "main"`.
   multimodal : `ScaledLinear` quantifiable (`per_layer_model_projection`), et
   `k_proj` / `v_proj` / `k_norm` absents des couches KV-shared.
 
-[Non publié]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.9.0...HEAD
+[Non publié]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.10.0...HEAD
+[1.10.0]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.9.0...1.10.0
 [1.9.0]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.8.0...1.9.0
 [1.8.0]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.7.3...1.8.0
 [1.7.3]: https://github.com/VincentGourbin/gemma-4-swift-mlx/compare/1.7.2...1.7.3
