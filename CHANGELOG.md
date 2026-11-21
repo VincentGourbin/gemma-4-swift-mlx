@@ -38,9 +38,15 @@ Les entrées sont écrites du point de vue d'un consommateur de la bibliothèque
 
 ### Dépendances
 
-- mlx-swift-lm épinglé sur la révision `48114ee` de `main` (EmbeddingGemma 2, ml-explore/mlx-swift-lm#684) :
-  **à remplacer par le prochain tag avant toute publication** (une dépendance `revision:` rend le paquet
-  inconsommable par un projet qui dépend d'un tag).
+- mlx-swift `.upToNextMinor(from: "0.33.0")` (0.32.3 avant) et mlx-swift-lm `.upToNextMinor(from: "3.33.0")`,
+  qui remplace l'épinglage sur la révision `48114ee` de `main` : le paquet redevient consommable par un projet
+  qui dépend d'un tag. 3.33.0 contient EmbeddingGemma 2 (ml-explore/mlx-swift-lm#684).
+- Seule adaptation requise : les closures de `CustomFunction` doivent être `@Sendable` depuis mlx-swift 0.33
+  (#481) ; point de contrôle de gradient de `Gemma4TextModel` ajusté, sans changement de comportement.
+- Aucun effet du nouveau flux `.reasoning` de mlx-swift-lm 3.33 (#563) : il ne s'active que pour un modèle qui
+  déclare un `reasoningConfig`, ce que font les Gemma 4 amont mais pas ceux de ce paquet. Les API texte
+  (`ChatSession.respond`, `streamResponse`) rendent donc toujours la pensée en clair, et `Gemma4ChatEngine`
+  la découpe lui-même comme avant.
 
 ## [1.9.0] - 2026-10-03
 
