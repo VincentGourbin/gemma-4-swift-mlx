@@ -17,6 +17,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 | Multimodal LoRA | ✅ **Working** | Audio + vision fine-tuning. 50% accuracy on 20-species bird call classification, LaTeX OCR verified |
 | Speculative decoding (MTP) | ✅ **Working** | Gemma 4 Assistant drafter. Matches greedy decoding except on near-ties of logits (not bit-exact in general). Fine-tuneable: ×2.5 acceptance on domain-specific dataset |
 | KV cache quantization | ✅ **Working** | mlx-swift-lm native `QuantizedKVCache` via `kvBits`, all families (8-bit KV in the `lean` profiles of 26B-A4B and 31B). TurboQuant kept, explicit only. See [KV Cache Quantization](#kv-cache-quantization) |
+| Embeddings (EmbeddingGemma 2) | ✅ **Working** | `Gemma4Embedder`: text, image, audio, video and interleaved inputs in one 768-dim space, Matryoshka 128/256/512. Parity vs sentence-transformers fp32 ≥ 0.998. See [Embeddings](#embeddings-embeddinggemma-2) |
 | Multi-turn chat | ✅ **Working** | Via ChatSession streaming, or `Gemma4ChatEngine` (tools, thinking channel, images, prefix reuse: TTFT −78 % on the next turn) |
 | OpenAI-compatible server | ✅ **Working** | `Server/` package, `gemma4-server` (SSE, tools, images, API key, per-client conversation cache). See [Inference Server](#inference-server-openai-compatible) |
 | Reference profiles | ✅ **Measured** | `<bits>bit-<fast\|lean>` for inference (30 profiles), `lora-<bits>bit-<fast\|lean>` for training (12 profiles), `a4bdiff/*` for diffusion. `gemma4-cli references`, `lora profiles` |
@@ -30,7 +31,7 @@ Native Gemma 4 multimodal inference for Apple Silicon via [MLX Swift](https://gi
 
 - macOS 15+ (Sequoia) — `Package.swift` : `.macOS(.v15)`
 - Apple Silicon (M1/M2/M3/M4)
-- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.32 declares swift-tools-version 6.3; CI builds with
+- Xcode 26 or later with Swift 6.3+ (`mlx-swift` 0.33 declares swift-tools-version 6.3; CI builds with
   Xcode 26.6, development uses Xcode 27)
 
 ## Quick Start
@@ -112,6 +113,16 @@ gemma4-cli describe --model-path ~/Library/Caches/models/mlx-community/gemma-4-e
 ```
 
 > Audio supports up to 30 seconds, processed via Conformer encoder (750 tokens max). Only E2B and E4B models have an audio tower. Supports ASR (transcription) and comprehension tasks.
+
+### Embeddings
+
+```bash
+gemma4-cli embed --model-path /path/to/google/embeddinggemma-2 \
+  --text "Turn off the lights" --task classification --dimensions 256
+```
+
+> Image, audio and video go through `--image`, `--audio`, `--video` (interleaved after the text); `--batch`
+> takes a JSON file of named inputs. Details in [Embeddings](#embeddings-embeddinggemma-2).
 
 ### LoRA fine-tuning
 
@@ -701,6 +712,39 @@ Updates are written at most once per second (and at each phase change), atomical
 written disables itself and never fails the operation. Stale manifests left by a killed process are cleaned up
 by the next session.
 
+## Embeddings (EmbeddingGemma 2)
+
+`Gemma4Embedder` maps text, images, audio, video, or any interleaving of them, into one 768-dim unit
+vector space (EmbeddingGemma 2: bidirectional encoder with the Gemma 4 vision and audio towers, mean
+pooling, 512 → 768 projection, L2). The model itself is upstream's `MLXLMCommon.EmbeddingGemma2`
+(mlx-swift-lm 3.33); preprocessing is this package's, so `MLXVLM` stays unlinked.
+
+```swift
+import Gemma4Swift
+
+// Text-only: pass `encoders: []` (~270M parameters, vision/audio weights never read)
+let embedder = try await Gemma4Embedder.load(from: URL(fileURLWithPath: "/path/to/embeddinggemma-2"))
+
+let query = try await embedder.embed([.text("Turn off the lights")], task: .classification)
+let photo = try await embedder.embed([.image(imageURL)], task: .classification, dimensions: 256)
+let clip  = try await embedder.embed([.text("Kitchen camera"), .video(videoURL)], task: .none)
+let docs  = try await embedder.embed([[.text("…")], [.text("…")]], task: .document(title: nil))
+```
+
+- **Tasks** add the model card's instruction prefix (`classification`, `clustering`, `sentenceSimilarity`,
+  `searchQuery`, `questionAnswering`, `factChecking`, `codeRetrieval`, `document(title:)`); media-only
+  inputs get none.
+- **Parity** against sentence-transformers fp32: text ≥ 0.9997, audio 0.99998, PNG image 0.9997 (JPEG
+  0.998, decoder difference), video 0.9986.
+- **Checkpoints**: use bf16 (`google/embeddinggemma-2`) or 8-bit. The mlx-community 4-bit conversion
+  quantizes `embed_tokens` and drops to 0.97–0.99.
+- **Speed** (M3 Max, 8-bit, warm): short command 7 ms, image 190 ms, audio 37 ms for 2 s / 223 ms for 30 s, 8,000 text tokens 1 s.
+- **Memory**: the embedder does not touch `Memory.cacheLimit`. Set it in your app: 512 MB keeps the peak
+  footprint at 3.5 GB instead of 13.3 GB, for ≤ 11 % overhead.
+- **Intent routing**: embedder + logistic regression reaches 95.7 % in-scope on CLINC150 in 6.6 ms, ahead
+  of E4B few-shot (89.9 %, 130 ms); the LLM stays better at rejecting out-of-scope requests. See
+  [BENCHMARKS.md](BENCHMARKS.md).
+
 ## Library Integration
 
 ```swift
@@ -1013,6 +1057,11 @@ Gemma4Swift/
 ├── AudioEncoder/        # Conformer: SubSampleConv, chunked attention, rel positions
 ├── VideoProcessor/      # AVAsset frame extraction, ~1fps, aspect-ratio resize
 ├── Multimodal/          # Embedding fusion via masked_scatter
+├── Embedding/           # Gemma4Embedder (EmbeddingGemma 2)
+├── Speculative/         # MTP drafter, masked LM head, greedy walk, drafter training
+├── Diffusion/           # DiffusionGemma 26B-A4B (block-AR text diffusion)
+├── Download/            # Direct HTTPS model downloads, progress, status
+├── Runtime/             # Runtime beacon (SiliconScope)
 ├── LoRA/                # LoRA/DoRA/Full SFT training, adapter load/fuse/unload
 ├── TurboQuant/          # MSE codec, Metal kernels, chunked prefill attention
 ├── Pipeline/            # High-level API, processors, token filter, registration
