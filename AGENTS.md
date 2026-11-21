@@ -22,27 +22,29 @@ Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/WeightSanitizerTests
 
 ### Why the test wrapper
 
-A bare `xcodebuild ... test` **hangs forever** (0% CPU after ~250 tests). It is a
-lock-ordering deadlock in mlx-swift, not a slow test: `CompiledFunction.call`
-takes the per-function `NSLock` then the global `evalLock`
-(`Transforms+Compile.swift:39` and `:89`), while `vjp`/`jvp` — every
-`value_and_grad` — take the global `evalLock` first and then re-enter compiled
-functions during tracing (`Transforms.swift:31`, `:68`). One thread in a
-gradient (`DrafterTrainingTests`, `LoRATests`) plus one thread in a forward
-going through `geluApproximate` (a `compile`d function) is enough. `evalLock` is
-recursive, so single-threaded use never deadlocks — it takes two threads.
+Tests share process-global MLX state — `MLXRandom.seed`, `Memory` limits, the
+`Gemma4ComputeGate` — so swift-testing's default parallelism makes them interfere:
+a bare `xcodebuild ... test` fails ~70 expectations (`GradientCheckpointingTests`,
+`LoRATrainingLoopTests` reseeded by a neighbour, `DiffusionPipelineTests` hitting
+`trainingAlreadyRunning`). `Scripts/run-tests.sh` sets
+`SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1` (via the `TEST_RUNNER_` prefix, the
+only env vars xcodebuild forwards to the test process) and adds a watchdog.
 
-**This is not a test-only hazard.** Both locks are process-global, and the
-library exposes both sides: `Gemma4LoRATrain.train` is a nonisolated public
-static (runnable from any task) while `Gemma4Pipeline` is `@MainActor`. An app
-that fine-tunes on a background task while streaming inference can hit the same
-ABBA and wedge. Until upstream is fixed, do not run gradients concurrently with
-inference — serialize the two.
+Before mlx-swift 0.32 the bare run **hung forever**: a lock-ordering deadlock between
+`CompiledFunction.call` (per-function lock, then `evalLock`) and `vjp`/`jvp` (`evalLock`,
+then compiled functions re-entered during tracing). mlx-swift 0.32 fixes it (#461,
+`evalLock` taken outermost); verified 2026-10-03, three full parallel runs finish in
+3-7 s without a hang.
 
-`Scripts/run-tests.sh` sets `SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH=1`
-(via the `TEST_RUNNER_` prefix, the only env vars xcodebuild forwards to the test
-process). The whole suite then passes in ~1.2s. Drop the wrapper once the
-deadlock is fixed upstream.
+`Gemma4ComputeGate.shared` was introduced for that deadlock and is kept: the
+three gradient loops (`trainLoRA`, `trainMultimodalLoRA`,
+`Gemma4DrafterTraining.trainDrafter`) take it exclusively, and every inference entry
+point of `Gemma4Pipeline` / `Gemma4MTPPipeline` fails fast with `trainingInProgress`
+while a training runs (and training fails with `inferenceInProgress` while an
+inference runs). Running both at once on one GPU still contends for memory and the
+global random state. It is non-blocking by design and cannot see a consumer's direct
+MLX calls (forward on a `ModelContainer`, custom gradients). Any new gradient loop or
+inference entry point must take the gate.
 
 Integration tests that need a local model are gated on an env var, forwarded by
 the wrapper:
@@ -51,6 +53,14 @@ the wrapper:
 GEMMA4_INTEGRATION_MODEL_PATH=~/Library/Caches/models/mlx-community/gemma-4-e4b-it-4bit \
   Scripts/run-tests.sh -only-testing:Gemma4SwiftTests/NoRepeatNGramIntegrationTests
 ```
+
+The integration tests are model-sensitive (thinking length, rewording under n-gram
+blocking): before a dependency bump or release, run the full suite with **both** E2B and
+E4B 4-bit. Two suites need their own variables and are skipped otherwise:
+`LoRAFuseIntegrationTests` (`GEMMA4_LORA_BASE_PATH` = E2B bf16, `GEMMA4_LORA_ADAPTER_PATH`,
+`GEMMA4_LORA_FUSE_OUTPUT`, a scratch directory it deletes) and
+`DiffusionQuantizationMemoryDiagnosticTests` (`GEMMA4_DIFFUSION_MODEL_PATH`, the bf16
+26B-A4B checkpoint, ~50 GB active).
 
 ## Dependency pinning
 
@@ -77,13 +87,40 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 `MLXVLM`'s trampoline class is realized), so it can pass once and fail on the next call.
 
 **Always load via `Gemma4Registration.loadContainer(from:using:multimodal:)`**, which
-registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
-`ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
+builds a private `LLMModelFactory` whose type registry only knows the Gemma 4 types and loads
+through it, bypassing both `ModelFactoryRegistry` and the upstream entries of `LLMTypeRegistry`.
+Never call the free `loadModelContainer` for a Gemma 4 model.
+
+**Since mlx-swift-lm 3.32 the `prepare` requirement is `prepare(_:cache:state:prefill:)`**, and
+`LLMModel` ships a default for it. A model that only implements the old
+`prepare(_:cache:windowSize:)` still compiles but is **no longer called** by `TokenIterator`:
+images and audio would be skipped without any error. Our three models (text, multimodal,
+unified) implement the new requirement directly; text and multimodal chunk through
+`Gemma4ChunkedPrefill`, which drives `PrefillParameters.forEachChunk` (cancellation, progress,
+`balanced` chunking by default, `unchunked` mapped to one chunk). Keep that in mind for any new
+`LanguageModel` wrapper. `newCache(parameters:)` also `throws` since 3.32.
+
+**mlx-swift 0.33 / mlx-swift-lm 3.33** (release 1.10.0): closures passed to `CustomFunction`
+(`Forward`, `VJP`) and `compile(shapeless:_:)` must be `@Sendable`. Our only user is the gradient
+checkpoint in `Gemma4TextModel.checkpointedLayer`, whose captures are `nonisolated(unsafe)` because the
+closure runs synchronously on the calling thread. 3.33 also streams thinking as `Generation.reasoning`,
+without the delimiters, **only for models that declare a `reasoningConfig`**. Upstream's Gemma 4 does; ours
+deliberately does not, so `ChatSession` string APIs still return the thinking channel verbatim and
+`Gemma4ChatEngine` / `Gemma4TokenFilter` keep parsing it. Declaring one would silently strip
+thinking from `Gemma4Pipeline.chat` and change what the server returns.
 
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
 from `.build/*/checkouts/mlx-swift-lm/.git/packed-refs` (or delete the checkout) and
 re-resolve.
+
+## Where models live
+
+`Gemma4ModelCache.modelsDirectory` = `customModelsDirectory` (apps) → `$GEMMA4_MODELS_DIR`
+(forwarded to tests by `Scripts/run-tests.sh`) → `~/Library/Caches/models`. The internal disk of
+the dev Mac is nearly full: put weights on the external SSD (`GEMMA4_MODELS_DIR=/Volumes/Lexar/models`).
+Downloads refuse an unmounted `/Volumes/<name>`. Tests must never write to the real models
+directory (the download-manager suite uses a temporary one).
 
 ## Architecture
 
@@ -111,7 +148,7 @@ The decoder has two layer types with different configurations:
 
 `Gemma4Registration.register()` registers `"gemma4"` and `"gemma4_text"` model types with mlx-swift-lm's `LLMTypeRegistry`. Text-only vs multimodal is controlled by `register(multimodal:)`.
 
-`Gemma4Registration.loadContainer(from:using:multimodal:)` is the entry point to use: it registers, then loads through `LLMModelFactory.shared` so `ModelFactoryRegistry`'s VLM-first ordering can't hand back upstream's `MLXVLM.Gemma4` (see "Dependency pinning"). The resulting `ModelContainer` works with `ChatSession` as usual.
+`Gemma4Registration.loadContainer(from:using:multimodal:)` is the entry point to use: it loads through a private `LLMModelFactory` that only knows the Gemma 4 types, so neither upstream's Gemma 4 nor `ModelFactoryRegistry`'s VLM-first ordering (`MLXVLM.Gemma4`) can answer instead (see "Dependency pinning"). The resulting `ModelContainer` works with `ChatSession` as usual.
 
 ### Weight Loading
 
@@ -136,6 +173,21 @@ Quirks:
 - `Gemma4TextModel.forwardCollectingIntermediates` exposes the LAST decoder layer's output **BEFORE** the final RMSNorm via `preNormHidden` — the drafter's `pre_projection` was trained against pre-norm.
 - For kv-shared inference path with cache, queries get RoPE at `cache.offset - L` (pre-write offset), not `cache.offset` (post-write).
 - During training, `MaskedEmbedder` is bypassed via `useFullLMHead = true` because `putAlong` (scatter) has no VJP in MLX.
+
+### Embeddings (EmbeddingGemma 2)
+
+`Embedding/Gemma4Embedder.swift` wraps upstream's `MLXLMCommon.EmbeddingGemma2` (bidirectional encoder,
+Gemma 4 vision/audio towers, mean pooling → 512→768 projection → L2) with **this package's** preprocessing,
+so `MLXVLM` stays unlinked. Images use `Resampling.pillowBicubic` (Core Graphics costs ~0.005 cosine);
+video samples `t = i / fps` like transformers, not our generation path's spread. Parity is checked against
+sentence-transformers fp32 (`Fixtures/embeddinggemma2-reference.json`, `EmbedderIntegrationTests`, gated on
+`GEMMA4_EMBEDDING_MODEL_PATH`). Avoid the mlx-community 4-bit checkpoint (it quantizes `embed_tokens`).
+
+## Git
+
+- Branch from `main` (`feature/*`, `fix/*`, `chore/*`), PR to `main`; no `develop` branch.
+- **No `Claude-Session:` line** (session link) in commit messages, PR descriptions or release notes: the
+  repository is public. The `Co-Authored-By:` trailer and the "Generated with Claude Code" PR footer are fine.
 
 ## Key Conventions
 

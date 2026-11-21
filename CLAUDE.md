@@ -87,8 +87,9 @@ downstream as `unsupportedModelFamily` from `chatStreamMultimodal`'s
 `MLXVLM`'s trampoline class is realized), so it can pass once and fail on the next call.
 
 **Always load via `Gemma4Registration.loadContainer(from:using:multimodal:)`**, which
-registers and then calls `LLMModelFactory.shared.loadContainer` directly, bypassing
-`ModelFactoryRegistry`. Never call the free `loadModelContainer` for a Gemma 4 model.
+builds a private `LLMModelFactory` whose type registry only knows the Gemma 4 types and loads
+through it, bypassing both `ModelFactoryRegistry` and the upstream entries of `LLMTypeRegistry`.
+Never call the free `loadModelContainer` for a Gemma 4 model.
 
 **Since mlx-swift-lm 3.32 the `prepare` requirement is `prepare(_:cache:state:prefill:)`**, and
 `LLMModel` ships a default for it. A model that only implements the old
@@ -98,6 +99,15 @@ unified) implement the new requirement directly; text and multimodal chunk throu
 `Gemma4ChunkedPrefill`, which drives `PrefillParameters.forEachChunk` (cancellation, progress,
 `balanced` chunking by default, `unchunked` mapped to one chunk). Keep that in mind for any new
 `LanguageModel` wrapper. `newCache(parameters:)` also `throws` since 3.32.
+
+**mlx-swift 0.33 / mlx-swift-lm 3.33** (release 1.10.0): closures passed to `CustomFunction`
+(`Forward`, `VJP`) and `compile(shapeless:_:)` must be `@Sendable`. Our only user is the gradient
+checkpoint in `Gemma4TextModel.checkpointedLayer`, whose captures are `nonisolated(unsafe)` because the
+closure runs synchronously on the calling thread. 3.33 also streams thinking as `Generation.reasoning`,
+without the delimiters, **only for models that declare a `reasoningConfig`**. Upstream's Gemma 4 does; ours
+deliberately does not, so `ChatSession` string APIs still return the thinking channel verbatim and
+`Gemma4ChatEngine` / `Gemma4TokenFilter` keep parsing it. Declaring one would silently strip
+thinking from `Gemma4Pipeline.chat` and change what the server returns.
 
 If `swift package resolve` fails with `bad object refs/remotes/origin/<branch>`, a cached
 SwiftPM checkout holds a ref to an upstream branch that was deleted. Drop the stale line
@@ -138,7 +148,7 @@ The decoder has two layer types with different configurations:
 
 `Gemma4Registration.register()` registers `"gemma4"` and `"gemma4_text"` model types with mlx-swift-lm's `LLMTypeRegistry`. Text-only vs multimodal is controlled by `register(multimodal:)`.
 
-`Gemma4Registration.loadContainer(from:using:multimodal:)` is the entry point to use: it registers, then loads through `LLMModelFactory.shared` so `ModelFactoryRegistry`'s VLM-first ordering can't hand back upstream's `MLXVLM.Gemma4` (see "Dependency pinning"). The resulting `ModelContainer` works with `ChatSession` as usual.
+`Gemma4Registration.loadContainer(from:using:multimodal:)` is the entry point to use: it loads through a private `LLMModelFactory` that only knows the Gemma 4 types, so neither upstream's Gemma 4 nor `ModelFactoryRegistry`'s VLM-first ordering (`MLXVLM.Gemma4`) can answer instead (see "Dependency pinning"). The resulting `ModelContainer` works with `ChatSession` as usual.
 
 ### Weight Loading
 
@@ -172,6 +182,12 @@ so `MLXVLM` stays unlinked. Images use `Resampling.pillowBicubic` (Core Graphics
 video samples `t = i / fps` like transformers, not our generation path's spread. Parity is checked against
 sentence-transformers fp32 (`Fixtures/embeddinggemma2-reference.json`, `EmbedderIntegrationTests`, gated on
 `GEMMA4_EMBEDDING_MODEL_PATH`). Avoid the mlx-community 4-bit checkpoint (it quantizes `embed_tokens`).
+
+## Git
+
+- Branch from `main` (`feature/*`, `fix/*`, `chore/*`), PR to `main`; no `develop` branch.
+- **No `Claude-Session:` line** (session link) in commit messages, PR descriptions or release notes: the
+  repository is public. The `Co-Authored-By:` trailer and the "Generated with Claude Code" PR footer are fine.
 
 ## Key Conventions
 
